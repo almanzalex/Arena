@@ -45,6 +45,28 @@ class RuntimeFailure(RlxError):
         self.details = details or {}
 
 
+class TaskRuntimeError(RlxError):
+    """Failure reported by an external task transport before runtime accounting.
+
+    Task adapters use this narrow error to preserve disconnect, remote crash, and
+    transport timeout semantics. Match runners convert it into ``RuntimeFailure``
+    records instead of collapsing every external failure into ``crash``.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        kind: str,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        if kind not in {"disconnect", "container_crash", "timeout", "protocol_error"}:
+            raise ValueError(f"invalid task runtime failure kind: {kind!r}")
+        super().__init__(message)
+        self.kind = kind
+        self.details = details or {}
+
+
 @dataclass
 class CompatibilityIssue:
     code: str

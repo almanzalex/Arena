@@ -20,6 +20,8 @@ EVAL_RUN_SCHEMA = "rlx.eval-run/v0alpha1"
 EVAL_REPORT_SCHEMA = "rlx.eval-report/v0alpha1"
 DATASET_SCHEMA = "rlx.dataset/v0alpha1"
 EVAL_BUNDLE_SCHEMA = "rlx.eval-bundle/v0alpha1"
+TASK_SCHEMA = "rlx.task/v0alpha1"
+TRACE_SUITE_SCHEMA = "rlx.trace-suite/v1"
 
 
 def load_manifest(path: Path | str) -> dict[str, Any]:
@@ -110,6 +112,58 @@ def validate_policy_manifest(data: dict[str, Any]) -> dict[str, Any]:
             architecture=data["architecture"],
             adapter="custom-pytorch",
         )
+    return data
+
+
+def validate_task_manifest(data: dict[str, Any]) -> dict[str, Any]:
+    if data.get("schema") != TASK_SCHEMA:
+        raise SchemaError(f"expected schema {TASK_SCHEMA}, got {data.get('schema')!r}")
+    for key in ("name", "adapter", "env", "interaction"):
+        if not data.get(key):
+            raise SchemaError(f"task manifest missing required field: {key}")
+    if data["interaction"] not in {"parallel", "aec"}:
+        raise SchemaError("task interaction must be parallel|aec")
+    declared = data.get("digest")
+    if declared is not None:
+        actual = task_content_digest(data)
+        if declared != actual:
+            raise SchemaError(
+                f"task digest mismatch: declared {declared!r}, actual {actual!r}"
+            )
+    return data
+
+
+def task_content_digest(data: dict[str, Any]) -> str:
+    def identity_value(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: identity_value(item)
+                for key, item in value.items()
+                if not str(key).startswith("_")
+            }
+        if isinstance(value, list):
+            return [identity_value(item) for item in value]
+        return value
+
+    identity = {
+        key: identity_value(value)
+        for key, value in data.items()
+        if key not in {"name", "digest"} and not str(key).startswith("_")
+    }
+    return digest_uri(sha256_bytes(canonical_json(identity)))
+
+
+def validate_trace_suite(data: dict[str, Any]) -> dict[str, Any]:
+    if data.get("schema") != TRACE_SUITE_SCHEMA:
+        raise SchemaError(
+            f"expected schema {TRACE_SUITE_SCHEMA}, got {data.get('schema')!r}"
+        )
+    episodes = data.get("episodes")
+    if not isinstance(episodes, list) or not episodes:
+        raise SchemaError("trace suite requires a non-empty episodes list")
+    for i, episode in enumerate(episodes):
+        if not isinstance(episode, dict) or not isinstance(episode.get("actions"), list):
+            raise SchemaError(f"trace suite episodes[{i}] requires actions list")
     return data
 
 
@@ -250,10 +304,25 @@ def validate_evaluation_manifest(data: dict[str, Any]) -> dict[str, Any]:
             raise SchemaError(f"evaluation manifest missing required field: {key}")
     if data["action_mode"] not in {"deterministic", "stochastic"}:
         raise SchemaError("action_mode must be deterministic|stochastic")
+    provider = data.get("provider", "native")
+    if not isinstance(provider, str) or not provider:
+        raise SchemaError("evaluation provider must be a non-empty string")
+    provider_config = data.get("provider_config", {})
+    if not isinstance(provider_config, dict):
+        raise SchemaError("evaluation provider_config must be a mapping")
+    from rlx.core.registry import EVAL_PROVIDERS, ensure_plugins_loaded
+
+    ensure_plugins_loaded()
+    EVAL_PROVIDERS.get(provider)
     interaction = data.get("interaction", "parallel")
     if interaction not in {"parallel", "aec"}:
         raise SchemaError("interaction must be parallel|aec")
-    data = {**data, "interaction": interaction}
+    data = {
+        **data,
+        "interaction": interaction,
+        "provider": provider,
+        "provider_config": provider_config,
+    }
     assignments = data["assignments"]
     if not isinstance(assignments, dict) or not assignments:
         raise SchemaError("assignments must be a non-empty mapping")
@@ -291,7 +360,7 @@ def validate_evaluation_manifest(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def evaluation_content_digest(data: dict[str, Any]) -> str:
-    identity = {
+    identity: dict[str, Any] = {
         "schema": EVALUATION_SCHEMA,
         "task": data.get("task"),
         "interaction": data.get("interaction", "parallel"),
@@ -305,6 +374,14 @@ def evaluation_content_digest(data: dict[str, Any]) -> str:
         "sampling": data.get("sampling"),
         "recording": data.get("recording"),
     }
+    provider = data.get("provider", "native")
+    provider_config = data.get("provider_config", {})
+    # Preserve 0.2 native-suite identities: the implicit/explicit native provider
+    # with empty config is semantically the old execution path. Non-native
+    # providers and configured providers remain identity-bearing.
+    if provider != "native" or provider_config:
+        identity["provider"] = provider
+        identity["provider_config"] = provider_config
     return digest_uri(sha256_bytes(canonical_json(identity)))
 
 

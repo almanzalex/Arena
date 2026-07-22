@@ -18,6 +18,7 @@ from rlx.core.manifests import (
     evaluation_content_digest,
     expand_seeds,
     load_manifest,
+    task_content_digest,
     validate_eval_run_manifest,
     validate_evaluation_manifest,
 )
@@ -46,6 +47,32 @@ def _policy_from_digest_or_path(
 def load_evaluation(path: Path | str) -> dict[str, Any]:
     data = load_manifest(path)
     return validate_evaluation_manifest(data)
+
+
+def _identity_suite(
+    suite: dict[str, Any], *, policy_index: dict[str, Path]
+) -> dict[str, Any]:
+    """Replace movable policy paths/names with immutable policy digests."""
+    assignments: dict[str, Any] = {}
+    for role, spec in suite["assignments"].items():
+        if isinstance(spec, str):
+            try:
+                assignments[role] = _policy_from_digest_or_path(
+                    spec, policy_index=policy_index
+                ).digest
+            except SchemaError:
+                assignments[role] = spec
+        elif isinstance(spec, dict) and spec.get("kind", "policy") == "policy":
+            key = "policy" if "policy" in spec else "ref"
+            ref = str(spec[key])
+            try:
+                digest = _policy_from_digest_or_path(ref, policy_index=policy_index).digest
+            except SchemaError:
+                digest = ref
+            assignments[role] = {**spec, key: digest}
+        else:
+            assignments[role] = spec
+    return {**suite, "assignments": assignments}
 
 
 def validate_evaluation(
@@ -133,7 +160,7 @@ def expand_evaluation_cells(
 
     if len(cross_roles) > 2:
         raise SchemaError(
-            "0.2.0 supports at most two crossplay/population assignment roles "
+            "RLX 0.3 supports at most two crossplay/population assignment roles "
             "(cartesian cross-play matrix)"
         )
 
@@ -192,6 +219,39 @@ def run_evaluation(
     out_dir: Path | None = None,
     workers: int = 1,
     record: bool = True,
+    provider: str | None = None,
+) -> dict[str, Any]:
+    """Dispatch a suite through the registered evaluation-provider axis."""
+    from rlx.core.registry import EVAL_PROVIDERS, ensure_plugins_loaded
+
+    suite = validate_evaluation_manifest(dict(suite))
+    provider_kind = provider or str(suite.get("provider", "native"))
+    if provider is not None:
+        suite = {**suite, "provider": provider_kind}
+    ensure_plugins_loaded()
+    return EVAL_PROVIDERS.get(provider_kind).run(
+        suite,
+        identity_suite=_identity_suite(suite, policy_index=policy_index),
+        policy_index=policy_index,
+        populations=populations,
+        store=store,
+        out_dir=out_dir,
+        workers=workers,
+        record=record,
+    )
+
+
+def _run_native_evaluation(
+    suite: dict[str, Any],
+    *,
+    policy_index: dict[str, Path],
+    populations: dict[str, dict[str, Any]] | None = None,
+    store: LocalStore | None = None,
+    out_dir: Path | None = None,
+    workers: int = 1,
+    record: bool = True,
+    provider_lineage: dict[str, Any] | None = None,
+    identity_suite: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Validate, expand, run match jobs, and write an eval-run record.
 
@@ -206,7 +266,7 @@ def run_evaluation(
     interaction = suite.get("interaction", "parallel")
     _run = get_interaction(interaction).run_match
     cells, ledger = expand_evaluation_cells(suite, populations=populations)
-    suite_digest = evaluation_content_digest(suite)
+    suite_digest = evaluation_content_digest(identity_suite or suite)
     run_id = f"eval-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{sha256_canonical(suite_digest)[:8]}"
     if out_dir is not None:
         run_root = Path(out_dir)
@@ -226,9 +286,18 @@ def run_evaluation(
     }:
         task_spec["env"] = "rlx/competitive_rps_aec_v0"
     task_info = describe_task(task_spec)
+    identity_task = dict((identity_suite or suite)["task"])
+    task_digest = task_content_digest(identity_task)
+    provider_lineage = provider_lineage or {
+        "kind": "native",
+        "version": "rlx-native-0.3",
+        "config_digest": digest_uri(
+            sha256_bytes(canonical_json((identity_suite or suite).get("provider_config") or {}))
+        ),
+    }
     if bool(task_info.get("dynamic_agents")):
         raise SchemaError(
-            "Dynamic agent birth/removal is unsupported in RLX 0.2.0. "
+            "Dynamic agent birth/removal is outside RLX 0.3 (RFC 005 is parked). "
             "To add support: implement agent lifecycle linked to policy state, "
             "register an interaction/task case, add conformance tests, and run "
             "`rlx adapter qualify` before claiming support."
@@ -290,6 +359,11 @@ def run_evaluation(
                 "episodes": episodes,
                 "evidence_refs": evidence_refs,
                 "failures": len(result.get("failures") or []),
+                "lineage": {
+                    "policy_digests": sorted(set(cell["assignments"].values())),
+                    "task_digest": task_digest,
+                    "provider": provider_lineage,
+                },
             }
         )
 
@@ -310,15 +384,18 @@ def run_evaluation(
                 "evidence_refs": c["evidence_refs"],
                 "candidate_policy": c.get("candidate_policy"),
                 "opponent_policy": c.get("opponent_policy"),
+                "lineage": c["lineage"],
             }
             for c in cell_results
         ],
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "task_digest": task_digest,
+        "provider": provider_lineage,
     }
     validate_eval_run_manifest(eval_run)
     dump_yaml(eval_run, run_root / "eval_run.yaml")
     dump_json(eval_run, run_root / "eval_run.json")
-    dump_yaml(suite, run_root / "suite.yaml")
+    dump_yaml(identity_suite or suite, run_root / "suite.yaml")
     # Attach rich cell results for metrics (not all duplicated into schema-minimal yaml).
     eval_run["cell_results"] = cell_results
     eval_run["suite"] = suite
@@ -358,6 +435,8 @@ def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
         "eval_run_digest": eval_run.get("object_digest")
         or digest_uri(sha256_bytes(canonical_json(eval_run.get("cells")))),
         "metrics": computed,
+        "provider": eval_run.get("provider") or {"kind": "native"},
+        "task_digest": eval_run.get("task_digest"),
         "nontransitivity_warning": (computed.get("payoff_matrix") or {}).get(
             "nontransitivity_warning"
         ),

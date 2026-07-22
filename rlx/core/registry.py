@@ -161,6 +161,20 @@ TASK_PACKAGERS: Registry[Any] = Registry(
     tests="make_env dispatch + trust defaults for entrypoint_bundle",
 )
 
+EVAL_PROVIDERS: Registry[Any] = Registry(
+    "eval_provider",
+    interface="rlx.plugins.eval_providers.EvalProvider",
+    register_via="rlx.plugins.eval_providers.register_eval_provider(kind, provider)",
+    tests="provider config identity + complete lineage + native-offline regression",
+)
+
+EXTERNAL_STORES: Registry[Any] = Registry(
+    "external_store",
+    interface="rlx.plugins.stores.ExternalStoreAdapter",
+    register_via="rlx.plugins.stores.register_store_adapter(scheme, adapter)",
+    tests="byte-identical push/pull --verify + tamper rejection + offline-core regression",
+)
+
 
 def ensure_plugins_loaded() -> None:
     """Idempotently register built-in cases (import side-effect safe)."""
@@ -179,6 +193,8 @@ def capability_matrix() -> dict[str, list[str]]:
         "wrapper": sorted(WRAPPER_OPS.known()),
         "payload": sorted(PAYLOAD_LOADERS.known()),
         "task_packaging": sorted(TASK_PACKAGERS.known()),
+        "eval_provider": sorted(EVAL_PROVIDERS.known()),
+        "external_store": sorted(EXTERNAL_STORES.known()),
     }
 
 

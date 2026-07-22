@@ -1,7 +1,7 @@
 # RFC 008 — Gimitest Evaluation Provider (RLX 0.3)
 
-**Status:** Draft for 0.3  
-**Date:** 2026-07-21  
+**Status:** Accepted and implemented in 0.3
+**Date:** 2026-07-21
 **Depends on:** RFC 000, RFC 004
 
 ## User promise
@@ -37,9 +37,17 @@ Providers are a **registry axis** (like metrics/samplers): unknown provider → 
 
 ## Non-goals
 
-- Reimplementing Gimitest inside RLX  
-- Requiring Gimitest for ordinary cross-play  
+- Reimplementing Gimitest inside RLX
+- Requiring Gimitest for ordinary cross-play
 
 ## Exit evidence
 
 One robustness eval fixture qualifies; disabling the extra leaves `native` eval green (I-03).
+
+## Frozen implementation
+
+`examples/eval/robustness.yaml` uses Gimitest 1.0 base hooks. Eval-run/report records
+provider version, provider-config digest, task digest, and policy digests for every cell.
+Gimitest 1.0's published Gymnasium 0.29.1 pin conflicts with current PettingZoo; the
+documented install keeps current Gymnasium and installs the provider package with
+`--no-deps`. The provider is never imported on native evaluation paths.

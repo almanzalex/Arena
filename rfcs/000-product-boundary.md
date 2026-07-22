@@ -1,6 +1,6 @@
 # RFC 000 — Product Boundary (RLX)
 
-**Status:** Accepted for MVP 0.1; Stage **0.2 done**; Stage **0.3 specified / ready to execute**  
+**Status:** Accepted; Stages **0.1, 0.2, and 0.3 done**
 **Date:** 2026-07-16 (updated 2026-07-21)
 
 ## Stage table
@@ -9,12 +9,12 @@
 |-------|--------|--------|
 | **0.1** | Done | Portable policy handoff, Parallel matches, trajectories, registries |
 | **0.2** | Done | Populations, versioned evaluation, AEC, slicing, eval bundles |
-| **0.3** | Specified | OpenEnv, OpenSpiel, Gimitest provider, external stores ([docs/0.3-delivery.md](../docs/0.3-delivery.md)) |
+| **0.3** | Done | OpenEnv, one OpenSpiel game, Gimitest provider, file/HF stores ([docs/0.3-complete.md](../docs/0.3-complete.md)) |
 | **0.4+** | Deferred | Training recipes, dataset export/reuse |
 
 Handoff: [docs/0.2-complete.md](../docs/0.2-complete.md). Parked: [RFC 005 dynamic agents](005-dynamic-agents.md).
 
-## Pilot pair (frozen)
+## Native pilot pair (frozen)
 
 | Role | Choice | Rationale |
 |------|--------|-----------|
@@ -22,6 +22,15 @@ Handoff: [docs/0.2-complete.md](../docs/0.2-complete.md). Parked: [RFC 005 dynam
 | Policies | Simple custom PyTorch categorical actors (feed-forward MLP templates shipped inside the `custom-pytorch` adapter) | No training-repo imports at load time; weights + architecture + preprocessing live in the policy bundle. |
 
 Conformance fixtures F1–F4 exercise Gymnasium-compatible observation/action contracts against these templates. Fixture F5 runs the RPS Parallel task end-to-end. Fixture F6 is the AEC twin. A checked-in cyclic eval demo lives at `examples/eval/demo/` (`bash examples/eval/run_demo.sh`). Deferred maximal-claim items: `docs/0.2-revisit.md`.
+
+## 0.3 external pilots (frozen)
+
+| Integration | Frozen scope |
+|---|---|
+| OpenEnv | OpenEnv 0.4.x WebSocket transport serving the existing Parallel competitive RPS twin |
+| OpenSpiel | OpenSpiel 2.x game id `tic_tac_toe`, AEC only |
+| Gimitest | Gimitest 1.0 `GTest` provider hooks with content-addressed provider config |
+| Stores | `file://` reference backend and Hugging Face Hub `hf://` backend |
 
 ## What RLX owns
 
@@ -37,8 +46,8 @@ Conformance fixtures F1–F4 exercise Gymnasium-compatible observation/action co
 
 - Hosted services, auth, billing, telemetry, dashboards
 - Training algorithms or recipe execution
-- OpenEnv, RLlib, Gimitest (0.3 adapters; not reimplemented cores)
-- External registries / cloud stores (0.3 optional adapters; local `.rlx/` remains default)
+- OpenEnv, OpenSpiel, and Gimitest internals (0.3 owns adapters only, not upstream cores)
+- Hosted registries / cloud services (0.3 mirrors to user-owned file/HF stores; local `.rlx/` remains default)
 - Populations / cross-play / AEC are **0.2** (done; see RFC 003/004)
 - Dynamic agent lifecycle: **fail loud** until RFC 005 is implemented and qualified
 - Training recipes: **0.4** (not 0.3)
@@ -82,7 +91,7 @@ Conformance fixtures F1–F4 exercise Gymnasium-compatible observation/action co
 
 - Schema ids: `rlx.policy/v0alpha1`, `rlx.match/v0alpha1`, `rlx.trajectory/v0alpha1`
 - Unknown manifest fields are preserved where possible (forward compatibility)
-- Package version tracks the CLI/SDK release (0.2.0 for populations + evaluation)
+- Package version tracks the CLI/SDK release (0.3.0 for external integrations)
 
 ## Acceptance gates (testable)
 

@@ -46,4 +46,6 @@ lineage:
   action: 2
   pilot: rlx/competitive_rps_v0
 conformance:
-  status: unverified
+  status: verified
+  cases: 11
+  verify_mode: source-conformance

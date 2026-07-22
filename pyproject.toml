@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rlx"
-version = "0.2.0"
-description = "Local-first interoperability layer for portable RL policies, populations, and evaluation"
+version = "0.3.0"
+description = "Portable RL policy/evaluation interoperability across native and external runtimes"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
@@ -20,14 +20,21 @@ dependencies = [
 torch = ["torch>=2.2"]
 pettingzoo = ["pettingzoo>=1.24", "gymnasium>=0.29", "mpe2>=1.0"]
 wrappers = ["supersuit>=3.9"]
+openenv = ["openenv>=0.4.1,<0.5", "rlx[pettingzoo]"]
+openspiel = ["open_spiel>=2.0.1,<3", "gymnasium>=1.0"]
+hf = ["huggingface_hub>=0.27"]
+# Gimitest 1.0 pins Gymnasium 0.29.1 while current PettingZoo requires >=1.0.
+# It is deliberately not expressed as a co-installable extra; docs use a
+# compatibility-checked `pip install --no-deps gimitest==1.0` provider install.
 all = ["rlx[torch,pettingzoo,wrappers]"]
+integrations = ["rlx[openenv,openspiel,hf]"]
 dev = [
   "pytest>=8.0",
   "pytest-cov>=5.0",
   "ruff>=0.4",
   "build>=1.2",
   "hatchling>=1.21",
-  "rlx[all]",
+  "rlx[all,integrations]",
 ]
 
 [project.scripts]
@@ -51,6 +58,9 @@ markers = [
   "requires_pettingzoo: needs pettingzoo extra",
   "slow: slow gates (wheel build + hermetic venv install)",
   "docker: hermetic gate that requires a working Docker daemon",
+  "requires_openenv: needs the OpenEnv extra",
+  "requires_openspiel: needs the OpenSpiel extra",
+  "requires_gimitest: needs a compatible Gimitest provider install",
 ]
 
 [tool.ruff]

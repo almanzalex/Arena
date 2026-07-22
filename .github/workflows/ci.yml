@@ -21,6 +21,10 @@ jobs:
           # CPU-only torch keeps the runner small/fast (no CUDA wheels).
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -e '.[dev]'
+          # Gimitest 1.0 publishes an obsolete Gymnasium pin. RLX tests the
+          # provider against the already-resolved native stack without allowing
+          # that pin to downgrade PettingZoo's runtime dependency.
+          pip install --no-deps gimitest==1.0
       - name: Ruff
         run: ruff check .
       - name: Pytest (fast default selection)

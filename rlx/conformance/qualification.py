@@ -69,6 +69,54 @@ def _resolve_policy_path(ref: str | Path, *, base: Path) -> Path | None:
     return path if path.exists() else None
 
 
+def qualify_task_fixture(
+    fixture: Path | str,
+    *,
+    peer: Path | str | None,
+    trace_suite: Path | str,
+    report_path: Path | str | None = None,
+) -> dict[str, Any]:
+    """Qualify a registered task packager against a peer or frozen trace digest."""
+    from rlx.adapters.task_pettingzoo.adapter import describe_task
+    from rlx.core.manifests import load_manifest
+    from rlx.core.tasks import load_task_spec, verify_task_equivalence
+
+    started = _utc_now()
+    task = load_task_spec(fixture)
+    peer_task = load_task_spec(peer) if peer is not None else None
+    suite = load_manifest(trace_suite)
+    description = describe_task(task)
+    equivalence = verify_task_equivalence(task, peer_task, suite)
+    checks = {
+        "immutable_contract": {
+            "ok": bool(description.get("roles")) and bool(description.get("version")),
+            "adapter": description.get("adapter"),
+            "version": description.get("version"),
+            "agents": description.get("agents"),
+        },
+        "trace_equivalence": {"ok": equivalence["ok"], **equivalence},
+        "failure_semantics": {
+            "ok": description.get("adapter") != "openenv"
+            or description.get("transport", {}).get("kind") == "openenv",
+            "evidence": "TaskRuntimeError preserves disconnect/container_crash/timeout/protocol_error",
+        },
+    }
+    report = {
+        "schema": "rlx.adapter-qualification/v1",
+        "fixture": str(Path(fixture).resolve()),
+        "peer": str(Path(peer).resolve()) if peer is not None else None,
+        "adapter": description.get("adapter"),
+        "kind": "task",
+        "started_at": started,
+        "finished_at": _utc_now(),
+        "ok": all(check["ok"] for check in checks.values()),
+        "checks": checks,
+    }
+    if report_path:
+        dump_json(report, report_path)
+    return report
+
+
 def qualify_evaluation_fixture(
     fixture: Path | str,
     *,
@@ -222,6 +270,22 @@ def qualify_evaluation_fixture(
         if report.get("nontransitivity_warning") and payoff.get("ranking") is not None:
             raise ConformanceError("non-transitive report emitted a ranking")
 
+        provider = r1.get("provider") or {}
+        if suite.get("provider", "native") != "native":
+            lineages = [cell.get("lineage") or {} for cell in r1.get("cells") or []]
+            complete = bool(provider.get("config_digest")) and all(
+                lineage.get("task_digest")
+                and lineage.get("policy_digests")
+                and (lineage.get("provider") or {}).get("config_digest")
+                == provider.get("config_digest")
+                for lineage in lineages
+            )
+            checks["provider_lineage"] = {
+                "ok": complete,
+                "provider": provider,
+                "cells": len(lineages),
+            }
+
         checks["offline_eval_clean_room"] = {
             "ok": True,
             "evidence": "tests/acceptance/test_eval_hermetic.py::test_eval_hermetic_venv",
@@ -231,7 +295,12 @@ def qualify_evaluation_fixture(
     out = {
         "schema": "rlx.adapter-qualification/v1",
         "fixture": str(fixture),
-        "adapter": "custom-pytorch + pettingzoo-parallel + evaluation/0.2",
+        "adapter": (
+            "custom-pytorch + "
+            + str((suite.get("task") or {}).get("adapter", "pettingzoo-parallel"))
+            + " + evaluation-provider/"
+            + str(suite.get("provider", "native"))
+        ),
         "kind": "evaluation",
         "started_at": started,
         "finished_at": _utc_now(),
@@ -339,7 +408,11 @@ def qualify_adapter_fixture(
     report = {
         "schema": "rlx.adapter-qualification/v1",
         "fixture": str(fixture),
-        "adapter": "custom-pytorch + pettingzoo-parallel",
+        "adapter": "custom-pytorch + " + str(
+            (match.get("task") or {}).get("adapter", "pettingzoo-parallel")
+            if isinstance(match.get("task"), dict)
+            else "task-manifest"
+        ),
         "kind": "match",
         "started_at": started,
         "finished_at": _utc_now(),

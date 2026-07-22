@@ -1,0 +1,9 @@
+schema: rlx.task/v0alpha1
+name: task:openspiel-tic-tac-toe@0.3
+adapter: openspiel
+env: openspiel://tic_tac_toe
+interaction: aec
+version: open_spiel-2:tic_tac_toe
+packaging:
+  kind: openspiel
+digest: sha256:d42f14d1ad3cc74a1c5599dde335a5d9a48451c10144184036d5643a5f1425af

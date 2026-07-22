@@ -13,8 +13,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="rlx",
         description=(
-            "RLX 0.2 — portable policies, populations, and versioned evaluation "
-            "(Parallel + AEC); Discrete templates plus BYO TorchScript actors"
+            "RLX 0.3 — portable policies/evaluation across native and external task "
+            "runtimes, robustness providers, and identity-preserving artifact mirrors"
         ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -204,6 +204,26 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
 
+    p_task = sub.add_parser("task", help="Import external tasks and verify trace semantics")
+    p_t = p_task.add_subparsers(dest="task_command", required=True)
+    p_ti = p_t.add_parser("import", help="Import and identity-pin a registered external task")
+    p_ti.add_argument("source", help="openenv://host/env or openspiel://tic_tac_toe")
+    p_ti.add_argument("--name", required=True)
+    p_ti.add_argument("--out", default=None, help="Task YAML output (defaults from --name)")
+    p_ti.add_argument("--contract", default=None, help="RLX role-space contract YAML")
+    p_ti.add_argument("--source-revision", default=None)
+    p_ti.add_argument("--timeout", type=float, default=10.0)
+    p_ti.add_argument("--json", action="store_true")
+    p_tv = p_t.add_parser(
+        "verify-equivalence",
+        help="Compare seeded observations/actions/rewards/done semantics from a trace suite",
+    )
+    p_tv.add_argument("left")
+    p_tv.add_argument("right", nargs="?", default=None)
+    p_tv.add_argument("--trace-suite", required=True)
+    p_tv.add_argument("--out", default=None)
+    p_tv.add_argument("--json", action="store_true")
+
     p_data = sub.add_parser("data", help="Data commands")
     p_d = p_data.add_subparsers(dest="data_command", required=True)
     p_di = p_d.add_parser("inspect", help="Inspect a trajectory bundle")
@@ -259,6 +279,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_erun.add_argument("--out", default=None)
     p_erun.add_argument("--workers", type=int, default=1)
+    p_erun.add_argument("--provider", default=None, help="Override native|gimitest provider")
     p_erun.add_argument("--json", action="store_true")
     p_erep = p_e.add_parser("report", help="Build metrics report from an eval run directory")
     p_erep.add_argument("run_dir")
@@ -287,6 +308,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_aq.add_argument("fixture", help="Match YAML fixture with policy bundle assignments")
     p_aq.add_argument("--out", required=True, help="Machine-readable qualification report JSON")
+    p_aq.add_argument("--peer", default=None, help="Peer task YAML for equivalence qualification")
+    p_aq.add_argument("--trace-suite", default=None, help="Trace suite for task qualification")
 
     p_capture = sub.add_parser(
         "capture",
@@ -304,6 +327,18 @@ def main(argv: list[str] | None = None) -> int:
     p_capture.add_argument("--out", default=None, help="Write draft JSON to this path")
     p_capture.add_argument("--json", action="store_true", help="Print draft as JSON")
 
+    p_push = sub.add_parser("push", help="Mirror an RLX artifact without changing identity")
+    p_push.add_argument("source", help="Artifact path, object digest, or local ref")
+    p_push.add_argument("destination", help="file:// or hf:// store URI")
+    p_push.add_argument("--verify", action="store_true")
+    p_push.add_argument("--json", action="store_true")
+
+    p_pull = sub.add_parser("pull", help="Restore a mirrored RLX artifact")
+    p_pull.add_argument("source", help="Artifact URI returned by `rlx push`")
+    p_pull.add_argument("--out", default=None, help="Restore directory (defaults from identity)")
+    p_pull.add_argument("--verify", action="store_true")
+    p_pull.add_argument("--json", action="store_true")
+
     args = parser.parse_args(argv)
     try:
         if args.command == "init":
@@ -319,6 +354,11 @@ def main(argv: list[str] | None = None) -> int:
                 return cmd_policy_verify(args)
         if args.command == "match" and args.match_command == "run":
             return cmd_match_run(args)
+        if args.command == "task":
+            if args.task_command == "import":
+                return cmd_task_import(args)
+            if args.task_command == "verify-equivalence":
+                return cmd_task_verify_equivalence(args)
         if args.command == "data":
             if args.data_command == "inspect":
                 return cmd_data_inspect(args)
@@ -344,6 +384,10 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_adapter_qualify(args)
         if args.command == "capture":
             return cmd_capture(args)
+        if args.command == "push":
+            return cmd_push(args)
+        if args.command == "pull":
+            return cmd_pull(args)
     except Exception as e:  # noqa: BLE001
         print(f"error: {e}", file=sys.stderr)
         return 1
@@ -585,7 +629,13 @@ def cmd_match_run(args: argparse.Namespace) -> int:
 
     path = Path(args.match_manifest)
     data = validate_match_manifest(load_manifest(path))
-    task_spec = dict(data["task"]) if isinstance(data["task"], dict) else {"env": data["task"]}
+    if isinstance(data["task"], dict):
+        task_spec = dict(data["task"])
+    else:
+        task_ref = Path(str(data["task"]))
+        if not task_ref.is_absolute():
+            task_ref = (path.parent / task_ref).resolve()
+        task_spec = dict(Task.load(task_ref if task_ref.exists() else data["task"]).spec)
     if getattr(args, "trust_task_code", False):
         task_spec["trust_task_code"] = True
         packaging = dict(task_spec.get("packaging") or {})
@@ -614,6 +664,65 @@ def cmd_match_run(args: argparse.Namespace) -> int:
     if out:
         print(f"  output={out}")
     return 0 if result["outcome"]["failure_count"] == 0 else 1
+
+
+def cmd_task_import(args: argparse.Namespace) -> int:
+    from rlx.core.manifests import TASK_SCHEMA, dump_yaml, task_content_digest
+
+    out = args.out or (args.name.replace(":", "-").replace("@", "-") + ".yaml")
+    if args.source.startswith("openenv://"):
+        from rlx.core.tasks import import_openenv_task
+
+        manifest = import_openenv_task(
+            args.source,
+            name=args.name,
+            out=out,
+            contract_path=args.contract,
+            source_revision=args.source_revision,
+            timeout_seconds=args.timeout,
+        )
+    elif args.source == "openspiel://tic_tac_toe":
+        from rlx.adapters.task_openspiel import OpenSpielPackager
+
+        manifest = {
+            "schema": TASK_SCHEMA,
+            "name": args.name,
+            "adapter": "openspiel",
+            "env": args.source,
+            "interaction": "aec",
+            "packaging": {"kind": "openspiel"},
+        }
+        description = OpenSpielPackager().describe_task(manifest)
+        manifest["version"] = description["version"]
+        if args.source_revision:
+            manifest["source_revision"] = args.source_revision
+        manifest["digest"] = task_content_digest(manifest)
+        dump_yaml(manifest, out)
+    else:
+        from rlx.core.registry import TASK_PACKAGERS, ensure_plugins_loaded
+
+        ensure_plugins_loaded()
+        scheme = args.source.split(":", 1)[0]
+        TASK_PACKAGERS.get(scheme)
+        raise SystemExit(f"task import for registered scheme {scheme!r} has no importer")
+    _print(manifest, as_json=args.json)
+    return 0
+
+
+def cmd_task_verify_equivalence(args: argparse.Namespace) -> int:
+    from rlx.core.manifests import dump_json, load_manifest
+    from rlx.core.tasks import load_task_spec, verify_task_equivalence
+
+    suite = load_manifest(args.trace_suite)
+    result = verify_task_equivalence(
+        load_task_spec(args.left),
+        load_task_spec(args.right) if args.right else None,
+        suite,
+    )
+    if args.out:
+        dump_json(result, args.out)
+    _print(result, as_json=args.json)
+    return 0
 
 
 def cmd_data_inspect(args: argparse.Namespace) -> int:
@@ -771,6 +880,15 @@ def cmd_eval_run(args: argparse.Namespace) -> int:
                 raise SystemExit(f"population {pref!r} not provided for eval run")
             assigns[role] = {**spec, "population": pop["digest"]}
             populations[pop["digest"]] = pop
+        elif isinstance(spec, str):
+            candidate = Path(spec) if Path(spec).is_absolute() else (base / spec)
+            assigns[role] = str(candidate.resolve()) if candidate.exists() else spec
+        elif isinstance(spec, dict) and spec.get("kind", "policy") == "policy":
+            pref = str(spec.get("policy") or spec.get("ref"))
+            candidate = Path(pref) if Path(pref).is_absolute() else (base / pref)
+            resolved = str(candidate.resolve()) if candidate.exists() else pref
+            key = "policy" if "policy" in spec else "ref"
+            assigns[role] = {**spec, key: resolved}
         else:
             assigns[role] = spec
     suite = {**suite, "assignments": assigns}
@@ -782,6 +900,7 @@ def cmd_eval_run(args: argparse.Namespace) -> int:
         store=store,
         out_dir=Path(args.out) if args.out else None,
         workers=args.workers,
+        provider=args.provider,
     )
     summary = {
         "run_id": result["run_id"],
@@ -876,9 +995,20 @@ def cmd_release_build(args: argparse.Namespace) -> int:
 
 
 def cmd_adapter_qualify(args: argparse.Namespace) -> int:
-    from rlx.conformance.qualification import qualify_adapter_fixture
+    from rlx.conformance.qualification import (
+        qualify_adapter_fixture,
+        qualify_task_fixture,
+    )
 
-    report = qualify_adapter_fixture(args.fixture, report_path=args.out)
+    if args.trace_suite:
+        report = qualify_task_fixture(
+            args.fixture,
+            peer=args.peer,
+            trace_suite=args.trace_suite,
+            report_path=args.out,
+        )
+    else:
+        report = qualify_adapter_fixture(args.fixture, report_path=args.out)
     print(json.dumps(report, indent=2))
     return 0 if report["ok"] else 1
 
@@ -902,6 +1032,26 @@ def cmd_capture(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_push(args: argparse.Namespace) -> int:
+    from rlx.core.mirror import push_artifact
+
+    result = push_artifact(args.source, args.destination, verify=args.verify)
+    _print(result, as_json=args.json)
+    return 0
+
+
+def cmd_pull(args: argparse.Namespace) -> int:
+    from urllib.parse import urldefrag
+
+    from rlx.core.mirror import pull_artifact
+
+    _base, identity = urldefrag(args.source)
+    out = args.out or f"pulled-{identity.removeprefix('sha256:')[:12]}.rlx"
+    result = pull_artifact(args.source, out, verify=args.verify)
+    _print(result, as_json=args.json)
+    return 0
+
+
 def _load_task_arg(task_arg: str, *, config: dict[str, Any] | None = None) -> Any:
     """Load a task from env id, task YAML, or match.yaml (using its nested task).
 
@@ -921,7 +1071,7 @@ def _load_task_arg(task_arg: str, *, config: dict[str, Any] | None = None) -> An
             task = Task.load(task_ref) if not isinstance(task_ref, Task) else task_ref
         else:
             task = Task(data) if "adapter" in data or "env" in data else Task.load(data)
-    elif task_arg.startswith("pettingzoo://"):
+    elif task_arg.startswith(("pettingzoo://", "openspiel://")):
         task = Task.load(task_arg)
     else:
         # Treat as env id

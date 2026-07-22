@@ -19,7 +19,13 @@ from rlx.adapters.task_pettingzoo.adapter import (
 )
 from rlx.core.action_cases import validate_runtime_action
 from rlx.core.compatibility import compose_check
-from rlx.core.errors import CompatibilityError, ConformanceError, RuntimeFailure, SchemaError
+from rlx.core.errors import (
+    CompatibilityError,
+    ConformanceError,
+    RuntimeFailure,
+    SchemaError,
+    TaskRuntimeError,
+)
 from rlx.core.identity import sha256_canonical
 from rlx.core.manifests import RUN_SCHEMA, TRAJECTORY_SCHEMA, dump_json, dump_yaml
 from rlx.core.sdk import Policy
@@ -182,7 +188,7 @@ def run_match(
             "adapter": task_info["adapter"],
             "env": task_info["env"],
             "version": task_info["version"],
-            "spec": task_spec,
+            "spec": _public_spec(task_spec),
         },
         "assignments": {
             k: {"name": v.name, "digest": v.digest, "path": str(v.root)} for k, v in assignments.items()
@@ -219,9 +225,25 @@ def _run_episode(
 ) -> dict[str, Any]:
     # Trust for entrypoint_bundle lives on the task spec so patched make_env(spec)
     # call sites (tests / adapters) stay single-argument compatible.
-    env = make_env(task_spec)
     try:
-        obs, infos = env.reset(seed=seed)
+        env = make_env(task_spec)
+    except TaskRuntimeError as e:
+        raise RuntimeFailure(
+            str(e),
+            kind=e.kind,
+            episode_index=episode_index,
+            details={**e.details, "steps": 0},
+        ) from e
+    try:
+        try:
+            obs, infos = env.reset(seed=seed)
+        except TaskRuntimeError as e:
+            raise RuntimeFailure(
+                str(e),
+                kind=e.kind,
+                episode_index=episode_index,
+                details={**e.details, "steps": 0},
+            ) from e
         for agent, rt in runtimes.items():
             rt.reset(agent)
 
@@ -283,7 +305,24 @@ def _run_episode(
                 )
                 actions[agent] = action
 
-            next_obs, rewards, terminations, truncations, next_infos = env.step(actions)
+            try:
+                next_obs, rewards, terminations, truncations, next_infos = env.step(actions)
+            except TaskRuntimeError as e:
+                partial = _episode_dict(
+                    seed,
+                    episode_index,
+                    task_info,
+                    assignments,
+                    steps,
+                    action_mode,
+                    status=e.kind,
+                )
+                raise RuntimeFailure(
+                    str(e),
+                    kind=e.kind,
+                    episode_index=episode_index,
+                    details={**e.details, "steps": step_i, "partial_episode": partial},
+                ) from e
 
             step_rec = {
                 "t": step_i,
@@ -350,3 +389,16 @@ def _jsonable(obj: Any) -> Any:
     if isinstance(obj, (list, tuple)):
         return [_jsonable(v) for v in obj]
     return obj
+
+
+def _public_spec(value: Any) -> Any:
+    """Drop private runtime injection keys from persisted task provenance."""
+    if isinstance(value, dict):
+        return {
+            key: _public_spec(item)
+            for key, item in value.items()
+            if not str(key).startswith("_")
+        }
+    if isinstance(value, (list, tuple)):
+        return [_public_spec(item) for item in value]
+    return value

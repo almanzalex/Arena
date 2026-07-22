@@ -1,0 +1,19 @@
+schema: rlx.trace-suite/v1
+name: openspiel-tic-tac-toe-reference
+interaction: aec
+episodes:
+  - seed: 0
+    actions:
+      - agent: player_0
+        action: 0
+      - agent: player_1
+        action: 3
+      - agent: player_0
+        action: 1
+      - agent: player_1
+        action: 4
+      - agent: player_0
+        action: 2
+tolerances:
+  default: 0.0
+reference_digest: sha256:ceec4ebf59f7c3856b8645716ccaf839bbcb33b8ac24c5bbacb2a27f3f8586cd

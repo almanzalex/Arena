@@ -12,11 +12,13 @@ def ensure_registered() -> None:
     from rlx.plugins import (
         actions,
         distributions,
+        eval_providers,
         interactions,
         metrics,
         payloads,
         preprocess_ops,
         samplers,
+        stores,
         tasks,
         wrappers,
     )
@@ -27,6 +29,8 @@ def ensure_registered() -> None:
     wrappers.register_builtins()
     payloads.register_builtins()
     tasks.register_builtins()
+    eval_providers.register_builtins()
+    stores.register_builtins()
     samplers.register_builtins()
     metrics.register_builtins()
     interactions.register_builtins()

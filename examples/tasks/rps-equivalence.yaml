@@ -1,0 +1,14 @@
+schema: rlx.trace-suite/v1
+name: rps-native-openenv
+interaction: parallel
+episodes:
+  - seed: 0
+    actions:
+      - player_0: 0
+        player_1: 1
+  - seed: 9
+    actions:
+      - player_0: 2
+        player_1: 1
+tolerances:
+  default: 0.0

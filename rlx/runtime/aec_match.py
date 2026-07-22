@@ -11,12 +11,23 @@ from typing import Any
 import numpy as np
 
 from rlx.adapters.policy_custom_torch import load_runtime
-from rlx.adapters.task_pettingzoo.adapter import describe_task, extract_action_mask, make_env
+from rlx.adapters.task_pettingzoo.adapter import (
+    describe_task,
+    extract_action_mask,
+    extract_observation,
+    make_env,
+)
 from rlx.core.action_cases import validate_runtime_action
 from rlx.core.compatibility import compose_check
-from rlx.core.errors import CompatibilityError, ConformanceError, RuntimeFailure, SchemaError
+from rlx.core.errors import (
+    CompatibilityError,
+    ConformanceError,
+    RuntimeFailure,
+    SchemaError,
+    TaskRuntimeError,
+)
 from rlx.core.identity import sha256_canonical
-from rlx.core.manifests import RUN_SCHEMA, dump_json, dump_yaml
+from rlx.core.manifests import RUN_SCHEMA, TRAJECTORY_SCHEMA, dump_json, dump_yaml
 from rlx.core.sdk import Policy
 from rlx.runtime.trajectory import TrajectoryWriter
 
@@ -44,7 +55,7 @@ def run_aec_match(
     task_info = describe_task(task_spec)
     if bool(task_info.get("dynamic_agents")):
         raise SchemaError(
-            "Dynamic agent birth/removal is unsupported in RLX 0.2.0. "
+            "Dynamic agent birth/removal is outside RLX 0.3 (RFC 005 is parked). "
             "Register a lifecycle-aware interaction case and qualify it before claiming support."
         )
     roles_meta = task_info["roles"]
@@ -147,7 +158,7 @@ def run_aec_match(
             "adapter": task_info["adapter"],
             "env": task_info["env"],
             "version": task_info["version"],
-            "spec": task_spec,
+            "spec": _public_spec(task_spec),
         },
         "assignments": {
             k: {"name": v.name, "digest": v.digest, "path": str(v.root)} for k, v in assignments.items()
@@ -182,9 +193,25 @@ def _run_aec_episode(
     timeout: float,
     ep_start: float,
 ) -> dict[str, Any]:
-    env = make_env(task_spec)
     try:
-        env.reset(seed=seed)
+        env = make_env(task_spec)
+    except TaskRuntimeError as e:
+        raise RuntimeFailure(
+            str(e),
+            kind=e.kind,
+            episode_index=episode_index,
+            details={**e.details, "steps": 0},
+        ) from e
+    try:
+        try:
+            env.reset(seed=seed)
+        except TaskRuntimeError as e:
+            raise RuntimeFailure(
+                str(e),
+                kind=e.kind,
+                episode_index=episode_index,
+                details={**e.details, "steps": 0},
+            ) from e
         for agent, rt in runtimes.items():
             rt.reset(agent)
 
@@ -225,12 +252,13 @@ def _run_aec_episode(
                     agent=agent,
                     details={"steps": step_i},
                 )
-            obs = env.observe(agent)
-            mask = None
+            raw_obs = env.observe(agent)
+            obs = extract_observation(raw_obs)
+            mask = extract_action_mask(raw_obs)
             info = {}
             if hasattr(env, "infos") and agent in getattr(env, "infos", {}):
                 info = env.infos[agent] or {}
-                mask = extract_action_mask(info) if info else None
+                mask = mask if mask is not None else (extract_action_mask(info) if info else None)
             # Some AEC envs expose masks via observation dict — keep None if absent.
             try:
                 action = runtimes[agent].act(
@@ -260,10 +288,19 @@ def _run_aec_episode(
                     details={"steps": step_i, "action": action},
                 ) from e
 
-            pending_obs[agent] = obs
-            pending_actions[agent] = action
+            pending_obs[agent] = _jsonable(obs)
+            pending_actions[agent] = _jsonable(action)
             agents_this_tick.add(agent)
-            env.step(action)
+            try:
+                env.step(action)
+            except TaskRuntimeError as e:
+                raise RuntimeFailure(
+                    str(e),
+                    kind=e.kind,
+                    episode_index=episode_index,
+                    agent=agent,
+                    details={**e.details, "steps": step_i},
+                ) from e
             # PettingZoo AEC: after a resolving step, rewards may be set for all agents.
             if hasattr(env, "rewards"):
                 for a, r in (env.rewards or {}).items():
@@ -303,12 +340,22 @@ def _run_aec_episode(
                 break
 
         episode = {
+            "schema": TRAJECTORY_SCHEMA,
             "episode_index": episode_index,
             "seed": seed,
             "steps": steps,
             "returns": returns,
             "status": "completed",
             "interaction": "aec",
+            "action_mode": action_mode,
+            "task": {
+                "env": task_info["env"],
+                "adapter": task_info["adapter"],
+                "version": task_info["version"],
+            },
+            "agents": task_info["agents"],
+            "role_map": {agent: agent for agent in task_info["agents"]},
+            "policies": {key: policy.digest for key, policy in assignments.items()},
         }
         if writer is not None:
             writer.write_episode(episode)
@@ -322,3 +369,27 @@ def _run_aec_episode(
     finally:
         if hasattr(env, "close"):
             env.close()
+
+
+def _jsonable(value: Any) -> Any:
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(item) for item in value]
+    return value
+
+
+def _public_spec(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _public_spec(item)
+            for key, item in value.items()
+            if not str(key).startswith("_")
+        }
+    if isinstance(value, (list, tuple)):
+        return [_public_spec(item) for item in value]
+    return value

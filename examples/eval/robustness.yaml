@@ -1,0 +1,25 @@
+schema: rlx.evaluation/v0alpha1
+name: rps-gimitest-robustness
+provider: gimitest
+provider_config:
+  suite: base-hooks
+  test_class: gimitest.gtest:GTest
+  parameters:
+    purpose: RLX provider lineage qualification
+interaction: parallel
+task:
+  adapter: pettingzoo-parallel
+  env: rlx/competitive_rps_v0
+  interaction: parallel
+  config:
+    max_cycles: 1
+assignments:
+  player_0: ./demo/rock.rlx
+  player_1: ./demo/paper.rlx
+seeds:
+  start: 0
+  count: 2
+action_mode: deterministic
+metrics:
+  - mean_return
+  - win_rate

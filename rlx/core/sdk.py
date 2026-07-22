@@ -17,6 +17,7 @@ from rlx.core.manifests import (
     validate_match_manifest,
     validate_policy_manifest,
     validate_population_manifest,
+    validate_task_manifest,
 )
 
 
@@ -73,7 +74,10 @@ class Task:
             return cls(ref)
         path = Path(ref)
         if path.exists():
-            return cls(load_manifest(path))
+            manifest = load_manifest(path)
+            if manifest.get("schema") == "rlx.task/v0alpha1":
+                validate_task_manifest(manifest)
+            return cls(manifest)
         # Inline adapter ref string: pettingzoo://rlx/competitive_rps_v0
         if isinstance(ref, str) and ref.startswith("pettingzoo://"):
             env = ref.removeprefix("pettingzoo://")
@@ -82,6 +86,15 @@ class Task:
                     "adapter": "pettingzoo-parallel",
                     "env": env,
                     "version": "pettingzoo",
+                }
+            )
+        if isinstance(ref, str) and ref.startswith("openspiel://"):
+            return cls(
+                {
+                    "adapter": "openspiel",
+                    "env": ref,
+                    "interaction": "aec",
+                    "packaging": {"kind": "openspiel"},
                 }
             )
         raise SchemaError(f"cannot load task: {ref!r}")
@@ -189,7 +202,7 @@ class Match:
         record: bool = True,
         out: str | Path | None = None,
     ) -> dict[str, Any]:
-        from rlx.runtime.match import run_match
+        from rlx.plugins.interactions import get_interaction
 
         seed_list: list[int]
         if seeds is None:
@@ -199,7 +212,8 @@ class Match:
         else:
             seed_list = list(seeds)
 
-        return run_match(
+        interaction = str(self.task.spec.get("interaction", "parallel"))
+        return get_interaction(interaction).run_match(
             task_spec=self.task.spec,
             assignments=self.assignments,
             seeds=seed_list,

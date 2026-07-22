@@ -1,14 +1,14 @@
 # RFC 005 — Dynamic Agent Lifecycle (parked)
 
-**Status:** Deferred interface stub (not in 0.2.0 or default 0.3 scope)  
-**Date:** 2026-07-21  
+**Status:** Parked beyond 0.3 (the frozen 0.3 pilots use fixed agents)
+**Date:** 2026-07-21
 **Depends on:** RFC 000, RFC 004, interaction registry (`rlx.plugins.interactions`)
 
 ## Decision
 
 RLX **0.2.0 fails loud** when a task reports `dynamic_agents: true` (or when living agents diverge from the fixed assignment set mid-episode). Full birth/removal lifecycle is **not** required to close 0.2 or to open 0.3.
 
-Implement only when a **concrete external env** (likely OpenEnv/OpenSpiel in 0.3 validation) cannot be represented with a fixed agent set.
+Implement only when a **concrete named external environment** cannot be represented with a fixed agent set.
 
 ## Required interface (when revived)
 
@@ -26,4 +26,4 @@ Implement only when a **concrete external env** (likely OpenEnv/OpenSpiel in 0.3
 
 ## Extension recipe (current product text)
 
-Dynamic agent birth/removal is unsupported in RLX 0.2.0. To add support: implement agent lifecycle linked to policy state, register an interaction/task case, add conformance tests, and run `rlx adapter qualify` before claiming support.
+Dynamic agent birth/removal is outside RLX 0.3. To add support: implement agent lifecycle linked to policy state, register an interaction/task case, add conformance tests, and run `rlx adapter qualify` before claiming support.

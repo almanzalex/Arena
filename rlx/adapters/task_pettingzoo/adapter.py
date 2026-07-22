@@ -82,7 +82,20 @@ def make_env(spec: dict[str, Any], *, trust_task_code: bool = False):
         or packaging.get("trust_task_code")
     )
     kind = resolve_packaging_kind(spec)
-    return TASK_PACKAGERS.get(kind).make_env(spec, trust_task_code=trust)
+    env = TASK_PACKAGERS.get(kind).make_env(spec, trust_task_code=trust)
+    provider = spec.get("_eval_provider")
+    if isinstance(provider, dict):
+        provider_kind = provider.get("kind")
+        if provider_kind == "gimitest":
+            from rlx.adapters.eval_gimitest import decorate_env
+
+            env = decorate_env(env, dict(provider.get("config") or {}))
+        elif provider_kind:
+            raise SchemaError(
+                f"eval provider {provider_kind!r} requested task decoration but no "
+                "registered environment hook exists"
+            )
+    return env
 
 
 def _make_env_pettingzoo(spec: dict[str, Any]):
@@ -148,7 +161,7 @@ def _make_env_pettingzoo(spec: dict[str, Any]):
         env = apply_wrappers(env, spec.get("wrappers"))
     elif spec.get("wrappers"):
         raise SchemaError(
-            "task.wrappers (SuperSuit) require interaction=parallel in 0.2.0; "
+            "task.wrappers (SuperSuit) require interaction=parallel in RLX 0.3; "
             "AEC + SuperSuit is an unregistered combination — fail loud."
         )
 
@@ -241,6 +254,22 @@ def _load_parallel_env(env_id: str, config: dict[str, Any]):
 
 
 def describe_task(spec: dict[str, Any]) -> dict[str, Any]:
+    """Describe a task through its registered packaging case."""
+    from rlx.core.registry import TASK_PACKAGERS, ensure_plugins_loaded
+    from rlx.plugins.tasks import resolve_packaging_kind
+
+    ensure_plugins_loaded()
+    kind = resolve_packaging_kind(spec)
+    packager = TASK_PACKAGERS.get(kind)
+    if not hasattr(packager, "describe_task"):
+        raise SchemaError(
+            f"task packager {kind!r} does not implement describe_task(spec); "
+            "remote/env-server task cases must expose immutable role spaces and runtime identity"
+        )
+    return packager.describe_task(spec)
+
+
+def _describe_pettingzoo_task(spec: dict[str, Any]) -> dict[str, Any]:
     """Return role/agent observation and action schemas for compatibility checks.
 
     Observation spaces reflect the post-wrapper env. When ``observation_layout``
@@ -248,10 +277,38 @@ def describe_task(spec: dict[str, Any]) -> dict[str, Any]:
     ``rlx check`` can fail on layout mismatches (HWC vs CHW) rather than only
     on shape.
     """
-    interaction = _interaction(spec)
+    # Keep environment construction behind the public seam. Besides making
+    # wrappers/provider decoration consistent with execution, this is the
+    # supported injection point for embedders and conformance fixtures.
     env = make_env(spec)
     layout = _observation_layout(spec)
     wrapper_info = wrappers_provenance(spec.get("wrappers"))
+    version = (
+        f"pilot+pettingzoo-{__import__('pettingzoo').__version__}"
+        if env_id_is_pilot(spec)
+        else __import__("pettingzoo").__version__
+    )
+    return describe_env_contract(
+        spec,
+        env,
+        adapter_name=ADAPTER_NAME,
+        version=version,
+        layout=layout,
+        wrappers=wrapper_info,
+    )
+
+
+def describe_env_contract(
+    spec: dict[str, Any],
+    env: Any,
+    *,
+    adapter_name: str,
+    version: str,
+    layout: str | None = None,
+    wrappers: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Describe any PettingZoo-shaped Parallel/AEC adapter without changing identity."""
+    interaction = _interaction(spec)
     try:
         if interaction == "aec":
             env.reset(seed=0)
@@ -287,19 +344,15 @@ def describe_task(spec: dict[str, Any]) -> dict[str, Any]:
         if set(possible) != set(agents):
             dynamic_agents = True
         result: dict[str, Any] = {
-            "adapter": ADAPTER_NAME,
+            "adapter": adapter_name,
             "env": spec.get("env") or PILOT_ENV,
-            "version": (
-                f"pilot+pettingzoo-{__import__('pettingzoo').__version__}"
-                if env_id_is_pilot(spec)
-                else __import__("pettingzoo").__version__
-            ),
+            "version": version,
             "agents": agents,
             "roles": roles,
             "provides_masks": provides_masks,
             "interaction": interaction,
             "dynamic_agents": dynamic_agents,
-            "wrappers": wrapper_info,
+            "wrappers": wrappers or {"steps": [], "identity": "none"},
             "config": dict(spec.get("config") or {}),
         }
         if layout is not None:

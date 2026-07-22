@@ -1,4 +1,4 @@
-"""Task packaging cases: pettingzoo_wrappers | entrypoint_bundle."""
+"""Task packaging cases and the external-task extension boundary."""
 
 from __future__ import annotations
 
@@ -24,6 +24,8 @@ class TaskPackager(Protocol):
 
     def make_env(self, spec: dict[str, Any], *, trust_task_code: bool = False) -> Any: ...
 
+    def describe_task(self, spec: dict[str, Any]) -> dict[str, Any]: ...
+
 
 def register_task_packager(
     kind: str, packager: TaskPackager, *, replace: bool = False
@@ -33,7 +35,15 @@ def register_task_packager(
 
 def resolve_packaging_kind(spec: dict[str, Any]) -> str:
     """Default packaging is pettingzoo_wrappers for existing PettingZoo tasks."""
-    packaging = spec.get("packaging") or spec.get("task_packaging") or "pettingzoo_wrappers"
+    packaging = spec.get("packaging") or spec.get("task_packaging")
+    if packaging is None:
+        adapter = str(spec.get("adapter") or "pettingzoo-parallel")
+        packaging = {
+            "openenv": "openenv",
+            "openspiel": "openspiel",
+            "pettingzoo-parallel": "pettingzoo_wrappers",
+            "pettingzoo-aec": "pettingzoo_wrappers",
+        }.get(adapter, adapter)
     if isinstance(packaging, dict):
         kind = packaging.get("kind")
     else:
@@ -54,6 +64,11 @@ class PettingZooWrappersPackager:
 
         # Delegate to the existing PettingZoo path (wrappers applied inside).
         return pz._make_env_pettingzoo(spec)
+
+    def describe_task(self, spec: dict[str, Any]) -> dict[str, Any]:
+        from rlx.adapters.task_pettingzoo import adapter as pz
+
+        return pz._describe_pettingzoo_task(spec)
 
 
 class EntrypointBundlePackager:
@@ -121,6 +136,17 @@ class EntrypointBundlePackager:
             env = apply_wrappers(env, wrappers)
         return env
 
+    def describe_task(self, spec: dict[str, Any]) -> dict[str, Any]:
+        from rlx.adapters.task_pettingzoo import adapter as pz
+
+        env = self.make_env(spec, trust_task_code=bool(spec.get("trust_task_code")))
+        return pz.describe_env_contract(
+            spec,
+            env,
+            adapter_name="entrypoint_bundle",
+            version=str(spec.get("source_revision") or "digest-pinned"),
+        )
+
 
 def _safe_join(root: Path, rel: str) -> Path:
     if Path(rel).is_absolute():
@@ -155,3 +181,8 @@ def _import_pinned_source(src_path: Path, *, attr: str) -> Any:
 def register_builtins() -> None:
     register_task_packager("pettingzoo_wrappers", PettingZooWrappersPackager(), replace=True)
     register_task_packager("entrypoint_bundle", EntrypointBundlePackager(), replace=True)
+    from rlx.adapters.task_openenv import OpenEnvPackager
+    from rlx.adapters.task_openspiel import OpenSpielPackager
+
+    register_task_packager("openenv", OpenEnvPackager(), replace=True)
+    register_task_packager("openspiel", OpenSpielPackager(), replace=True)

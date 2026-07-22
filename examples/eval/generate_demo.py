@@ -15,6 +15,7 @@ from rlx.adapters.policy_custom_torch import (
     _embed_reference_cases,
     generate_reference_cases,
     load_runtime,
+    verify_bundle_self,
 )
 from rlx.conformance.fixtures import build_fixed_action_rps_policy
 from rlx.core.manifests import dump_yaml
@@ -31,6 +32,7 @@ def _with_source_cases(bundle: Path) -> Path:
         ),
         provenance="source-conformance",
     )
+    verify_bundle_self(bundle)
     return bundle
 
 

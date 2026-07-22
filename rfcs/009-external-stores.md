@@ -1,7 +1,7 @@
 # RFC 009 — External Artifact Stores (RLX 0.3)
 
-**Status:** Draft for 0.3  
-**Date:** 2026-07-21  
+**Status:** Accepted and implemented in 0.3
+**Date:** 2026-07-21
 **Depends on:** RFC 000
 
 ## User promise
@@ -28,9 +28,16 @@ rlx pull <uri> --verify
 
 ## Non-goals
 
-- RLX accounts, billing, or public catalog hosting  
-- Replacing W&B/MLflow experiment tracking UX  
+- RLX accounts, billing, or public catalog hosting
+- Replacing W&B/MLflow experiment tracking UX
 
 ## Exit evidence
 
 Round-trip test: export policy → push → wipe local object → pull --verify → `policy verify` / match still green.
+
+## Frozen implementation
+
+0.3 selects `file://` first and Hugging Face Hub `hf://` as the network backend. Both
+store an `rlx.mirror/v1` descriptor plus digest-keyed bytes; verified pull rehashes every
+file and reloads policies to confirm identity. HF delegates auth to normal Hub credentials.
+OCI, W&B, and MLflow are explicit follow-ons rather than partial 0.3 claims.

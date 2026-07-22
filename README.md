@@ -1,7 +1,7 @@
-# RLX 0.2
+# RLX 0.3
 
-Local-first Python CLI/SDK for **portable RL policy handoff**, **populations**, and
-**versioned evaluation**.
+Local-first Python CLI/SDK for **portable RL policy handoff**, **versioned
+evaluation**, and verified external runtime/provider/store integrations.
 
 Export a custom PyTorch policy, hand it to a collaborator without the training repository, run a seeded PettingZoo Parallel (or AEC) match, evaluate populations with cross-play, and inspect complete joint trajectories.
 
@@ -45,9 +45,34 @@ rlx eval bundle ./eval-runs/x --out ./bundles/x
 
 See [docs/populations.md](docs/populations.md), [docs/evaluation.md](docs/evaluation.md),
 [docs/eval-clean-room.md](docs/eval-clean-room.md), [docs/eval-usability-signoff.md](docs/eval-usability-signoff.md).
-**0.2 sealed:** [docs/0.2-complete.md](docs/0.2-complete.md).  
-**0.3 plan:** [docs/0.3-delivery.md](docs/0.3-delivery.md).  
+**0.2 sealed:** [docs/0.2-complete.md](docs/0.2-complete.md).
+**0.3 complete:** [docs/0.3-complete.md](docs/0.3-complete.md).
+**Release evidence:** [docs/0.3-evidence.md](docs/0.3-evidence.md).
 Deferred items: [docs/0.2-revisit.md](docs/0.2-revisit.md).
+
+## External integration workflow (0.3)
+
+```bash
+# OpenEnv: launch/import the frozen RPS pilot, then prove native↔remote semantics.
+pip install 'rlx[openenv]'
+python -m rlx.adapters.task_openenv.server --port 8000
+rlx task import openenv://127.0.0.1:8000/rlx/competitive_rps_v0 \
+  --name task:rps-openenv@0.3 --source-revision openenv-0.4.1
+rlx task verify-equivalence examples/tasks/native-rps.yaml task-rps-openenv-0.3.yaml \
+  --trace-suite examples/tasks/rps-equivalence.yaml
+
+# OpenSpiel: the 0.3 support claim is exactly tic_tac_toe.
+pip install 'rlx[openspiel]'
+rlx task verify-equivalence examples/tasks/openspiel-tic-tac-toe.yaml \
+  --trace-suite examples/tasks/openspiel-tic-tac-toe-trace.yaml
+
+# Artifact mirrors preserve the policy's sha256 identity.
+rlx push examples/eval/demo/rock.rlx file:///tmp/rlx-mirror --verify
+rlx pull 'file:///tmp/rlx-mirror#sha256:…' --verify
+```
+
+See [external tasks](docs/external-tasks.md), [evaluation providers](docs/eval-providers.md),
+and [external stores](docs/external-stores.md).
 
 ## Pilot pair (frozen in RFCs)
 
@@ -109,6 +134,15 @@ Capability claims are limited to **registry-registered + qualified** cases.
 | Supported only with explicit trust | `trusted_source` payload; `entrypoint_bundle` task packaging | Digest-pinned Python; `--trust-source` / `--trust-task-code`; **not sandboxed**. Prefer TorchScript / pettingzoo_wrappers. |
 | Deliberately rejected | Incomplete claims; unknown registry kinds; untyped Dict; arbitrary mixtures | Fail loud with repair guidance or an extension recipe. No silent coercion. |
 
+### Integration capability matrix
+
+| Axis | Supported in 0.3 | Boundary |
+|---|---|---|
+| Task runtime | OpenEnv 0.4.x, frozen remote RPS pilot | Imported endpoint/schema/role contract are pinned; disconnect, remote crash, timeout, and protocol failures remain distinct. |
+| Game runtime | OpenSpiel 2.x `tic_tac_toe` | AEC, observation tensor + legal-action mask; no broader game-catalog claim. |
+| Eval provider | Native; Gimitest 1.0 provider | Provider config is content-addressed and copied onto every cell lineage. Native remains the default. |
+| Artifact store | `file://`; Hugging Face Hub `hf://` | Mirrors manifest/payload bytes by digest. HF uses normal Hub credentials. OCI/W&B/MLflow are not claimed. |
+
 ### How to add a case
 
 1. Implement the axis interface under `rlx/plugins/` (e.g. `ActionCase`, `DistributionCase`, `PreprocessOp`, `WrapperOp`, `PayloadCase`, `TaskPackager`).
@@ -126,6 +160,9 @@ clipped, or approximated.
 pip install -e '.[dev]'   # from a checkout
 # or
 pip install 'rlx[torch,pettingzoo]'
+pip install 'rlx[openenv]'    # optional external task runtime
+pip install 'rlx[openspiel]'  # optional frozen game adapter
+pip install 'rlx[hf]'         # optional Hugging Face mirror
 ```
 
 Core stays small (`pyyaml`, `numpy`). Heavy deps are optional extras.
@@ -143,6 +180,9 @@ Core stays small (`pyyaml`, `numpy`). Heavy deps are optional extras.
 | D-02/D-03 | Dataset slice lineage + eval release bundles |
 | Q-02 | Adapter qualify covers population/eval fixtures |
 | U-02 | In-repo cross-play script replaced by population+eval |
+| T-01…T-03 | External trace equivalence, serialization, and failure semantics |
+| I-01…I-03 | Provider lineage, store round-trip, offline native core |
+| S-01/U-03 | Overhead budget and integration-author qualification workflow |
 
 ```bash
 pytest -q                    # fast default selection (slow/docker gates deselected)
@@ -185,8 +225,12 @@ rlx/
   adapters/
     policy_custom_torch/
     task_pettingzoo/
+    task_openenv/
+    task_openspiel/
+    eval_gimitest/
 ```
 
-## Non-goals (0.2)
+## Non-goals (0.3)
 
-No hosted service, auth, DB, dashboard, OpenEnv, RLlib, Gimitest, external stores, training recipes, or silent Elo-only ranking.
+No hosted service/auth, broad OpenSpiel catalog, OCI/W&B/MLflow claim, dynamic-agent
+lifecycle, training recipes, `rlx train`, or silent Elo-only ranking. Training is 0.4.

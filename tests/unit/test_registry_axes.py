@@ -43,7 +43,7 @@ def test_capability_matrix_lists_registered_cases() -> None:
         (lambda: PREPROCESS_OPS.get("warp"), "warp"),
         (lambda: WRAPPER_OPS.get("grayscale_custom"), "grayscale_custom"),
         (lambda: PAYLOAD_LOADERS.get("onnx"), "onnx"),
-        (lambda: TASK_PACKAGERS.get("openenv"), "openenv"),
+        (lambda: TASK_PACKAGERS.get("ray"), "ray"),
     ],
 )
 def test_unknown_kinds_include_extension_recipe(getter, kind: str) -> None:

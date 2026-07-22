@@ -1,7 +1,7 @@
 # RFC 006 — OpenEnv Task Adapter (RLX 0.3)
 
-**Status:** Draft for 0.3  
-**Date:** 2026-07-21  
+**Status:** Accepted and implemented in 0.3
+**Date:** 2026-07-21
 **Depends on:** RFC 000, RFC 001, RFC 004
 
 ## User promise
@@ -41,18 +41,26 @@ equivalence:
 
 Fixed action-trace suite compares native vs OpenEnv for the same seeds:
 
-- observations, actions, rewards, terminations/truncations  
-- agent order / selection (AEC)  
-- masks when declared  
+- observations, actions, rewards, terminations/truncations
+- agent order / selection (AEC)
+- masks when declared
 
 Mismatches fail with a structured diff unless a **declared** tolerance is present in the suite.
 
 ## Non-goals
 
-- Replacing PettingZoo pilot as the default local path  
-- Guaranteeing bit-identical floats across remote hardware without tolerances  
-- Hosting OpenEnv for users  
+- Replacing PettingZoo pilot as the default local path
+- Guaranteeing bit-identical floats across remote hardware without tolerances
+- Hosting OpenEnv for users
 
 ## Exit evidence
 
 Qualify fixture: native RPS (or chosen pilot) + OpenEnv twin; `verify-equivalence` green; one eval suite runs on both adapters with identical digests for policies/populations.
+
+## Frozen implementation
+
+- Pilot: `openenv://rlx/competitive_rps_v0`, OpenEnv 0.4.x, Parallel joint-action bridge.
+- Import pins `/schema`, endpoint, source revision, and an explicit RLX role-space contract.
+- `examples/tasks/rps-equivalence.yaml` crosses the real WebSocket serialization boundary.
+- Runtime errors preserve `disconnect`, `container_crash`, `timeout`, and `protocol_error`.
+- Evidence: `tests/acceptance/test_openenv_equivalence.py` and `rlx adapter qualify --peer … --trace-suite …`.
