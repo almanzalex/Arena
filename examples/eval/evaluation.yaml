@@ -1,0 +1,28 @@
+schema: rlx.evaluation/v0alpha1
+name: rps-crossplay-v1
+interaction: parallel
+task:
+  adapter: pettingzoo-parallel
+  env: rlx/competitive_rps_v0
+  version: rlx-pilot
+  config:
+    max_cycles: 1
+assignments:
+  player_0:
+    kind: policy
+    policy: sha256:REPLACE_CANDIDATE
+  player_1:
+    kind: crossplay
+    population: sha256:REPLACE_POPULATION
+seeds:
+  start: 0
+  count: 4
+action_mode: deterministic
+metrics:
+  - payoff_matrix
+  - mean_return
+  - win_rate
+budgets:
+  timeout_seconds: 60
+recording:
+  trajectories: true

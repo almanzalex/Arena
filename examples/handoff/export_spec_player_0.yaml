@@ -1,0 +1,24 @@
+# Example export spec for player_0 (RPS pilot)
+name: rps-player_0
+roles:
+  allowed: [player_0]
+architecture:
+  type: mlp_categorical
+  observation_dim: 4
+  hidden_dims: [32, 32]
+  action_n: 3
+observation:
+  type: Discrete
+  n: 4
+  dtype: int64
+action:
+  type: Discrete
+  n: 3
+  dtype: int64
+  masks: none
+state:
+  recurrent: false
+preprocessing:
+  id: normalize_v0
+  mean: 0.0
+  std: 1.0

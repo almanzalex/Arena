@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          # CPU-only torch keeps the runner small/fast (no CUDA wheels).
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e '.[dev]'
+      - name: Ruff
+        run: ruff check .
+      - name: Pytest (fast default selection)
+        run: pytest -q
+
+  hermetic:
+    # Full "never-trained machine" U-01 gate: build a wheel, install it into a
+    # fresh network-isolated venv, and run the doc-parsed commands. Also runs the
+    # Docker `--network none` variant (Docker is available on ubuntu runners).
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install (build tooling + CPU torch for bundle fixtures)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e '.[dev]'
+      - name: Hermetic + doc-driven U-01 gate (venv + Docker)
+        env:
+          # Use the CPU wheel index inside the throwaway venv too.
+          RLX_TORCH_INDEX_URL: https://download.pytorch.org/whl/cpu
+        run: pytest -m slow -q

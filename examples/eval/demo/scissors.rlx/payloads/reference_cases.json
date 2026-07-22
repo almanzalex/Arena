@@ -1,0 +1,125 @@
+{
+  "provenance": "source-conformance",
+  "cases": [
+    {
+      "observation": 0,
+      "mode": "deterministic",
+      "expected_action": 2,
+      "hidden_reset": true,
+      "agent_id": "default",
+      "expected_logits": [
+        0.0,
+        0.0,
+        50.0
+      ]
+    },
+    {
+      "observation": 1,
+      "mode": "deterministic",
+      "expected_action": 2,
+      "hidden_reset": true,
+      "agent_id": "default",
+      "expected_logits": [
+        0.0,
+        0.0,
+        50.0
+      ]
+    },
+    {
+      "observation": 2,
+      "mode": "deterministic",
+      "expected_action": 2,
+      "hidden_reset": true,
+      "agent_id": "default",
+      "expected_logits": [
+        0.0,
+        0.0,
+        50.0
+      ]
+    },
+    {
+      "observation": 3,
+      "mode": "deterministic",
+      "expected_action": 2,
+      "hidden_reset": true,
+      "agent_id": "default",
+      "expected_logits": [
+        0.0,
+        0.0,
+        50.0
+      ]
+    },
+    {
+      "observation": 0,
+      "mode": "deterministic",
+      "expected_action": 2,
+      "hidden_reset": true,
+      "agent_id": "default",
+      "expected_logits": [
+        0.0,
+        0.0,
+        50.0
+      ]
+    },
+    {
+      "observation": 1,
+      "mode": "deterministic",
+      "expected_action": 2,
+      "hidden_reset": true,
+      "agent_id": "default",
+      "expected_logits": [
+        0.0,
+        0.0,
+        50.0
+      ]
+    },
+    {
+      "observation": 2,
+      "mode": "deterministic",
+      "expected_action": 2,
+      "hidden_reset": true,
+      "agent_id": "default",
+      "expected_logits": [
+        0.0,
+        0.0,
+        50.0
+      ]
+    },
+    {
+      "observation": 3,
+      "mode": "deterministic",
+      "expected_action": 2,
+      "hidden_reset": true,
+      "agent_id": "default",
+      "expected_logits": [
+        0.0,
+        0.0,
+        50.0
+      ]
+    },
+    {
+      "observation": 3,
+      "mode": "stochastic",
+      "expected_action": 2,
+      "hidden_reset": true,
+      "agent_id": "default",
+      "seed": 7
+    },
+    {
+      "observation": 3,
+      "mode": "stochastic",
+      "expected_action": 2,
+      "hidden_reset": true,
+      "agent_id": "default",
+      "seed": 11
+    },
+    {
+      "observation": 3,
+      "mode": "stochastic",
+      "expected_action": 2,
+      "hidden_reset": true,
+      "agent_id": "default",
+      "seed": 19
+    }
+  ]
+}

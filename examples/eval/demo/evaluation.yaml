@@ -1,0 +1,23 @@
+schema: rlx.evaluation/v0alpha1
+name: cyclic-matrix
+interaction: parallel
+task:
+  adapter: pettingzoo-parallel
+  env: rlx/competitive_rps_v0
+  config:
+    max_cycles: 1
+assignments:
+  player_0:
+    kind: crossplay
+    population: ./population.yaml
+  player_1:
+    kind: crossplay
+    population: ./population.yaml
+seeds:
+  start: 0
+  count: 1
+action_mode: deterministic
+metrics:
+- payoff_matrix
+- mean_return
+- win_rate

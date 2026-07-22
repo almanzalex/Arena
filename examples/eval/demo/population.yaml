@@ -1,0 +1,15 @@
+schema: rlx.population/v0alpha1
+name: cyclic-rps
+members:
+- policy: ./rock.rlx
+  weight: 1.0
+  tags:
+  - rock
+- policy: ./paper.rlx
+  weight: 1.0
+  tags:
+  - paper
+- policy: ./scissors.rlx
+  weight: 1.0
+  tags:
+  - scissors

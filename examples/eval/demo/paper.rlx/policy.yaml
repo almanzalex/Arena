@@ -1,0 +1,49 @@
+schema: rlx.policy/v0alpha1
+name: paper
+roles:
+  allowed:
+  - player_0
+  - player_1
+runtime:
+  adapter: custom-pytorch
+  python: '3.12'
+observation:
+  type: Discrete
+  n: 4
+  dtype: int64
+action:
+  type: Discrete
+  n: 3
+  dtype: int64
+  masks: none
+state:
+  recurrent: false
+  reset_on: []
+inference:
+  modes:
+  - deterministic
+  - stochastic
+preprocessing:
+  included: true
+  id: normalize_v0
+  mean: 0.0
+  std: 1.0
+architecture:
+  type: mlp_categorical
+  observation_dim: 4
+  hidden_dims:
+  - 8
+  action_n: 3
+payloads:
+  weights:
+    digest: sha256:a6f6bbf2c48e31ec15fb66f395f441edc737d02df2f797a0650182433d258057
+    path: payloads/weights.pt
+  reference_cases:
+    digest: sha256:0e16ca417d90f36e8d049a2f10d6ab61109c1bc3af438df2153f6f0b312b5dfa
+    path: payloads/reference_cases.json
+lineage:
+  fixture: fixed-action
+  action: 1
+  pilot: rlx/competitive_rps_v0
+conformance:
+  status: unverified

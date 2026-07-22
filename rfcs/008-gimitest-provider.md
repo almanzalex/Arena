@@ -1,0 +1,45 @@
+# RFC 008 — Gimitest Evaluation Provider (RLX 0.3)
+
+**Status:** Draft for 0.3  
+**Date:** 2026-07-21  
+**Depends on:** RFC 000, RFC 004
+
+## User promise
+
+Apply Gimitest (or compatible) robustness scenarios to an RLX policy/task pair and keep **lineage**: exact policy digests, task digest, perturbation config, seeds, and raw evidence.
+
+## Interface
+
+```yaml
+# evaluation.yaml
+schema: rlx.evaluation/v0alpha1
+provider: gimitest          # default: native
+provider_config:
+  suite: …
+  …
+```
+
+```text
+rlx eval run eval/robustness.yaml --provider gimitest
+```
+
+Providers are a **registry axis** (like metrics/samplers): unknown provider → extension recipe.
+
+## Requirements (GI-*)
+
+| ID | Requirement |
+|----|-------------|
+| GI-01 | Provider registry; `native` remains default and offline |
+| GI-02 | Every result cell carries policy/task/provider_config digests (I-01) |
+| GI-03 | Perturbation config is content-addressed and frozen on the eval-run |
+| GI-04 | Failures (unsupported perturbation, crash) use M-02 failure records |
+| GI-05 | Report plugins may add robustness metrics; matrices/non-transitivity rules still apply when payoffs exist |
+
+## Non-goals
+
+- Reimplementing Gimitest inside RLX  
+- Requiring Gimitest for ordinary cross-play  
+
+## Exit evidence
+
+One robustness eval fixture qualifies; disabling the extra leaves `native` eval green (I-03).

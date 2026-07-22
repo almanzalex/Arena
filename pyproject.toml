@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rlx"
+version = "0.2.0"
+description = "Local-first interoperability layer for portable RL policies, populations, and evaluation"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [{ name = "RLX Contributors" }]
+keywords = ["reinforcement-learning", "marl", "interoperability", "pettingzoo"]
+dependencies = [
+  "pyyaml>=6.0",
+  "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+torch = ["torch>=2.2"]
+pettingzoo = ["pettingzoo>=1.24", "gymnasium>=0.29", "mpe2>=1.0"]
+wrappers = ["supersuit>=3.9"]
+all = ["rlx[torch,pettingzoo,wrappers]"]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.4",
+  "build>=1.2",
+  "hatchling>=1.21",
+  "rlx[all]",
+]
+
+[project.scripts]
+rlx = "rlx.cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/rlx-project/rlx"
+Documentation = "https://github.com/rlx-project/rlx/tree/main/docs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["rlx"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Keep the default selection fast: the slow wheel-build / hermetic-venv and
+# Docker gates are opt-in. Run them with `pytest -m slow` / `pytest -m docker`.
+addopts = "-m 'not slow and not docker'"
+markers = [
+  "acceptance: MVP acceptance gates P/M/D/U",
+  "requires_torch: needs torch extra",
+  "requires_pettingzoo: needs pettingzoo extra",
+  "slow: slow gates (wheel build + hermetic venv install)",
+  "docker: hermetic gate that requires a working Docker daemon",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]

@@ -1,0 +1,49 @@
+schema: rlx.policy/v0alpha1
+name: scissors
+roles:
+  allowed:
+  - player_0
+  - player_1
+runtime:
+  adapter: custom-pytorch
+  python: '3.12'
+observation:
+  type: Discrete
+  n: 4
+  dtype: int64
+action:
+  type: Discrete
+  n: 3
+  dtype: int64
+  masks: none
+state:
+  recurrent: false
+  reset_on: []
+inference:
+  modes:
+  - deterministic
+  - stochastic
+preprocessing:
+  included: true
+  id: normalize_v0
+  mean: 0.0
+  std: 1.0
+architecture:
+  type: mlp_categorical
+  observation_dim: 4
+  hidden_dims:
+  - 8
+  action_n: 3
+payloads:
+  weights:
+    digest: sha256:d3852a8ba3b0bffd227fc2bde6d28b013e1aab6ca68db5a0884b30a5dceaa223
+    path: payloads/weights.pt
+  reference_cases:
+    digest: sha256:8ddbac380bcfb36f0b6d2cf847fa40ab5c729a1631e51b02c4d8cb29f7a64185
+    path: payloads/reference_cases.json
+lineage:
+  fixture: fixed-action
+  action: 2
+  pilot: rlx/competitive_rps_v0
+conformance:
+  status: unverified

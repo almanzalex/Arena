@@ -1,0 +1,16 @@
+schema: rlx.match/v0alpha1
+task:
+  adapter: pettingzoo-parallel
+  env: rlx/competitive_rps_v0
+assignments:
+  player_0: ./artifacts/player_0.rlx
+  player_1: ./artifacts/player_1.rlx
+seeds: {start: 0, count: 10}
+action_mode: deterministic
+record:
+  trajectories: all
+  policy_inputs: true
+failure_policy:
+  timeout_seconds: 60
+  retain_incomplete: true
+  retry: 0
