@@ -29,7 +29,7 @@ def test_v03_builtin_registry_axes() -> None:
     ("registry", "kind", "axis"),
     [
         (EVAL_PROVIDERS, "lab-evaluator", "eval_provider"),
-        (EXTERNAL_STORES, "oci", "external_store"),
+        (EXTERNAL_STORES, "s3", "external_store"),
         (TASK_PACKAGERS, "ray", "task_packaging"),
     ],
 )

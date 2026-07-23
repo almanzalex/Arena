@@ -14,12 +14,14 @@ def ensure_registered() -> None:
         distributions,
         eval_providers,
         interactions,
+        lifecycle,
         metrics,
         payloads,
         preprocess_ops,
         samplers,
         stores,
         tasks,
+        trainers,
         wrappers,
     )
 
@@ -34,4 +36,6 @@ def ensure_registered() -> None:
     samplers.register_builtins()
     metrics.register_builtins()
     interactions.register_builtins()
+    trainers.register_builtins()
+    lifecycle.register_builtins()
     _REGISTERED = True

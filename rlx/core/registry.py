@@ -175,6 +175,20 @@ EXTERNAL_STORES: Registry[Any] = Registry(
     tests="byte-identical push/pull --verify + tamper rejection + offline-core regression",
 )
 
+TRAINERS: Registry[Any] = Registry(
+    "trainer",
+    interface="rlx.plugins.trainers.TrainingCase",
+    register_via="rlx.plugins.trainers.register_trainer(kind, trainer)",
+    tests="recipe validation + seeded reproducibility + portable policy verify/reuse",
+)
+
+LIFECYCLE_RESOLVERS: Registry[Any] = Registry(
+    "lifecycle_resolver",
+    interface="rlx.plugins.lifecycle.LifecycleResolver",
+    register_via="rlx.plugins.lifecycle.register_lifecycle_resolver(kind, resolver)",
+    tests="assignment preflight + join eligibility + rejoin segment provenance",
+)
+
 
 def ensure_plugins_loaded() -> None:
     """Idempotently register built-in cases (import side-effect safe)."""
@@ -195,6 +209,8 @@ def capability_matrix() -> dict[str, list[str]]:
         "task_packaging": sorted(TASK_PACKAGERS.known()),
         "eval_provider": sorted(EVAL_PROVIDERS.known()),
         "external_store": sorted(EXTERNAL_STORES.known()),
+        "trainer": sorted(TRAINERS.known()),
+        "lifecycle_resolver": sorted(LIFECYCLE_RESOLVERS.known()),
     }
 
 

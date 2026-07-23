@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -92,6 +94,29 @@ def test_eval_crossplay_matrix_and_ledger_stable(tmp_path: Path, monkeypatch) ->
         out_dir=tmp_path / "eval1",
         workers=1,
     )
+    from rlx.plugins import interactions
+
+    real_run = interactions.get_interaction("parallel").run_match
+    rendezvous = threading.Barrier(2, timeout=5)
+    worker_threads: set[int] = set()
+    worker_lock = threading.Lock()
+    arrivals = 0
+
+    def overlapping_run(**kwargs):
+        nonlocal arrivals
+        with worker_lock:
+            worker_threads.add(threading.get_ident())
+            arrivals += 1
+            ordinal = arrivals
+        if ordinal <= 2:
+            rendezvous.wait()
+        return real_run(**kwargs)
+
+    monkeypatch.setattr(
+        interactions,
+        "get_interaction",
+        lambda _kind: SimpleNamespace(run_match=overlapping_run),
+    )
     r2 = run_evaluation(
         suite,
         policy_index=policy_index,
@@ -101,6 +126,7 @@ def test_eval_crossplay_matrix_and_ledger_stable(tmp_path: Path, monkeypatch) ->
         workers=4,
     )
     assert len(r1["cells"]) == 3
+    assert len(worker_threads) >= 2
     assert r1["sampling_ledger"] == r2["sampling_ledger"]
     assert r1["evaluation_digest"] == r2["evaluation_digest"]
 

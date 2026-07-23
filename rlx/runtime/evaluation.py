@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -160,7 +161,7 @@ def expand_evaluation_cells(
 
     if len(cross_roles) > 2:
         raise SchemaError(
-            "RLX 0.3 supports at most two crossplay/population assignment roles "
+            "RLX supports at most two crossplay/population assignment roles "
             "(cartesian cross-play matrix)"
         )
 
@@ -255,10 +256,12 @@ def _run_native_evaluation(
 ) -> dict[str, Any]:
     """Validate, expand, run match jobs, and write an eval-run record.
 
-    ``workers`` is accepted for API compatibility but must not change seed/cell
-    mapping (EV-04); jobs always execute in deterministic cell order.
+    Independent cells may execute concurrently. ``executor.map`` and the final
+    serialization retain deterministic cell order and seed mapping (EV-04).
     """
-    del workers  # scheduling only; deterministic order
+    workers = int(workers)
+    if workers < 1:
+        raise SchemaError("evaluation workers must be >= 1")
     populations = populations or {}
     suite = validate_evaluation(suite, populations=populations, policy_index=policy_index)
     from rlx.plugins.interactions import get_interaction
@@ -290,21 +293,21 @@ def _run_native_evaluation(
     task_digest = task_content_digest(identity_task)
     provider_lineage = provider_lineage or {
         "kind": "native",
-        "version": "rlx-native-0.3",
+        "version": "rlx-native-0.5",
         "config_digest": digest_uri(
             sha256_bytes(canonical_json((identity_suite or suite).get("provider_config") or {}))
         ),
     }
-    if bool(task_info.get("dynamic_agents")):
+    if bool(task_info.get("dynamic_agents")) and interaction != "dynamic_aec":
         raise SchemaError(
-            "Dynamic agent birth/removal is outside RLX 0.3 (RFC 005 is parked). "
-            "To add support: implement agent lifecycle linked to policy state, "
-            "register an interaction/task case, add conformance tests, and run "
-            "`rlx adapter qualify` before claiming support."
+            "Dynamic tasks require interaction=dynamic_aec plus explicit birth "
+            "eligibility. Fixed-agent parallel/aec modes refuse lifecycle changes."
         )
-    cell_results: list[dict[str, Any]] = []
-
-    for cell in cells:
+    if interaction == "dynamic_aec" and not bool(task_info.get("dynamic_agents")):
+        raise SchemaError(
+            "interaction=dynamic_aec requires a task whose contract declares dynamic_agents=true"
+        )
+    def run_cell(cell: dict[str, Any]) -> dict[str, Any]:
         assignments: dict[str, Policy] = {}
         for role, pref in cell["assignments"].items():
             policy = _policy_from_digest_or_path(str(pref), policy_index=policy_index)
@@ -352,20 +355,27 @@ def _run_native_evaluation(
             bundle = traj_dir / "bundle.json"
             if bundle.exists():
                 evidence_refs.insert(0, str(bundle))
-        cell_results.append(
-            {
-                **cell,
-                "run": result,
-                "episodes": episodes,
-                "evidence_refs": evidence_refs,
-                "failures": len(result.get("failures") or []),
-                "lineage": {
-                    "policy_digests": sorted(set(cell["assignments"].values())),
-                    "task_digest": task_digest,
-                    "provider": provider_lineage,
-                },
-            }
-        )
+        return {
+            **cell,
+            "run": result,
+            "episodes": episodes,
+            "evidence_refs": evidence_refs,
+            "failures": len(result.get("failures") or []),
+            "lineage": {
+                "policy_digests": sorted(set(cell["assignments"].values())),
+                "task_digest": task_digest,
+                "provider": provider_lineage,
+            },
+        }
+
+    if workers == 1 or len(cells) <= 1:
+        cell_results = [run_cell(cell) for cell in cells]
+    else:
+        with ThreadPoolExecutor(
+            max_workers=min(workers, len(cells)),
+            thread_name_prefix="rlx-eval",
+        ) as executor:
+            cell_results = list(executor.map(run_cell, cells))
 
     eval_run = {
         "schema": EVAL_RUN_SCHEMA,

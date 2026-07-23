@@ -55,8 +55,8 @@ def run_aec_match(
     task_info = describe_task(task_spec)
     if bool(task_info.get("dynamic_agents")):
         raise SchemaError(
-            "Dynamic agent birth/removal is outside RLX 0.3 (RFC 005 is parked). "
-            "Register a lifecycle-aware interaction case and qualify it before claiming support."
+            "Dynamic agent birth/removal requires interaction=dynamic_aec. "
+            "Fixed-agent AEC refuses lifecycle changes."
         )
     roles_meta = task_info["roles"]
 
@@ -224,6 +224,7 @@ def _run_aec_episode(
         pending_rewards: dict[str, float] = {}
         pending_terms: dict[str, bool] = {}
         pending_truncs: dict[str, bool] = {}
+        pending_infos: dict[str, Any] = {}
         agents_this_tick: set[str] = set()
 
         while env.agents:
@@ -290,6 +291,7 @@ def _run_aec_episode(
 
             pending_obs[agent] = _jsonable(obs)
             pending_actions[agent] = _jsonable(action)
+            pending_infos[agent] = _jsonable(info)
             agents_this_tick.add(agent)
             try:
                 env.step(action)
@@ -316,8 +318,9 @@ def _run_aec_episode(
                 if hasattr(env, "truncations"):
                     pending_truncs[a] = bool(env.truncations.get(a, False))
 
-            # Joint record when all assigned agents have acted at least once this cycle.
-            if agents_this_tick >= set(assignments):
+            # Joint record when all assigned agents acted, or flush a partial final
+            # cycle when a sequential game terminates before every player acts.
+            if agents_this_tick >= set(assignments) or not env.agents:
                 steps.append(
                     {
                         "observations": dict(pending_obs),
@@ -325,7 +328,7 @@ def _run_aec_episode(
                         "rewards": dict(pending_rewards),
                         "terminations": dict(pending_terms),
                         "truncations": dict(pending_truncs),
-                        "infos": {},
+                        "infos": dict(pending_infos),
                     }
                 )
                 step_i += 1
@@ -334,6 +337,7 @@ def _run_aec_episode(
                 pending_rewards.clear()
                 pending_terms.clear()
                 pending_truncs.clear()
+                pending_infos.clear()
                 agents_this_tick.clear()
 
             if not env.agents:

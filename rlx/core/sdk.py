@@ -89,11 +89,13 @@ class Task:
                 }
             )
         if isinstance(ref, str) and ref.startswith("openspiel://"):
+            from rlx.adapters.task_openspiel import interaction_for_game
+
             return cls(
                 {
                     "adapter": "openspiel",
                     "env": ref,
-                    "interaction": "aec",
+                    "interaction": interaction_for_game(ref),
                     "packaging": {"kind": "openspiel"},
                 }
             )

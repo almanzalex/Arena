@@ -1,0 +1,21 @@
+schema: rlx.task/v0alpha1
+name: task:dynamic-reentry@0.5
+adapter: pettingzoo-parallel
+env: rlx/dynamic_reentry_aec_v0
+interaction: dynamic_aec
+version: pilot+pettingzoo-1.25.0
+packaging:
+  kind: pettingzoo_wrappers
+lifecycle:
+  resolver:
+    kind: role
+    agent_roles:
+      agent_0: contestant
+      agent_1: contestant
+      agent_2: contestant
+    # Qualification pins lifecycle semantics without choosing a user's policy.
+    # Executable matches replace this placeholder with the assigned policy digest.
+    join_eligibility:
+      contestant:
+        - sha256:0000000000000000000000000000000000000000000000000000000000000000
+digest: sha256:704aaa2f834a619e35513a82827334719f020801b8138a1ecbc951bfb12a3db9

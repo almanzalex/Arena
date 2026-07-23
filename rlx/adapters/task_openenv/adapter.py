@@ -52,10 +52,42 @@ def _space_from_contract(data: dict[str, Any]) -> Any:
             shape=tuple(data["shape"]),
             dtype=np.dtype(data.get("dtype", "float32")),
         )
+    if kind == "MultiDiscrete":
+        return spaces.MultiDiscrete(
+            np.asarray(data["nvec"], dtype=np.int64),
+            dtype=np.dtype(data.get("dtype", "int64")),
+        )
+    if kind == "Dict":
+        fields = data.get("spaces")
+        if not isinstance(fields, dict) or not fields:
+            raise SchemaError("OpenEnv Dict space requires a non-empty spaces mapping")
+        return spaces.Dict(
+            {
+                str(key): _space_from_contract(dict(value))
+                for key, value in fields.items()
+            }
+        )
     raise SchemaError(
         f"OpenEnv bridge does not support RLX space {kind!r}; add a registered task "
         "packager case and qualification fixture before claiming it"
     )
+
+
+def _wire_value(value: Any) -> Any:
+    """Convert registered runtime values into JSON-safe OpenEnv payloads."""
+    try:
+        import numpy as np
+    except ImportError:  # pragma: no cover
+        np = None
+    if np is not None and isinstance(value, np.ndarray):
+        return value.tolist()
+    if np is not None and isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, dict):
+        return {str(key): _wire_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_wire_value(item) for item in value]
+    return value
 
 
 def _payload(value: Any) -> dict[str, Any]:
@@ -113,7 +145,7 @@ class OpenEnvParallelEnv:
 
     def __init__(self, spec: dict[str, Any]) -> None:
         if str(spec.get("interaction", "parallel")) != "parallel":
-            raise SchemaError("OpenEnv 0.3 pilot supports interaction=parallel only")
+            raise SchemaError("OpenEnv generic bridge currently requires interaction=parallel")
         packaging = spec.get("packaging") if isinstance(spec.get("packaging"), dict) else {}
         contract = spec.get("contract") or PILOT_CONTRACT
         if not isinstance(contract, dict) or not contract.get("roles"):
@@ -182,13 +214,22 @@ class OpenEnvParallelEnv:
                 "OpenEnv reset response missing observations mapping",
                 kind="protocol_error",
             )
+        if set(observations) != set(self.possible_agents):
+            raise TaskRuntimeError(
+                "OpenEnv reset observations do not match pinned contract agents",
+                kind="protocol_error",
+                details={
+                    "expected": sorted(self.possible_agents),
+                    "actual": sorted(observations),
+                },
+            )
         self.agents = list(self.possible_agents)
         infos = data.get("infos") or {agent: {} for agent in self.agents}
         return observations, infos
 
     def step(self, actions: dict[str, Any]):
         try:
-            result = self._client.step({"actions": actions})
+            result = self._client.step({"actions": _wire_value(actions)})
             data = _payload(result)
         except TaskRuntimeError:
             raise
@@ -265,6 +306,12 @@ class OpenEnvPackager:
         schema_digest = packaging.get("schema_digest")
         if schema_digest is None:
             schema_digest = digest_uri(sha256_bytes(canonical_json(contract)))
+        contract_digest = digest_uri(sha256_bytes(canonical_json(contract)))
+        protocol = dict(packaging.get("protocol") or {})
+        if protocol.get("contract_digest") not in {None, contract_digest}:
+            raise SchemaError(
+                "OpenEnv packaging.protocol.contract_digest does not match task contract"
+            )
         return {
             "adapter": "openenv",
             "env": spec.get("env") or PILOT_ENV,
@@ -278,6 +325,22 @@ class OpenEnvPackager:
                 "kind": "openenv",
                 "base_url": packaging.get("base_url"),
                 "schema_digest": schema_digest,
+                "protocol": {
+                    "schema": str(
+                        protocol.get("schema", "rlx.openenv-capabilities/v1")
+                    ),
+                    "interaction": "parallel",
+                    "features": list(
+                        protocol.get("features")
+                        or [
+                            "seeded_reset",
+                            "joint_action",
+                            "typed_contract",
+                            "failure_taxonomy",
+                        ]
+                    ),
+                    "contract_digest": contract_digest,
+                },
             },
             "config": dict(spec.get("config") or {}),
         }

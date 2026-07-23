@@ -1,4 +1,4 @@
-# External tasks in RLX 0.3
+# External tasks in RLX 0.5
 
 RLX executes external tasks only through the `task_packaging` registry. A packager
 must implement both `make_env(spec)` and `describe_task(spec)`. The second method is
@@ -7,9 +7,9 @@ runtime revision, and mask semantics from preflight checks.
 
 ## OpenEnv
 
-The frozen pilot is RLX competitive RPS served over OpenEnv 0.4.x. The server wraps
-the existing PettingZoo pilot with OpenEnv's own FastAPI/WebSocket transport; RLX does
-not replace OpenEnv containers or hosting.
+The qualification set includes competitive RPS and vector coordination served over
+OpenEnv 0.4.x. The server wraps PettingZoo tasks with OpenEnv's own
+FastAPI/WebSocket transport; RLX does not replace OpenEnv containers or hosting.
 
 ```bash
 pip install 'rlx[openenv]'
@@ -24,8 +24,9 @@ rlx adapter qualify task-rps-openenv-0.3.yaml \
 ```
 
 Import reads `/schema`, records its SHA-256 digest, pins the endpoint/revision, and
-embeds the RLX per-role contract. Each new client session refuses a changed schema pin.
-For non-pilot environments, pass `--contract`; an
+embeds the RLX per-role contract plus an `rlx.openenv-capabilities/v1` protocol
+declaration. Each new client session refuses a changed schema or contract pin. For
+non-pilot environments, pass `--contract`; an
 OpenEnv action/observation JSON Schema does not by itself define multi-agent Gym spaces.
 
 T-01 compares seeded observations, actions, rewards, terminations, truncations, masks,
@@ -34,9 +35,19 @@ and agent selection. T-02 crosses the actual WebSocket JSON boundary. T-03 recor
 
 ## OpenSpiel
 
-The support claim is exactly OpenSpiel `tic_tac_toe`, exposed as AEC. Observation
-tensors have shape 27, actions are `Discrete(9)`, and legal actions are required masks.
-The checked trace digest is a reference generated from OpenSpiel's authoritative state.
+The qualified catalog is organized by OpenSpiel semantics rather than one generic
+wrapper:
+
+| Family | Qualified game | RLX interaction |
+|---|---|---|
+| Sequential, deterministic, perfect information | `tic_tac_toe`, `connect_four`, `breakthrough` | `aec` |
+| Sequential with explicit chance and imperfect information | `kuhn_poker` | `aec` using information-state tensors |
+| Simultaneous, deterministic | `matrix_rps` | `parallel` using one joint `apply_actions` |
+
+Observation/action dimensions remain game-specific; legal actions are required masks.
+Chance outcomes use the episode's seeded NumPy generator and are retained in task
+infos. Each game support claim requires a checked trace generated from OpenSpiel's
+authoritative state.
 
 ```bash
 pip install 'rlx[openspiel]'
@@ -45,7 +56,15 @@ rlx task verify-equivalence examples/tasks/openspiel-tic-tac-toe.yaml \
 rlx adapter qualify examples/tasks/openspiel-tic-tac-toe.yaml \
   --trace-suite examples/tasks/openspiel-tic-tac-toe-trace.yaml \
   --out openspiel-qualification.json
+
+rlx task verify-equivalence examples/tasks/openspiel-connect-four.yaml \
+  --trace-suite examples/tasks/openspiel-connect-four-trace.yaml
+
+rlx task verify-equivalence examples/tasks/openspiel-kuhn-poker.yaml \
+  --trace-suite examples/tasks/openspiel-kuhn-poker-trace.yaml
+rlx task verify-equivalence examples/tasks/openspiel-matrix-rps.yaml \
+  --trace-suite examples/tasks/openspiel-matrix-rps-trace.yaml
 ```
 
-Chance nodes, simultaneous games, imperfect-information claims, exploitability metrics,
-and other game IDs require a new frozen fixture and qualification report.
+Exploitability metrics, unlisted game IDs, unsupported player counts, and semantic
+mismatches remain rejected and require a new contract plus frozen qualification fixture.

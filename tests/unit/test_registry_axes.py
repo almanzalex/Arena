@@ -13,9 +13,11 @@ from rlx.core.errors import SchemaError
 from rlx.core.registry import (
     ACTION_CASES,
     DISTRIBUTIONS,
+    LIFECYCLE_RESOLVERS,
     PAYLOAD_LOADERS,
     PREPROCESS_OPS,
     TASK_PACKAGERS,
+    TRAINERS,
     WRAPPER_OPS,
     UnknownKindError,
     capability_matrix,
@@ -33,6 +35,11 @@ def test_capability_matrix_lists_registered_cases() -> None:
     assert "torchscript" in matrix["payload"]
     assert "trusted_source" in matrix["payload"]
     assert "entrypoint_bundle" in matrix["task_packaging"]
+    assert {
+        "behavior_cloning",
+        "return_weighted_regression",
+    } <= set(matrix["trainer"])
+    assert {"explicit", "role"} <= set(matrix["lifecycle_resolver"])
 
 
 @pytest.mark.parametrize(
@@ -44,6 +51,8 @@ def test_capability_matrix_lists_registered_cases() -> None:
         (lambda: WRAPPER_OPS.get("grayscale_custom"), "grayscale_custom"),
         (lambda: PAYLOAD_LOADERS.get("onnx"), "onnx"),
         (lambda: TASK_PACKAGERS.get("ray"), "ray"),
+        (lambda: TRAINERS.get("ppo"), "ppo"),
+        (lambda: LIFECYCLE_RESOLVERS.get("matchmaker"), "matchmaker"),
     ],
 )
 def test_unknown_kinds_include_extension_recipe(getter, kind: str) -> None:

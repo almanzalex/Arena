@@ -35,6 +35,16 @@ class AECInteraction:
         return run_aec_match(**kwargs)
 
 
+@dataclass
+class DynamicAECInteraction:
+    kind: str = "dynamic_aec"
+
+    def run_match(self, **kwargs: Any) -> dict[str, Any]:
+        from rlx.runtime.dynamic_aec_match import run_dynamic_aec_match
+
+        return run_dynamic_aec_match(**kwargs)
+
+
 INTERACTIONS: Registry[InteractionCase] = Registry(
     "interaction",
     interface="InteractionCase",
@@ -52,6 +62,7 @@ def register_interaction(
 def register_builtins() -> None:
     register_interaction("parallel", ParallelInteraction(), replace=True)
     register_interaction("aec", AECInteraction(), replace=True)
+    register_interaction("dynamic_aec", DynamicAECInteraction(), replace=True)
 
 
 def get_interaction(kind: str) -> InteractionCase:

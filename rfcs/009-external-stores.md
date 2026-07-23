@@ -1,7 +1,7 @@
-# RFC 009 — External Artifact Stores (RLX 0.3)
+# RFC 009 — External Artifact Stores
 
-**Status:** Accepted and implemented in 0.3
-**Date:** 2026-07-21
+**Status:** Backends complete in 0.4; common qualification and authenticity added in 0.5
+**Date:** 2026-07-21 (expanded 2026-07-22)
 **Depends on:** RFC 000
 
 ## User promise
@@ -35,9 +35,19 @@ rlx pull <uri> --verify
 
 Round-trip test: export policy → push → wipe local object → pull --verify → `policy verify` / match still green.
 
-## Frozen implementation
+## Implemented backends
 
 0.3 selects `file://` first and Hugging Face Hub `hf://` as the network backend. Both
 store an `rlx.mirror/v1` descriptor plus digest-keyed bytes; verified pull rehashes every
 file and reloads policies to confirm identity. HF delegates auth to normal Hub credentials.
-OCI, W&B, and MLflow are explicit follow-ons rather than partial 0.3 claims.
+0.4 adds OCI through the standard ORAS CLI, W&B Artifacts, and MLflow run
+artifacts. They delegate authentication to their normal clients. Every credentialed
+scheme also accepts an explicit `?simulate=/absolute/path` for deterministic local
+workflow testing; simulation stays visibly present in the returned URI and is never
+reported as a live remote operation.
+
+0.5 adds one `rlx.store-qualification/v1` report for every registered scheme and
+labels evidence `simulation` or `live`. Optional detached Ed25519 attestations bind a
+user-owned issuer/key to the original artifact identity and remain valid across
+verified mirrors. RLX deliberately does not own a certificate authority or revocation
+service.

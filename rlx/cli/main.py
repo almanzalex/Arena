@@ -13,8 +13,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="rlx",
         description=(
-            "RLX 0.3 — portable policies/evaluation across native and external task "
-            "runtimes, robustness providers, and identity-preserving artifact mirrors"
+            "RLX 0.5 — portable policies/evaluation, extensible lifecycle and training, "
+            "qualified external runtimes, and authenticated artifact identity"
         ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -207,7 +207,7 @@ def main(argv: list[str] | None = None) -> int:
     p_task = sub.add_parser("task", help="Import external tasks and verify trace semantics")
     p_t = p_task.add_subparsers(dest="task_command", required=True)
     p_ti = p_t.add_parser("import", help="Import and identity-pin a registered external task")
-    p_ti.add_argument("source", help="openenv://host/env or openspiel://tic_tac_toe")
+    p_ti.add_argument("source", help="openenv://host/env or a qualified openspiel:// game")
     p_ti.add_argument("--name", required=True)
     p_ti.add_argument("--out", default=None, help="Task YAML output (defaults from --name)")
     p_ti.add_argument("--contract", default=None, help="RLX role-space contract YAML")
@@ -240,6 +240,27 @@ def main(argv: list[str] | None = None) -> int:
     p_ds.add_argument("--outcome", default=None, help="win|loss|draw")
     p_ds.add_argument("--task", default=None, help="Filter by task env id")
     p_ds.add_argument("--json", action="store_true")
+    p_dm = p_d.add_parser(
+        "materialize", help="Copy a selected dataset into a portable verified directory"
+    )
+    p_dm.add_argument("dataset", help="dataset.yaml produced by data select")
+    p_dm.add_argument("--out", required=True)
+    p_dm.add_argument(
+        "--split",
+        action="append",
+        default=[],
+        metavar="NAME=WEIGHT",
+        help="Deterministic digest-bucket split; repeat for train/validation/test",
+    )
+    p_dm.add_argument("--split-seed", type=int, default=0)
+    p_dm.add_argument("--json", action="store_true")
+
+    p_train = sub.add_parser(
+        "train", help="Run a reproducible training recipe over an RLX dataset"
+    )
+    p_train.add_argument("recipe", help="rlx.train/v1 YAML recipe")
+    p_train.add_argument("--out", required=True, help="Training run + policy output directory")
+    p_train.add_argument("--json", action="store_true")
 
     p_population = sub.add_parser("population", help="Population commands (0.2)")
     p_pop = p_population.add_subparsers(dest="population_command", required=True)
@@ -327,9 +348,29 @@ def main(argv: list[str] | None = None) -> int:
     p_capture.add_argument("--out", default=None, help="Write draft JSON to this path")
     p_capture.add_argument("--json", action="store_true", help="Print draft as JSON")
 
+    p_attest = sub.add_parser(
+        "attest",
+        help="Create and verify detached artifact authenticity attestations",
+    )
+    p_at = p_attest.add_subparsers(dest="attest_command", required=True)
+    p_ak = p_at.add_parser("keygen", help="Generate a user-owned Ed25519 keypair")
+    p_ak.add_argument("--private", required=True)
+    p_ak.add_argument("--public", required=True)
+    p_as = p_at.add_parser("sign", help="Sign an RLX artifact identity")
+    p_as.add_argument("source")
+    p_as.add_argument("--key", required=True, help="Ed25519 private key PEM")
+    p_as.add_argument("--issuer", required=True)
+    p_as.add_argument("--out", required=True)
+    p_av = p_at.add_parser("verify", help="Verify artifact identity and detached signature")
+    p_av.add_argument("source")
+    p_av.add_argument("attestation")
+    p_av.add_argument("--key", required=True, help="Trusted Ed25519 public key PEM")
+
     p_push = sub.add_parser("push", help="Mirror an RLX artifact without changing identity")
     p_push.add_argument("source", help="Artifact path, object digest, or local ref")
-    p_push.add_argument("destination", help="file:// or hf:// store URI")
+    p_push.add_argument(
+        "destination", help="file://, hf://, oci://, wandb://, or mlflow:// store URI"
+    )
     p_push.add_argument("--verify", action="store_true")
     p_push.add_argument("--json", action="store_true")
 
@@ -338,6 +379,19 @@ def main(argv: list[str] | None = None) -> int:
     p_pull.add_argument("--out", default=None, help="Restore directory (defaults from identity)")
     p_pull.add_argument("--verify", action="store_true")
     p_pull.add_argument("--json", action="store_true")
+
+    p_store = sub.add_parser(
+        "store",
+        help="External-store qualification commands",
+    )
+    p_s = p_store.add_subparsers(dest="store_command", required=True)
+    p_sq = p_s.add_parser(
+        "qualify",
+        help="Produce machine-readable verified push/pull identity evidence",
+    )
+    p_sq.add_argument("source", help="Local RLX artifact")
+    p_sq.add_argument("destination", help="Registered store URI")
+    p_sq.add_argument("--out", required=True, help="Qualification report JSON")
 
     args = parser.parse_args(argv)
     try:
@@ -364,6 +418,10 @@ def main(argv: list[str] | None = None) -> int:
                 return cmd_data_inspect(args)
             if args.data_command == "select":
                 return cmd_data_select(args)
+            if args.data_command == "materialize":
+                return cmd_data_materialize(args)
+        if args.command == "train":
+            return cmd_train(args)
         if args.command == "population":
             if args.population_command == "create":
                 return cmd_population_create(args)
@@ -384,10 +442,14 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_adapter_qualify(args)
         if args.command == "capture":
             return cmd_capture(args)
+        if args.command == "attest":
+            return cmd_attest(args)
         if args.command == "push":
             return cmd_push(args)
         if args.command == "pull":
             return cmd_pull(args)
+        if args.command == "store" and args.store_command == "qualify":
+            return cmd_store_qualify(args)
     except Exception as e:  # noqa: BLE001
         print(f"error: {e}", file=sys.stderr)
         return 1
@@ -681,15 +743,15 @@ def cmd_task_import(args: argparse.Namespace) -> int:
             source_revision=args.source_revision,
             timeout_seconds=args.timeout,
         )
-    elif args.source == "openspiel://tic_tac_toe":
-        from rlx.adapters.task_openspiel import OpenSpielPackager
+    elif args.source.startswith("openspiel://"):
+        from rlx.adapters.task_openspiel import OpenSpielPackager, interaction_for_game
 
         manifest = {
             "schema": TASK_SCHEMA,
             "name": args.name,
             "adapter": "openspiel",
             "env": args.source,
-            "interaction": "aec",
+            "interaction": interaction_for_game(args.source),
             "packaging": {"kind": "openspiel"},
         }
         description = OpenSpielPackager().describe_task(manifest)
@@ -756,6 +818,40 @@ def cmd_data_select(args: argparse.Namespace) -> int:
         out_dir=args.out,
     )
     _print(dataset, as_json=args.json)
+    return 0
+
+
+def cmd_data_materialize(args: argparse.Namespace) -> int:
+    from rlx.core.dataset import materialize_dataset
+
+    splits: dict[str, float] | None = None
+    if args.split:
+        splits = {}
+        for item in args.split:
+            if "=" not in item:
+                raise SystemExit("--split must be NAME=WEIGHT")
+            name, raw_weight = item.split("=", 1)
+            if name in splits:
+                raise SystemExit(f"duplicate --split name {name!r}")
+            try:
+                splits[name] = float(raw_weight)
+            except ValueError as exc:
+                raise SystemExit(f"--split weight must be numeric: {item!r}") from exc
+    dataset = materialize_dataset(
+        args.dataset,
+        out_dir=args.out,
+        splits=splits,
+        split_seed=args.split_seed,
+    )
+    _print(dataset, as_json=args.json)
+    return 0
+
+
+def cmd_train(args: argparse.Namespace) -> int:
+    from rlx.runtime.training import run_training_recipe
+
+    run = run_training_recipe(args.recipe, out_dir=args.out)
+    _print(run, as_json=args.json)
     return 0
 
 
@@ -1032,6 +1128,35 @@ def cmd_capture(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_attest(args: argparse.Namespace) -> int:
+    from rlx.core.attestation import (
+        generate_signing_keypair,
+        sign_artifact,
+        verify_artifact_attestation,
+    )
+
+    if args.attest_command == "keygen":
+        result = generate_signing_keypair(
+            private_key=args.private,
+            public_key=args.public,
+        )
+    elif args.attest_command == "sign":
+        result = sign_artifact(
+            args.source,
+            private_key=args.key,
+            out=args.out,
+            issuer=args.issuer,
+        )
+    else:
+        result = verify_artifact_attestation(
+            args.source,
+            attestation=args.attestation,
+            public_key=args.key,
+        )
+    print(json.dumps(result, indent=2))
+    return 0
+
+
 def cmd_push(args: argparse.Namespace) -> int:
     from rlx.core.mirror import push_artifact
 
@@ -1050,6 +1175,18 @@ def cmd_pull(args: argparse.Namespace) -> int:
     result = pull_artifact(args.source, out, verify=args.verify)
     _print(result, as_json=args.json)
     return 0
+
+
+def cmd_store_qualify(args: argparse.Namespace) -> int:
+    from rlx.conformance.qualification import qualify_store
+
+    report = qualify_store(
+        args.source,
+        destination=args.destination,
+        report_path=args.out,
+    )
+    print(json.dumps(report, indent=2))
+    return 0 if report["ok"] else 1
 
 
 def _load_task_arg(task_arg: str, *, config: dict[str, Any] | None = None) -> Any:

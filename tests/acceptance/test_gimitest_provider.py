@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -93,3 +94,50 @@ def test_gimitest_cli_and_qualification_fixture(tmp_path: Path) -> None:
     )
     assert qualification["ok"] is True
     assert qualification["checks"]["provider_lineage"]["ok"] is True
+
+
+@pytest.mark.acceptance
+@pytest.mark.requires_gimitest
+def test_gimitest_can_run_across_isolated_python_worker_boundary(
+    tmp_path: Path,
+) -> None:
+    provider_config = {
+        "suite": "base-hooks",
+        "test_class": "gimitest.gtest:GTest",
+        "parameters": {"purpose": "subprocess provider qualification"},
+        "isolation": {
+            "mode": "subprocess",
+            "python": str(Path(sys.executable).resolve()),
+            "timeout_seconds": 60,
+        },
+    }
+    suite = {
+        "schema": "rlx.evaluation/v0alpha1",
+        "name": "gimitest-subprocess",
+        "provider": "gimitest",
+        "provider_config": provider_config,
+        "interaction": "parallel",
+        "task": {
+            "adapter": "pettingzoo-parallel",
+            "env": "rlx/competitive_rps_v0",
+            "interaction": "parallel",
+            "config": {"max_cycles": 1},
+        },
+        "assignments": {
+            "player_0": str(Path("examples/eval/demo/rock.rlx").resolve()),
+            "player_1": str(Path("examples/eval/demo/paper.rlx").resolve()),
+        },
+        "seeds": [0],
+        "action_mode": "deterministic",
+        "metrics": ["mean_return"],
+    }
+    result = run_evaluation(
+        suite,
+        policy_index={},
+        out_dir=tmp_path / "subprocess-run",
+    )
+    assert result["provider"]["kind"] == "gimitest"
+    assert result["provider"]["config_digest"] == digest_uri(
+        sha256_bytes(canonical_json(provider_config))
+    )
+    assert result["cells"][0]["failures"] == 0

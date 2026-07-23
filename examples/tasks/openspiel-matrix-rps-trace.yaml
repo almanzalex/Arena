@@ -1,0 +1,10 @@
+schema: rlx.trace-suite/v1
+name: openspiel-matrix-rps-reference
+interaction: parallel
+episodes:
+  - seed: 0
+    actions:
+      - {player_0: 0, player_1: 1}
+tolerances:
+  default: 0.0
+reference_digest: sha256:1344333a1ab354196d896bd522776d0c4225e409a19c46543c00404af39eeabc

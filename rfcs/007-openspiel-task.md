@@ -1,6 +1,6 @@
 # RFC 007 — OpenSpiel Task Adapter (RLX 0.3)
 
-**Status:** Accepted and implemented in 0.3
+**Status:** Accepted in 0.3; generalized by semantic family in 0.5
 **Date:** 2026-07-21
 **Depends on:** RFC 000, RFC 004, RFC 006
 
@@ -29,7 +29,15 @@ One small game runs `match` + `eval` with provenance; qualify report attached.
 
 ## Frozen implementation
 
-The only 0.3 game id is `tic_tac_toe` on OpenSpiel 2.x. It is mapped to AEC roles
-`player_0`/`player_1`, observation tensors of length 27, `Discrete(9)` actions, and
-required legal-action masks. `examples/tasks/openspiel-tic-tac-toe-trace.yaml` pins the
-reference trace digest. Other games fail loud with the extension and qualification recipe.
+The 0.3 game is `tic_tac_toe`. Version 0.5 qualifies three explicit semantic
+families on OpenSpiel 2.x:
+
+- sequential deterministic perfect information: `tic_tac_toe`, `connect_four`,
+  `breakthrough`;
+- sequential chance/imperfect information: `kuhn_poker`, with seeded chance
+  consumption and information-state tensors;
+- simultaneous deterministic: `matrix_rps`, with one joint `apply_actions`.
+
+All use roles `player_0`/`player_1`, game-specific tensors/actions, required legal
+masks, and frozen traces. Other games or mismatched semantics fail with the extension
+and qualification recipe.

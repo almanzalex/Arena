@@ -132,3 +132,79 @@ def test_t01_t02_real_openenv_transport_equivalence(tmp_path: Path) -> None:
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(timeout=5)
+
+
+@pytest.mark.acceptance
+@pytest.mark.requires_openenv
+def test_openenv_generic_box_contract_second_task(tmp_path: Path) -> None:
+    port = _free_port()
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "rlx.adapters.task_openenv.server",
+            "--port",
+            str(port),
+            "--env",
+            "vector",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    try:
+        deadline = time.monotonic() + 30
+        while True:
+            if proc.poll() is not None:
+                output = proc.stdout.read() if proc.stdout else ""
+                pytest.fail(f"OpenEnv vector fixture exited before ready: {output}")
+            try:
+                with urlopen(
+                    f"http://127.0.0.1:{port}/health",
+                    timeout=0.5,
+                ) as response:  # noqa: S310
+                    if response.status == 200:
+                        break
+            except Exception:
+                if time.monotonic() >= deadline:
+                    pytest.fail("OpenEnv vector fixture did not become ready in 30 seconds")
+                time.sleep(0.1)
+
+        imported_path = tmp_path / "openenv-vector.yaml"
+        assert main(
+            [
+                "task",
+                "import",
+                f"openenv://127.0.0.1:{port}/rlx/vector_coordination_v0",
+                "--name",
+                "task:vector-openenv@0.5",
+                "--contract",
+                "examples/tasks/vector-contract.yaml",
+                "--out",
+                str(imported_path),
+                "--source-revision",
+                "openenv-0.4.1:vector",
+            ]
+        ) == 0
+        imported = load_manifest(imported_path)
+        protocol = imported["packaging"]["protocol"]
+        assert protocol["schema"] == "rlx.openenv-capabilities/v1"
+        assert protocol["contract_digest"].startswith("sha256:")
+        native = load_manifest("examples/tasks/native-vector.yaml")
+        suite = load_manifest("examples/tasks/vector-equivalence.yaml")
+        result = verify_task_equivalence(native, imported, suite)
+        assert result["ok"] is True
+        qualification = qualify_task_fixture(
+            imported_path,
+            peer="examples/tasks/native-vector.yaml",
+            trace_suite="examples/tasks/vector-equivalence.yaml",
+            report_path=tmp_path / "vector-qualification.json",
+        )
+        assert qualification["ok"] is True
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)

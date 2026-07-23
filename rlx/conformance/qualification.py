@@ -13,9 +13,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from rlx.adapters.policy_custom_torch import (
     load_runtime,
@@ -28,6 +30,69 @@ from rlx.core.manifests import (
     dump_json,
     load_manifest,
 )
+
+
+def qualify_store(
+    source: Path | str,
+    *,
+    destination: str,
+    report_path: Path | str | None = None,
+    restored_out: Path | str | None = None,
+) -> dict[str, Any]:
+    """Produce identity-preserving push/pull evidence for any registered store."""
+    from rlx.core.mirror import build_mirror_artifact, pull_artifact, push_artifact
+
+    started = _utc_now()
+    source_path = Path(source).resolve()
+    source_artifact = build_mirror_artifact(source_path)
+    expected = source_artifact.identity
+    parsed = urlparse(destination)
+    mode = "simulation" if "simulate" in parse_qs(parsed.query) else "live"
+    temporary = (
+        tempfile.TemporaryDirectory(prefix="rlx-store-qualify-")
+        if restored_out is None
+        else nullcontext(None)
+    )
+    with temporary as raw:
+        restored = (
+            Path(raw) / "restored.rlx"
+            if restored_out is None
+            else Path(restored_out)
+        )
+        pushed = push_artifact(source_path, destination, verify=True)
+        pulled = pull_artifact(pushed["uri"], restored, verify=True)
+        restored_identity = pulled["identity"]
+    checks = {
+        "push_verified": {"ok": bool(pushed.get("verified"))},
+        "pull_verified": {"ok": bool(pulled.get("verified"))},
+        "identity_preserved": {
+            "ok": (
+                restored_identity == expected
+                and pushed.get("kind") == source_artifact.kind
+                and pulled.get("kind") == source_artifact.kind
+            ),
+            "expected": expected,
+            "restored": restored_identity,
+            "kind": source_artifact.kind,
+        },
+    }
+    report = {
+        "schema": "rlx.store-qualification/v1",
+        "backend": parsed.scheme,
+        "mode": mode,
+        "source": str(source_path),
+        "destination": destination,
+        "immutable_uri": pushed["uri"],
+        "identity": expected,
+        "restored_out": str(Path(restored_out).resolve()) if restored_out is not None else None,
+        "started_at": started,
+        "finished_at": _utc_now(),
+        "ok": all(check["ok"] for check in checks.values()),
+        "checks": checks,
+    }
+    if report_path is not None:
+        dump_json(report, report_path)
+    return report
 
 
 def _utc_now() -> str:

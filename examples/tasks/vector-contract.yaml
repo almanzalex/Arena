@@ -1,0 +1,22 @@
+agents: [player_0, player_1]
+roles:
+  player_0:
+    agents: [player_0]
+    observation:
+      type: Box
+      shape: [2]
+      dtype: float32
+      low: 0.0
+      high: 1.0
+    action: {type: Discrete, n: 2, dtype: int64}
+  player_1:
+    agents: [player_1]
+    observation:
+      type: Box
+      shape: [2]
+      dtype: float32
+      low: 0.0
+      high: 1.0
+    action: {type: Discrete, n: 2, dtype: int64}
+provides_masks: false
+dynamic_agents: false

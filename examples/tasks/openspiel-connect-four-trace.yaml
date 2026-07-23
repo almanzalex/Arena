@@ -1,0 +1,16 @@
+schema: rlx.trace-suite/v1
+name: openspiel-connect-four-reference
+interaction: aec
+episodes:
+  - seed: 0
+    actions:
+      - {agent: player_0, action: 0}
+      - {agent: player_1, action: 1}
+      - {agent: player_0, action: 0}
+      - {agent: player_1, action: 1}
+      - {agent: player_0, action: 0}
+      - {agent: player_1, action: 1}
+      - {agent: player_0, action: 0}
+tolerances:
+  default: 0.0
+reference_digest: sha256:b3aa7b18ddf57c455950022bb17879604ac9c8da97be456553b40f8bf2e4012f

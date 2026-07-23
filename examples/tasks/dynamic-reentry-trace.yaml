@@ -1,0 +1,13 @@
+schema: rlx.trace-suite/v1
+name: dynamic-reentry-reference
+interaction: dynamic_aec
+episodes:
+  - seed: 0
+    actions:
+      - {agent: agent_0, action: 0}
+      - {agent: agent_1, action: 1}
+      - {agent: agent_0, action: 0}
+      - {agent: agent_2, action: 2}
+tolerances:
+  default: 0.0
+reference_digest: sha256:ee335d7bdb0838f66d61bcb9d68f3b6358607efb3c4f0be81f84d139adc42f46

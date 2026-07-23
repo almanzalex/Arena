@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import io
 import json
+import shutil
+import subprocess
+import tarfile
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urldefrag, urlparse
+from urllib.parse import parse_qs, urldefrag, urlencode, urlparse
 
 from rlx.core.errors import StoreError
 from rlx.core.identity import (
@@ -120,6 +124,9 @@ def _validate_descriptor(descriptor: dict[str, Any], expected: str | None = None
         raise StoreError("mirror descriptor identity must be sha256:…")
     if expected is not None and identity != expected:
         raise StoreError(f"mirror identity mismatch: URI requested {expected}, descriptor has {identity}")
+    kind = descriptor.get("kind")
+    if kind not in {"policy", "directory", "object"}:
+        raise StoreError(f"unsupported mirror artifact kind: {kind!r}")
     files = descriptor.get("files")
     if not isinstance(files, list) or not files:
         raise StoreError("mirror descriptor requires files")
@@ -147,6 +154,91 @@ def _identity_from_uri(uri: str) -> tuple[str, str]:
     return base, fragment
 
 
+def _simulation_root(uri: str) -> Path | None:
+    values = parse_qs(urlparse(urldefrag(uri)[0]).query).get("simulate")
+    if not values:
+        return None
+    root = Path(values[0])
+    if not root.is_absolute():
+        raise StoreError("store ?simulate= path must be absolute")
+    return root
+
+
+def _simulate_push(
+    artifact: MirrorArtifact, destination: str, *, verify: bool
+) -> str | None:
+    root = _simulation_root(destination)
+    if root is None:
+        return None
+    FileStoreAdapter().push(artifact, root.as_uri(), verify=verify)
+    return _artifact_uri(destination, artifact.identity)
+
+
+def _simulate_pull(source: str, out: Path | str, *, verify: bool) -> dict[str, Any] | None:
+    root = _simulation_root(source)
+    if root is None:
+        return None
+    _base, identity = _identity_from_uri(source)
+    return FileStoreAdapter().pull(
+        _artifact_uri(root.as_uri(), identity), out, verify=verify
+    )
+
+
+def _write_provider_tree(artifact: MirrorArtifact, root: Path) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    descriptor = artifact.descriptor()
+    _validate_descriptor(descriptor, artifact.identity)
+    (root / "descriptor.json").write_bytes(canonical_json(descriptor) + b"\n")
+    for entry in descriptor["files"]:
+        digest_hex = parse_digest(entry["digest"])
+        target = root / "objects" / digest_hex[:2] / digest_hex[2:]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(artifact.files[entry["path"]])
+
+
+def _read_provider_tree(root: Path, *, expected: str) -> tuple[dict[str, Any], dict[str, bytes]]:
+    descriptors = sorted(root.rglob("descriptor.json"))
+    if len(descriptors) != 1:
+        raise StoreError(
+            f"remote mirror must contain exactly one descriptor.json, found {len(descriptors)}"
+        )
+    tree = descriptors[0].parent
+    descriptor = json.loads(descriptors[0].read_text(encoding="utf-8"))
+    _validate_descriptor(descriptor, expected)
+    blobs: dict[str, bytes] = {}
+    for entry in descriptor["files"]:
+        digest_hex = parse_digest(entry["digest"])
+        blob = tree / "objects" / digest_hex[:2] / digest_hex[2:]
+        if not blob.is_file():
+            raise StoreError(f"remote mirror object missing: {entry['digest']}")
+        blobs[entry["digest"]] = blob.read_bytes()
+    return descriptor, blobs
+
+
+def _verify_provider_blobs(
+    descriptor: dict[str, Any], blobs: dict[str, bytes], *, backend: str
+) -> None:
+    for entry in descriptor["files"]:
+        actual = digest_uri(sha256_bytes(blobs[entry["digest"]]))
+        if actual != entry["digest"]:
+            raise StoreError(
+                f"{backend} verification failed for {entry['path']}: "
+                f"expected {entry['digest']}, got {actual}"
+            )
+
+
+def _restore_provider_tree(
+    root: Path,
+    source: str,
+    out: Path | str,
+    *,
+    verify: bool,
+) -> dict[str, Any]:
+    _base, identity = _identity_from_uri(source)
+    descriptor, blobs = _read_provider_tree(root, expected=identity)
+    return _write_restored(descriptor, blobs.__getitem__, out, verify=verify)
+
+
 def _write_restored(
     descriptor: dict[str, Any],
     load_blob: Any,
@@ -172,11 +264,17 @@ def _write_restored(
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(data)
         restored.append({"path": str(dest), "digest": actual})
-    if verify and descriptor["kind"] == "policy":
-        actual_identity = Policy.load(out_path).digest
+    if verify:
+        if descriptor["kind"] == "object":
+            if len(descriptor["files"]) != 1:
+                raise StoreError("object mirror descriptor must contain exactly one file")
+            only_path = out_path / descriptor["files"][0]["path"]
+            actual_identity = digest_uri(sha256_bytes(only_path.read_bytes()))
+        else:
+            actual_identity = build_mirror_artifact(out_path).identity
         if actual_identity != descriptor["identity"]:
             raise StoreError(
-                "restored policy identity changed: "
+                "restored artifact identity changed: "
                 f"expected {descriptor['identity']}, got {actual_identity}"
             )
     return {
@@ -277,6 +375,9 @@ class HuggingFaceStoreAdapter:
         return HfApi()
 
     def push(self, artifact: MirrorArtifact, destination: str, *, verify: bool = False) -> str:
+        simulated = _simulate_push(artifact, destination, verify=verify)
+        if simulated is not None:
+            return simulated
         base = urldefrag(destination)[0]
         repo_id, repo_type, prefix, revision = _parse_hf_uri(base)
         api = self._api()
@@ -358,11 +459,294 @@ class HuggingFaceStoreAdapter:
         return Path(path).read_bytes()
 
     def pull(self, source: str, out: Path | str, *, verify: bool = False) -> dict[str, Any]:
+        simulated = _simulate_pull(source, out, verify=verify)
+        if simulated is not None:
+            return simulated
         descriptor = self._download_descriptor(source)
         def load_blob(digest: str) -> bytes:
             return self._download_blob(source, digest)
 
         return _write_restored(descriptor, load_blob, out, verify=verify)
+
+
+class OCIStoreAdapter:
+    """OCI artifact mirror using the standard ORAS CLI and normal registry auth."""
+
+    scheme = "oci"
+    artifact_type = "application/vnd.rlx.mirror.v1"
+    media_type = "application/vnd.rlx.mirror.v1+tar"
+
+    @staticmethod
+    def _oras() -> str:
+        executable = shutil.which("oras")
+        if executable is None:
+            raise StoreError(
+                "OCI store requires the ORAS CLI. Install from https://oras.land/ "
+                "and authenticate with `oras login`, or append ?simulate=/absolute/path."
+            )
+        return executable
+
+    @staticmethod
+    def _target(uri: str, identity: str) -> tuple[str, str]:
+        parsed = urlparse(urldefrag(uri)[0])
+        if parsed.scheme != "oci" or not parsed.netloc or not parsed.path.strip("/"):
+            raise StoreError("OCI URI must be oci://registry/repository")
+        repository = f"{parsed.netloc}/{parsed.path.strip('/')}"
+        tag = parse_qs(parsed.query).get("tag", [f"sha256-{parse_digest(identity)}"])[0]
+        return f"{repository}:{tag}", tag
+
+    @staticmethod
+    def _archive(artifact: MirrorArtifact, path: Path) -> None:
+        with tempfile.TemporaryDirectory(prefix="rlx-oci-tree-") as raw:
+            tree = Path(raw) / "mirror"
+            _write_provider_tree(artifact, tree)
+            with tarfile.open(path, "w") as archive:
+                archive.add(tree, arcname="mirror", recursive=True)
+
+    @staticmethod
+    def _extract_archive(path: Path, out: Path) -> None:
+        with tarfile.open(path, "r") as archive:
+            for member in archive.getmembers():
+                relative = Path(member.name)
+                if relative.is_absolute() or ".." in relative.parts or member.issym() or member.islnk():
+                    raise StoreError(f"unsafe OCI mirror archive member: {member.name!r}")
+                if member.isdir():
+                    (out / relative).mkdir(parents=True, exist_ok=True)
+                    continue
+                if not member.isfile():
+                    raise StoreError(f"unsupported OCI mirror archive member: {member.name!r}")
+                target = out / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                source = archive.extractfile(member)
+                if source is None:
+                    raise StoreError(f"cannot extract OCI mirror member: {member.name!r}")
+                with target.open("wb") as destination:
+                    shutil.copyfileobj(source, destination)
+
+    def _download_tree(self, source: str) -> tuple[Path, tempfile.TemporaryDirectory[str]]:
+        _base, identity = _identity_from_uri(source)
+        target, _tag = self._target(source, identity)
+        holder = tempfile.TemporaryDirectory(prefix="rlx-oci-pull-")
+        root = Path(holder.name)
+        subprocess.run(
+            [self._oras(), "pull", target, "--output", str(root)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        archives = sorted(root.rglob("mirror.tar"))
+        if len(archives) != 1:
+            holder.cleanup()
+            raise StoreError(f"OCI artifact must contain one mirror.tar, found {len(archives)}")
+        extracted = root / "extracted"
+        extracted.mkdir()
+        self._extract_archive(archives[0], extracted)
+        return extracted, holder
+
+    def push(self, artifact: MirrorArtifact, destination: str, *, verify: bool = False) -> str:
+        simulated = _simulate_push(artifact, destination, verify=verify)
+        if simulated is not None:
+            return simulated
+        target, tag = self._target(destination, artifact.identity)
+        with tempfile.TemporaryDirectory(prefix="rlx-oci-push-") as raw:
+            root = Path(raw)
+            archive = root / "mirror.tar"
+            self._archive(artifact, archive)
+            subprocess.run(
+                [
+                    self._oras(),
+                    "push",
+                    target,
+                    "--artifact-type",
+                    self.artifact_type,
+                    f"mirror.tar:{self.media_type}",
+                ],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        base = urldefrag(destination)[0]
+        parsed = urlparse(base)
+        query = parse_qs(parsed.query)
+        query["tag"] = [tag]
+        encoded = urlencode({key: values[-1] for key, values in query.items()})
+        uri = parsed._replace(query=encoded).geturl() + f"#{artifact.identity}"
+        if verify:
+            tree, holder = self._download_tree(uri)
+            try:
+                descriptor, blobs = _read_provider_tree(tree, expected=artifact.identity)
+                _verify_provider_blobs(descriptor, blobs, backend="OCI push")
+            finally:
+                holder.cleanup()
+        return uri
+
+    def pull(self, source: str, out: Path | str, *, verify: bool = False) -> dict[str, Any]:
+        simulated = _simulate_pull(source, out, verify=verify)
+        if simulated is not None:
+            return simulated
+        tree, holder = self._download_tree(source)
+        try:
+            return _restore_provider_tree(tree, source, out, verify=verify)
+        finally:
+            holder.cleanup()
+
+
+class WandBStoreAdapter:
+    """Weights & Biases artifact adapter; credentials remain owned by W&B."""
+
+    scheme = "wandb"
+
+    @staticmethod
+    def _location(uri: str, identity: str) -> tuple[str, str, str, str]:
+        parsed = urlparse(urldefrag(uri)[0])
+        parts = [part for part in parsed.path.split("/") if part]
+        if parsed.scheme != "wandb" or not parsed.netloc or not parts:
+            raise StoreError("W&B URI must be wandb://entity/project[/artifact]")
+        name = parts[1] if len(parts) > 1 else f"rlx-{parse_digest(identity)[:16]}"
+        version = parse_qs(parsed.query).get("version", ["latest"])[0]
+        return parsed.netloc, parts[0], name, version
+
+    @staticmethod
+    def _wandb() -> Any:
+        try:
+            import wandb
+        except ImportError as exc:
+            raise StoreError(
+                "W&B store is optional. Install with `pip install 'rlx[wandb]'`, "
+                "run `wandb login`, or append ?simulate=/absolute/path."
+            ) from exc
+        return wandb
+
+    def push(self, artifact: MirrorArtifact, destination: str, *, verify: bool = False) -> str:
+        simulated = _simulate_push(artifact, destination, verify=verify)
+        if simulated is not None:
+            return simulated
+        entity, project, name, _version = self._location(destination, artifact.identity)
+        wandb = self._wandb()
+        with tempfile.TemporaryDirectory(prefix="rlx-wandb-push-") as raw:
+            tree = Path(raw) / "mirror"
+            _write_provider_tree(artifact, tree)
+            run = wandb.init(entity=entity, project=project, job_type="rlx-mirror", reinit=True)
+            try:
+                remote = wandb.Artifact(
+                    name=name,
+                    type="rlx-artifact",
+                    metadata={"identity": artifact.identity, "schema": MIRROR_SCHEMA},
+                )
+                remote.add_dir(str(tree))
+                logged = run.log_artifact(remote)
+                logged.wait()
+                version = getattr(logged, "version", None) or "latest"
+            finally:
+                run.finish()
+        parsed = urlparse(urldefrag(destination)[0])
+        uri = parsed._replace(query=urlencode({"version": version})).geturl()
+        uri += f"#{artifact.identity}"
+        if verify:
+            with tempfile.TemporaryDirectory(prefix="rlx-wandb-verify-") as raw:
+                downloaded = self._download(uri, Path(raw))
+                descriptor, blobs = _read_provider_tree(downloaded, expected=artifact.identity)
+                _verify_provider_blobs(descriptor, blobs, backend="W&B push")
+        return uri
+
+    def _download(self, source: str, root: Path) -> Path:
+        _base, identity = _identity_from_uri(source)
+        entity, project, name, version = self._location(source, identity)
+        artifact = self._wandb().Api().artifact(
+            f"{entity}/{project}/{name}:{version}", type="rlx-artifact"
+        )
+        return Path(artifact.download(root=str(root)))
+
+    def pull(self, source: str, out: Path | str, *, verify: bool = False) -> dict[str, Any]:
+        simulated = _simulate_pull(source, out, verify=verify)
+        if simulated is not None:
+            return simulated
+        with tempfile.TemporaryDirectory(prefix="rlx-wandb-pull-") as raw:
+            tree = self._download(source, Path(raw))
+            return _restore_provider_tree(tree, source, out, verify=verify)
+
+
+class MLflowStoreAdapter:
+    """MLflow run-artifact adapter with normal tracking-server credentials."""
+
+    scheme = "mlflow"
+
+    @staticmethod
+    def _mlflow() -> Any:
+        try:
+            import mlflow
+        except ImportError as exc:
+            raise StoreError(
+                "MLflow store is optional. Install with `pip install 'rlx[mlflow]'` "
+                "or append ?simulate=/absolute/path."
+            ) from exc
+        return mlflow
+
+    @staticmethod
+    def _tracking(uri: str) -> str | None:
+        return parse_qs(urlparse(urldefrag(uri)[0]).query).get("tracking_uri", [None])[0]
+
+    def push(self, artifact: MirrorArtifact, destination: str, *, verify: bool = False) -> str:
+        simulated = _simulate_push(artifact, destination, verify=verify)
+        if simulated is not None:
+            return simulated
+        parsed = urlparse(urldefrag(destination)[0])
+        if parsed.scheme != "mlflow" or not parsed.netloc:
+            raise StoreError("MLflow destination must be mlflow://experiment-name")
+        experiment = parsed.netloc
+        prefix = parsed.path.strip("/") or "rlx"
+        tracking = self._tracking(destination)
+        mlflow = self._mlflow()
+        if tracking:
+            mlflow.set_tracking_uri(tracking)
+        experiment_record = mlflow.set_experiment(experiment)
+        with tempfile.TemporaryDirectory(prefix="rlx-mlflow-push-") as raw:
+            tree = Path(raw) / "mirror"
+            _write_provider_tree(artifact, tree)
+            with mlflow.start_run(
+                experiment_id=experiment_record.experiment_id,
+                run_name=f"rlx-{parse_digest(artifact.identity)[:12]}",
+            ) as run:
+                artifact_path = f"{prefix}/{parse_digest(artifact.identity)}"
+                mlflow.log_artifacts(str(tree), artifact_path=artifact_path)
+                mlflow.set_tags({"rlx.identity": artifact.identity, "rlx.schema": MIRROR_SCHEMA})
+                run_id = run.info.run_id
+        query = urlencode({"tracking_uri": tracking}) if tracking else ""
+        uri = f"mlflow://{run_id}/{artifact_path}"
+        if query:
+            uri += f"?{query}"
+        uri += f"#{artifact.identity}"
+        if verify:
+            with tempfile.TemporaryDirectory(prefix="rlx-mlflow-verify-") as raw:
+                tree = self._download(uri, Path(raw))
+                descriptor, blobs = _read_provider_tree(tree, expected=artifact.identity)
+                _verify_provider_blobs(descriptor, blobs, backend="MLflow push")
+        return uri
+
+    def _download(self, source: str, root: Path) -> Path:
+        parsed = urlparse(urldefrag(source)[0])
+        if parsed.scheme != "mlflow" or not parsed.netloc or not parsed.path.strip("/"):
+            raise StoreError("MLflow artifact URI must include run id and artifact path")
+        mlflow = self._mlflow()
+        tracking = self._tracking(source)
+        if tracking:
+            mlflow.set_tracking_uri(tracking)
+        downloaded = mlflow.artifacts.download_artifacts(
+            run_id=parsed.netloc,
+            artifact_path=parsed.path.strip("/"),
+            dst_path=str(root),
+            tracking_uri=tracking,
+        )
+        return Path(downloaded)
+
+    def pull(self, source: str, out: Path | str, *, verify: bool = False) -> dict[str, Any]:
+        simulated = _simulate_pull(source, out, verify=verify)
+        if simulated is not None:
+            return simulated
+        with tempfile.TemporaryDirectory(prefix="rlx-mlflow-pull-") as raw:
+            tree = self._download(source, Path(raw))
+            return _restore_provider_tree(tree, source, out, verify=verify)
 
 
 def push_artifact(source: Path | str, destination: str, *, verify: bool = False) -> dict[str, Any]:

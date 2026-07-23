@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 import importlib
+import json
+import subprocess
+import sys
+import tempfile
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import Any
 
 from rlx.core.errors import RlxError, SchemaError
@@ -63,6 +68,17 @@ class GimitestEvalProvider:
         config = suite.get("provider_config") or {}
         if not isinstance(config, dict):
             raise SchemaError("provider_config must be a mapping")
+        isolation = dict(config.get("isolation") or {})
+        if isolation.get("mode", "in_process") == "subprocess":
+            return self._run_subprocess(suite, isolation=isolation, **kwargs)
+        if isolation.get("mode", "in_process") != "in_process":
+            raise SchemaError("gimitest isolation.mode must be in_process|subprocess")
+        return self._run_in_process(suite, **kwargs)
+
+    def _run_in_process(
+        self, suite: dict[str, Any], **kwargs: Any
+    ) -> dict[str, Any]:
+        config = suite.get("provider_config") or {}
         try:
             provider_version = version("gimitest")
         except PackageNotFoundError as e:
@@ -92,3 +108,77 @@ class GimitestEvalProvider:
             identity_suite=identity_suite,
             **kwargs,
         )
+
+    def _run_subprocess(
+        self,
+        suite: dict[str, Any],
+        *,
+        isolation: dict[str, Any],
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Run the complete provider in a user-selected Python environment.
+
+        This isolates incompatible Python dependencies. It is process isolation,
+        not a malware sandbox; OS/container restrictions remain the caller's job.
+        """
+        if kwargs.get("store") is not None:
+            raise SchemaError(
+                "subprocess eval providers require path/digest inputs; a live LocalStore "
+                "object cannot cross the JSON worker boundary"
+            )
+        python = Path(str(isolation.get("python") or sys.executable))
+        if not python.is_absolute():
+            raise SchemaError("gimitest isolation.python must be an absolute executable path")
+        policy_index = {
+            str(key): str(Path(value).resolve())
+            for key, value in dict(kwargs.get("policy_index") or {}).items()
+        }
+        out_dir = kwargs.get("out_dir")
+        if out_dir is None:
+            raise SchemaError(
+                "gimitest subprocess isolation requires an explicit evaluation out_dir"
+            )
+        request = {
+            "schema": "rlx.eval-provider-request/v1",
+            "suite": suite,
+            "identity_suite": kwargs.get("identity_suite", suite),
+            "policy_index": policy_index,
+            "populations": kwargs.get("populations"),
+            "out_dir": str(Path(out_dir).resolve()),
+            "workers": int(kwargs.get("workers", 1)),
+            "record": bool(kwargs.get("record", True)),
+        }
+        with tempfile.TemporaryDirectory(prefix="rlx-gimitest-worker-") as raw:
+            request_path = Path(raw) / "request.json"
+            response_path = Path(raw) / "response.json"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            command = [
+                str(python),
+                "-m",
+                "rlx.adapters.eval_gimitest.worker",
+                str(request_path),
+                str(response_path),
+            ]
+            try:
+                completed = subprocess.run(
+                    command,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=float(isolation.get("timeout_seconds", 300)),
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise RlxError(
+                    f"Gimitest subprocess exceeded timeout: {exc.timeout}s"
+                ) from exc
+            if completed.returncode != 0:
+                raise RlxError(
+                    "Gimitest subprocess failed: "
+                    f"exit={completed.returncode}, stderr={completed.stderr[-2000:]}"
+                )
+            if not response_path.is_file():
+                raise RlxError("Gimitest subprocess did not produce a response")
+            result = json.loads(response_path.read_text(encoding="utf-8"))
+        if result.get("provider", {}).get("kind") != "gimitest":
+            raise RlxError("Gimitest subprocess response lost provider lineage")
+        return result

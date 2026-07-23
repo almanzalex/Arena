@@ -1,7 +1,8 @@
-# RLX 0.3
+# RLX 0.5
 
 Local-first Python CLI/SDK for **portable RL policy handoff**, **versioned
-evaluation**, and verified external runtime/provider/store integrations.
+evaluation**, reproducible trajectory training, and verified external
+runtime/provider/store integrations.
 
 Export a custom PyTorch policy, hand it to a collaborator without the training repository, run a seeded PettingZoo Parallel (or AEC) match, evaluate populations with cross-play, and inspect complete joint trajectories.
 
@@ -48,6 +49,11 @@ See [docs/populations.md](docs/populations.md), [docs/evaluation.md](docs/evalua
 **0.2 sealed:** [docs/0.2-complete.md](docs/0.2-complete.md).
 **0.3 complete:** [docs/0.3-complete.md](docs/0.3-complete.md).
 **Release evidence:** [docs/0.3-evidence.md](docs/0.3-evidence.md).
+**0.4 boundary expansion:** [docs/0.4-boundaries.md](docs/0.4-boundaries.md).
+**0.4 evidence:** [docs/0.4-evidence.md](docs/0.4-evidence.md).
+**0.5 generalization boundary:** [docs/0.5-boundaries.md](docs/0.5-boundaries.md).
+**0.5 evidence:** [docs/0.5-evidence.md](docs/0.5-evidence.md).
+**Before 1.0:** [docs/1.0-readiness.md](docs/1.0-readiness.md).
 Deferred items: [docs/0.2-revisit.md](docs/0.2-revisit.md).
 
 ## External integration workflow (0.3)
@@ -61,10 +67,10 @@ rlx task import openenv://127.0.0.1:8000/rlx/competitive_rps_v0 \
 rlx task verify-equivalence examples/tasks/native-rps.yaml task-rps-openenv-0.3.yaml \
   --trace-suite examples/tasks/rps-equivalence.yaml
 
-# OpenSpiel: the 0.3 support claim is exactly tic_tac_toe.
+# OpenSpiel: deterministic frozen catalog with checked reference traces.
 pip install 'rlx[openspiel]'
-rlx task verify-equivalence examples/tasks/openspiel-tic-tac-toe.yaml \
-  --trace-suite examples/tasks/openspiel-tic-tac-toe-trace.yaml
+rlx task verify-equivalence examples/tasks/openspiel-connect-four.yaml \
+  --trace-suite examples/tasks/openspiel-connect-four-trace.yaml
 
 # Artifact mirrors preserve the policy's sha256 identity.
 rlx push examples/eval/demo/rock.rlx file:///tmp/rlx-mirror --verify
@@ -73,6 +79,40 @@ rlx pull 'file:///tmp/rlx-mirror#sha256:…' --verify
 
 See [external tasks](docs/external-tasks.md), [evaluation providers](docs/eval-providers.md),
 and [external stores](docs/external-stores.md).
+
+## Generalized boundary workflow (0.5)
+
+```bash
+# Match/eval with forced agent birth + removal and explicit digest eligibility.
+rlx match run dynamic-match.yaml --out dynamic-run
+
+# Turn selected trajectories into a source-independent dataset, then train/reuse.
+# Content-stable train/validation splits.
+rlx data materialize selected/dataset.yaml --out portable-dataset \
+  --split train=.8 --split validation=.2 --split-seed 17
+rlx train behavior-cloning.yaml --out training-run
+rlx policy verify training-run/policy.rlx
+
+# Produce machine-readable push/pull evidence for any store implementation.
+rlx store qualify training-run/policy.rlx \
+  'oci://registry.example/lab/rlx?simulate=/tmp/rlx-oci' \
+  --out store-qualification.json
+
+# Sign the artifact identity with a user-owned key; the detached signature remains
+# valid after any identity-preserving mirror round trip.
+rlx attest keygen --private lab-private.pem --public lab-public.pem
+rlx attest sign training-run/policy.rlx --key lab-private.pem \
+  --issuer my-lab --out policy.attestation.json
+rlx attest verify training-run/policy.rlx policy.attestation.json \
+  --key lab-public.pem
+
+# Run lifecycle re-entry, split/train/resume/reuse, three game semantics,
+# signing, and four simulated stores as one checked journey.
+bash examples/boundaries/run_demo.sh
+```
+
+See [training recipes](docs/training.md), [dynamic agents](docs/dynamic-agents.md),
+and the [0.5 boundary record](docs/0.5-boundaries.md).
 
 ## Pilot pair (frozen in RFCs)
 
@@ -136,12 +176,14 @@ Capability claims are limited to **registry-registered + qualified** cases.
 
 ### Integration capability matrix
 
-| Axis | Supported in 0.3 | Boundary |
+| Axis | Supported | Boundary |
 |---|---|---|
-| Task runtime | OpenEnv 0.4.x, frozen remote RPS pilot | Imported endpoint/schema/role contract are pinned; disconnect, remote crash, timeout, and protocol failures remain distinct. |
-| Game runtime | OpenSpiel 2.x `tic_tac_toe` | AEC, observation tensor + legal-action mask; no broader game-catalog claim. |
-| Eval provider | Native; Gimitest 1.0 provider | Provider config is content-addressed and copied onto every cell lineage. Native remains the default. |
-| Artifact store | `file://`; Hugging Face Hub `hf://` | Mirrors manifest/payload bytes by digest. HF uses normal Hub credentials. OCI/W&B/MLflow are not claimed. |
+| Task runtime | OpenEnv 0.4.x; RPS plus typed vector-coordination qualification tasks | Endpoint, schema, role contract, source revision, and protocol capabilities are pinned; transport failures remain distinct. This is not a claim over every OpenEnv environment. |
+| Agent lifecycle | `dynamic_aec`; explicit-agent and role resolvers | Join eligibility, compatibility recheck, recurrent-state reset, removal/re-entry segment history, and joint boundary events. Unknown agents still fail loud. |
+| Training | Registry cases: behavior cloning and return-weighted regression | Materialized verified episodes, deterministic digest-bucket splits, exact seeded checkpoint resume; categorical Discrete actions with Discrete/Box observations. |
+| Game runtime | OpenSpiel 2.x semantic-family fixtures | Sequential perfect-information (`connect_four`), chance/imperfect-information (`kuhn_poker`), and simultaneous (`matrix_rps`) paths with legal masks and frozen traces. Game IDs remain qualification-scoped. |
+| Eval provider | Native; Gimitest 1.0 provider | Content-addressed lineage; Gimitest may execute through an explicit separate-Python subprocess. Native cells can run concurrently with stable result order. |
+| Artifact store | `file://`, `hf://`, `oci://`, `wandb://`, `mlflow://` | Machine-readable verified qualification, simulation/live labels, identity-preserving mirrors, and optional detached Ed25519 authenticity. |
 
 ### How to add a case
 
@@ -163,6 +205,9 @@ pip install 'rlx[torch,pettingzoo]'
 pip install 'rlx[openenv]'    # optional external task runtime
 pip install 'rlx[openspiel]'  # optional frozen game adapter
 pip install 'rlx[hf]'         # optional Hugging Face mirror
+pip install 'rlx[wandb]'      # optional W&B artifact mirror
+pip install 'rlx[mlflow]'     # optional MLflow artifact mirror
+# OCI uses the ORAS CLI and its normal `oras login` credentials.
 ```
 
 Core stays small (`pyyaml`, `numpy`). Heavy deps are optional extras.
@@ -183,6 +228,10 @@ Core stays small (`pyyaml`, `numpy`). Heavy deps are optional extras.
 | T-01…T-03 | External trace equivalence, serialization, and failure semantics |
 | I-01…I-03 | Provider lineage, store round-trip, offline native core |
 | S-01/U-03 | Overhead budget and integration-author qualification workflow |
+| L-01…L-04 | Dynamic birth eligibility, compose-check/reset, lifecycle trajectories |
+| TR-01…TR-04 | Materialized dataset integrity, seeded recipe, policy verify/reuse |
+| ST-07 | Simulated and opt-in live OCI/W&B/MLflow/HF identity round trips |
+| G-01…G-10 | Registry generalization, lifecycle re-entry, exact resume, semantic game families, external isolation, store qualification, authenticity, concurrency, composition |
 
 ```bash
 pytest -q                    # fast default selection (slow/docker gates deselected)
@@ -220,7 +269,7 @@ rlx/
   core/           # manifests, store, compatibility, SDK, registry, capture, population, dataset
   plugins/        # axis case registrations (action, samplers, metrics, …)
   cli/            # rlx commands
-  runtime/        # match + AEC + evaluation + trajectories
+  runtime/        # match + fixed/dynamic AEC + evaluation + training + trajectories
   conformance/    # fixtures F1–F6
   adapters/
     policy_custom_torch/
@@ -230,7 +279,11 @@ rlx/
     eval_gimitest/
 ```
 
-## Non-goals (0.3)
+## Honest remaining boundaries (0.5)
 
-No hosted service/auth, broad OpenSpiel catalog, OCI/W&B/MLflow claim, dynamic-agent
-lifecycle, training recipes, `rlx train`, or silent Elo-only ranking. Training is 0.4.
+No hosted RLX service/auth, provider billing/dashboard replacement, universal OpenSpiel
+catalog, arbitrary online RL algorithm, silent lifecycle inference, artifact certificate
+authority/revocation service, or silent Elo-only ranking. Live remote smokes require the
+user's own credentials and are never conflated with `?simulate=` evidence. The exact
+remaining release gates—not vague future scope—are tracked in
+[docs/1.0-readiness.md](docs/1.0-readiness.md).

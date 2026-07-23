@@ -1,0 +1,11 @@
+schema: rlx.trace-suite/v1
+name: openspiel-kuhn-poker-reference
+interaction: aec
+episodes:
+  - seed: 0
+    actions:
+      - {agent: player_0, action: 0}
+      - {agent: player_1, action: 0}
+tolerances:
+  default: 0.0
+reference_digest: sha256:bd349b033b49f02c63c1fbbc9687803313ce8aec89f7885d8a7c3a74e7d1ecc2

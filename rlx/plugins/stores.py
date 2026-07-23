@@ -26,7 +26,16 @@ def register_store_adapter(
 
 
 def register_builtins() -> None:
-    from rlx.core.mirror import FileStoreAdapter, HuggingFaceStoreAdapter
+    from rlx.core.mirror import (
+        FileStoreAdapter,
+        HuggingFaceStoreAdapter,
+        MLflowStoreAdapter,
+        OCIStoreAdapter,
+        WandBStoreAdapter,
+    )
 
     register_store_adapter("file", FileStoreAdapter(), replace=True)
     register_store_adapter("hf", HuggingFaceStoreAdapter(), replace=True)
+    register_store_adapter("oci", OCIStoreAdapter(), replace=True)
+    register_store_adapter("wandb", WandBStoreAdapter(), replace=True)
+    register_store_adapter("mlflow", MLflowStoreAdapter(), replace=True)

@@ -121,8 +121,8 @@ def validate_task_manifest(data: dict[str, Any]) -> dict[str, Any]:
     for key in ("name", "adapter", "env", "interaction"):
         if not data.get(key):
             raise SchemaError(f"task manifest missing required field: {key}")
-    if data["interaction"] not in {"parallel", "aec"}:
-        raise SchemaError("task interaction must be parallel|aec")
+    if data["interaction"] not in {"parallel", "aec", "dynamic_aec"}:
+        raise SchemaError("task interaction must be parallel|aec|dynamic_aec")
     declared = data.get("digest")
     if declared is not None:
         actual = task_content_digest(data)
@@ -315,8 +315,8 @@ def validate_evaluation_manifest(data: dict[str, Any]) -> dict[str, Any]:
     ensure_plugins_loaded()
     EVAL_PROVIDERS.get(provider)
     interaction = data.get("interaction", "parallel")
-    if interaction not in {"parallel", "aec"}:
-        raise SchemaError("interaction must be parallel|aec")
+    if interaction not in {"parallel", "aec", "dynamic_aec"}:
+        raise SchemaError("interaction must be parallel|aec|dynamic_aec")
     data = {
         **data,
         "interaction": interaction,
@@ -411,6 +411,30 @@ def validate_dataset_manifest(data: dict[str, Any]) -> dict[str, Any]:
             raise SchemaError(f"dataset missing required field: {key}")
     if not isinstance(data["episodes"], list):
         raise SchemaError("dataset.episodes must be a list of episode digests/paths")
+    split_names: set[str] = set()
+    for index, episode in enumerate(data["episodes"]):
+        if not isinstance(episode, dict):
+            raise SchemaError(f"dataset.episodes[{index}] must be a mapping")
+        if episode.get("split") is not None:
+            split = str(episode["split"])
+            if not split:
+                raise SchemaError(f"dataset.episodes[{index}].split must be non-empty")
+            split_names.add(split)
+    if data.get("splits") is not None:
+        splits = data["splits"]
+        if not isinstance(splits, dict) or splits.get("method") != "sha256_bucket/v1":
+            raise SchemaError("dataset.splits.method must be sha256_bucket/v1")
+        weights = splits.get("weights")
+        counts = splits.get("counts")
+        if not isinstance(weights, dict) or not weights:
+            raise SchemaError("dataset.splits.weights must be a non-empty mapping")
+        if not isinstance(counts, dict) or set(counts) != set(weights):
+            raise SchemaError("dataset.splits.counts must cover split weights exactly")
+        if split_names - set(weights):
+            raise SchemaError(
+                f"episode split names missing from dataset.splits: "
+                f"{sorted(split_names - set(weights))}"
+            )
     return data
 
 

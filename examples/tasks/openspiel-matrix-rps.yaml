@@ -1,0 +1,9 @@
+schema: rlx.task/v0alpha1
+name: task:openspiel-matrix-rps@0.5
+adapter: openspiel
+env: openspiel://matrix_rps
+interaction: parallel
+version: open_spiel-2.0.1:matrix_rps
+packaging:
+  kind: openspiel
+digest: sha256:b2f3675a8200e8be6e378dd9ab6f56f92525fd8487cbc6245a3e4759f6f66db5

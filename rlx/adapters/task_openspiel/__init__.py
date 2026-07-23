@@ -1,5 +1,21 @@
-"""Frozen OpenSpiel tic-tac-toe task adapter (RLX 0.3)."""
+"""Qualified OpenSpiel semantic-family task catalog."""
 
-from rlx.adapters.task_openspiel.adapter import OpenSpielPackager, OpenSpielTicTacToeAEC
+from rlx.adapters.task_openspiel.adapter import (
+    FROZEN_GAMES,
+    OpenSpielPackager,
+    OpenSpielSequentialAEC,
+    OpenSpielSimultaneousParallel,
+    OpenSpielTicTacToeAEC,
+    frozen_game_spec,
+    interaction_for_game,
+)
 
-__all__ = ["OpenSpielPackager", "OpenSpielTicTacToeAEC"]
+__all__ = [
+    "FROZEN_GAMES",
+    "OpenSpielPackager",
+    "OpenSpielSequentialAEC",
+    "OpenSpielSimultaneousParallel",
+    "OpenSpielTicTacToeAEC",
+    "frozen_game_spec",
+    "interaction_for_game",
+]

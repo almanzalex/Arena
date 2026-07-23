@@ -1,18 +1,22 @@
-# RFC 005 — Dynamic Agent Lifecycle (parked)
+# RFC 005 — Dynamic Agent Lifecycle
 
-**Status:** Parked beyond 0.3 (the frozen 0.3 pilots use fixed agents)
-**Date:** 2026-07-21
+**Status:** Implemented and generalized through lifecycle resolvers in 0.5
+**Date:** 2026-07-21 (revived 2026-07-22)
 **Depends on:** RFC 000, RFC 004, interaction registry (`rlx.plugins.interactions`)
 
 ## Decision
 
-RLX **0.2.0 fails loud** when a task reports `dynamic_agents: true` (or when living agents diverge from the fixed assignment set mid-episode). Full birth/removal lifecycle is **not** required to close 0.2 or to open 0.3.
+Fixed-agent `parallel` and `aec` continue to fail loud when a task reports a
+changing lifecycle. Qualified dynamic tasks use the separate `dynamic_aec`
+interaction so existing execution semantics do not change silently.
 
-Implement only when a **concrete named external environment** cannot be represented with a fixed agent set.
+The qualification environments force removal, birth, same-ID re-entry, and a joint
+leave/join boundary. They are deliberately small, deterministic, and source-available;
+additional dynamic environments need their own qualification evidence.
 
 ## Required interface (when revived)
 
-1. **Interaction case** `dynamic_aec` (or extension of `aec`) registered via `rlx.plugins.interactions`.
+1. **Interaction case** `dynamic_aec` registered via `rlx.plugins.interactions`.
 2. **Assignment model:** map `agent_id → policy digest` that can grow/shrink; births must declare which policy digests are eligible; removals must freeze that agent’s trajectory segment.
 3. **Trajectory schema:** joint steps must record `agents_alive`, join/leave events, and per-agent reward accumulation across dead steps (PettingZoo AEC semantics).
 4. **Compose check:** every newly born agent must pass `compose_check` before first `act`.
@@ -24,6 +28,15 @@ Implement only when a **concrete named external environment** cannot be represen
 - Inferring policies for unknown agents.
 - Claiming “PettingZoo complete” without a qualify report for the dynamic case.
 
-## Extension recipe (current product text)
+## Implemented contract
 
-Dynamic agent birth/removal is outside RLX 0.3. To add support: implement agent lifecycle linked to policy state, register an interaction/task case, add conformance tests, and run `rlx adapter qualify` before claiming support.
+The `explicit` resolver preserves `agent_id → policy` assignments with
+`task.lifecycle.birth_eligibility`. The `role` resolver maps declared concrete IDs
+onto stable assignment roles and requires `join_eligibility` by role. Both plans are
+immutable and refuse undeclared agents.
+
+The runner refuses incomplete coverage before creating output, then re-runs
+compose-check and resets policy state at every actual join boundary, including
+same-ID re-entry. Trajectories record resolved bindings, `agents_alive`,
+`join_events`, `leave_events`, and ordered `agent_segment_history`; the old
+`agent_segments` view remains for compatibility.

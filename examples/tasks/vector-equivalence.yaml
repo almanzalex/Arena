@@ -1,0 +1,12 @@
+schema: rlx.trace-suite/v1
+name: vector-native-openenv-equivalence
+interaction: parallel
+episodes:
+  - seed: 0
+    actions:
+      - {player_0: 1, player_1: 1}
+  - seed: 9
+    actions:
+      - {player_0: 0, player_1: 0}
+tolerances:
+  default: 0.0

@@ -1,0 +1,13 @@
+schema: rlx.trace-suite/v1
+name: dynamic-lineup-reference
+interaction: dynamic_aec
+episodes:
+  - seed: 0
+    actions:
+      - {agent: agent_0, action: 0}
+      - {agent: agent_1, action: 1}
+      - {agent: agent_1, action: 1}
+      - {agent: agent_2, action: 2}
+tolerances:
+  default: 0.0
+reference_digest: sha256:3a80f8fa6eb97433c49cb04fdff8f7f4c76037167186db109df6cf1dbc11c845

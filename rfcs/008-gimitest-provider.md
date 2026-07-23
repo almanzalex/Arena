@@ -1,6 +1,6 @@
 # RFC 008 — Gimitest Evaluation Provider (RLX 0.3)
 
-**Status:** Accepted and implemented in 0.3
+**Status:** Accepted in 0.3; dependency-isolation boundary added in 0.5
 **Date:** 2026-07-21
 **Depends on:** RFC 000, RFC 004
 
@@ -50,4 +50,8 @@ One robustness eval fixture qualifies; disabling the extra leaves `native` eval 
 provider version, provider-config digest, task digest, and policy digests for every cell.
 Gimitest 1.0's published Gymnasium 0.29.1 pin conflicts with current PettingZoo; the
 documented install keeps current Gymnasium and installs the provider package with
-`--no-deps`. The provider is never imported on native evaluation paths.
+`--no-deps`. In 0.5, `provider_config.isolation.mode: subprocess` may select an
+absolute Python from a separate compatible environment and a timeout. The worker
+exchanges versioned JSON and the parent verifies provider lineage. This is dependency
+and failure isolation, not a hostile-code sandbox. The provider is never imported on
+native evaluation paths.

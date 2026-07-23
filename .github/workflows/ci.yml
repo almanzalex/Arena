@@ -6,10 +6,17 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.12"]
+        include:
+          - os: ubuntu-latest
+            python-version: "3.12"
+          - os: ubuntu-latest
+            python-version: "3.13"
+          - os: macos-latest
+            python-version: "3.12"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -18,8 +25,10 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          # CPU-only torch keeps the runner small/fast (no CUDA wheels).
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          # CPU-only torch keeps Linux runners small/fast (no CUDA wheels).
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            pip install torch --index-url https://download.pytorch.org/whl/cpu
+          fi
           pip install -e '.[dev]'
           # Gimitest 1.0 publishes an obsolete Gymnasium pin. RLX tests the
           # provider against the already-resolved native stack without allowing

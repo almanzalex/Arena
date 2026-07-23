@@ -29,3 +29,20 @@ Every eval run and result cell records the exact policy digests, task digest, pr
 version, and content digest of `provider_config`. External test classes execute Python
 and are refused unless `allow_external_test_class: true` is explicitly set. Ordinary
 cross-play remains `provider: native` and does not import Gimitest.
+
+When Gimitest's dependency set should not share the RLX interpreter, run the provider
+through an explicitly selected Python:
+
+```yaml
+provider_config:
+  suite: base-hooks
+  test_class: gimitest.gtest:GTest
+  isolation:
+    mode: subprocess
+    python: /absolute/path/to/gimitest-venv/bin/python
+    timeout_seconds: 60
+```
+
+The parent and worker exchange a versioned JSON request/result, and the parent verifies
+the returned provider lineage. The path must be absolute. This isolates dependency
+resolution and process failure; it is not an arbitrary-code security sandbox.

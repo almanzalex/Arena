@@ -1,6 +1,6 @@
 # RFC 006 — OpenEnv Task Adapter (RLX 0.3)
 
-**Status:** Accepted and implemented in 0.3
+**Status:** Accepted in 0.3; typed second-task qualification added in 0.5
 **Date:** 2026-07-21
 **Depends on:** RFC 000, RFC 001, RFC 004
 
@@ -60,7 +60,10 @@ Qualify fixture: native RPS (or chosen pilot) + OpenEnv twin; `verify-equivalenc
 ## Frozen implementation
 
 - Pilot: `openenv://rlx/competitive_rps_v0`, OpenEnv 0.4.x, Parallel joint-action bridge.
+- Second qualification task: `openenv://rlx/vector_coordination_v0`, typed Box
+  observations and Discrete joint actions over the real service transport.
 - Import pins `/schema`, endpoint, source revision, and an explicit RLX role-space contract.
+- Import pins `rlx.openenv-capabilities/v1` features plus the contract digest.
 - `examples/tasks/rps-equivalence.yaml` crosses the real WebSocket serialization boundary.
 - Runtime errors preserve `disconnect`, `container_crash`, `timeout`, and `protocol_error`.
 - Evidence: `tests/acceptance/test_openenv_equivalence.py` and `rlx adapter qualify --peer … --trace-suite …`.

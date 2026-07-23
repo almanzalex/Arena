@@ -15,6 +15,9 @@ from rlx.core.spaces import gymnasium_space_to_dict
 ADAPTER_NAME = "pettingzoo-parallel"
 PILOT_ENV = "rlx/competitive_rps_v0"
 AEC_PILOT_ENV = "rlx/competitive_rps_aec_v0"
+DYNAMIC_PILOT_ENV = "rlx/dynamic_lineup_aec_v0"
+DYNAMIC_REENTRY_ENV = "rlx/dynamic_reentry_aec_v0"
+VECTOR_PILOT_ENV = "rlx/vector_coordination_v0"
 _PILOT_ALIASES = {
     PILOT_ENV,
     "competitive_rps_v0",
@@ -27,12 +30,33 @@ _AEC_PILOT_ALIASES = {
     "rlx/competitive_rps_aec",
     "rlx/competitive_rps_aec_v0",
 }
+_DYNAMIC_PILOT_ALIASES = {
+    DYNAMIC_PILOT_ENV,
+    "dynamic_lineup_aec_v0",
+    "rlx/dynamic_lineup_aec",
+}
+_DYNAMIC_REENTRY_ALIASES = {
+    DYNAMIC_REENTRY_ENV,
+    "dynamic_reentry_aec_v0",
+    "rlx/dynamic_reentry_aec",
+}
+_VECTOR_PILOT_ALIASES = {
+    VECTOR_PILOT_ENV,
+    "vector_coordination_v0",
+    "rlx/vector_coordination",
+}
 _VALID_LAYOUTS = frozenset({"HWC", "CHW"})
 
 
 def env_id_is_pilot(spec: dict[str, Any]) -> bool:
     env = spec.get("env") or PILOT_ENV
-    return env in _PILOT_ALIASES or env in _AEC_PILOT_ALIASES
+    return (
+        env in _PILOT_ALIASES
+        or env in _AEC_PILOT_ALIASES
+        or env in _DYNAMIC_PILOT_ALIASES
+        or env in _DYNAMIC_REENTRY_ALIASES
+        or env in _VECTOR_PILOT_ALIASES
+    )
 
 
 def _interaction(spec: dict[str, Any]) -> str:
@@ -115,7 +139,31 @@ def _make_env_pettingzoo(spec: dict[str, Any]):
     config = dict(spec.get("config") or {})
     seed = config.pop("seed", None)
 
-    if env_id in _AEC_PILOT_ALIASES or (
+    if env_id in _VECTOR_PILOT_ALIASES:
+        if interaction != "parallel":
+            raise SchemaError(
+                "rlx/vector_coordination_v0 requires interaction=parallel"
+            )
+        from rlx.adapters.task_pettingzoo.pilot_env import vector_parallel_env
+
+        env = vector_parallel_env()
+    elif env_id in _DYNAMIC_REENTRY_ALIASES:
+        if interaction != "dynamic_aec":
+            raise SchemaError(
+                "rlx/dynamic_reentry_aec_v0 requires interaction=dynamic_aec"
+            )
+        from rlx.adapters.task_pettingzoo.pilot_env import dynamic_reentry_aec_env
+
+        env = dynamic_reentry_aec_env()
+    elif env_id in _DYNAMIC_PILOT_ALIASES:
+        if interaction != "dynamic_aec":
+            raise SchemaError(
+                "rlx/dynamic_lineup_aec_v0 requires interaction=dynamic_aec"
+            )
+        from rlx.adapters.task_pettingzoo.pilot_env import dynamic_aec_env
+
+        env = dynamic_aec_env()
+    elif env_id in _AEC_PILOT_ALIASES or (
         interaction == "aec" and env_id in _PILOT_ALIASES
     ):
         from rlx.adapters.task_pettingzoo.pilot_env import aec_env
@@ -126,7 +174,7 @@ def _make_env_pettingzoo(spec: dict[str, Any]):
         env = aec_env(**kwargs)
         interaction = "aec"
     elif env_id in _PILOT_ALIASES:
-        if interaction == "aec":
+        if interaction in {"aec", "dynamic_aec"}:
             from rlx.adapters.task_pettingzoo.pilot_env import aec_env
 
             kwargs = {}
@@ -146,12 +194,12 @@ def _make_env_pettingzoo(spec: dict[str, Any]):
         kwargs = {}
         if "max_cycles" in config:
             kwargs["max_cycles"] = config["max_cycles"]
-        if interaction == "aec":
+        if interaction in {"aec", "dynamic_aec"}:
             env = rps_v2.env(**kwargs)
         else:
             env = rps_v2.parallel_env(**kwargs)
     else:
-        if interaction == "aec":
+        if interaction in {"aec", "dynamic_aec"}:
             env = _load_aec_env(env_id, config)
         else:
             env = _load_parallel_env(env_id, config)
@@ -161,7 +209,7 @@ def _make_env_pettingzoo(spec: dict[str, Any]):
         env = apply_wrappers(env, spec.get("wrappers"))
     elif spec.get("wrappers"):
         raise SchemaError(
-            "task.wrappers (SuperSuit) require interaction=parallel in RLX 0.3; "
+            "task.wrappers (SuperSuit) require interaction=parallel; "
             "AEC + SuperSuit is an unregistered combination — fail loud."
         )
 
@@ -310,16 +358,18 @@ def describe_env_contract(
     """Describe any PettingZoo-shaped Parallel/AEC adapter without changing identity."""
     interaction = _interaction(spec)
     try:
-        if interaction == "aec":
+        if interaction in {"aec", "dynamic_aec"}:
             env.reset(seed=0)
             agents = list(env.agents)
-            sample_obs = {a: env.observe(a) for a in agents}
+            possible_agents = list(getattr(env, "possible_agents", agents))
+            sample_obs = {a: env.observe(a) for a in possible_agents}
         else:
             sample_obs, _infos = env.reset(seed=0)
             agents = list(env.agents)
+            possible_agents = list(getattr(env, "possible_agents", agents))
         roles: dict[str, Any] = {}
         provides_masks = False
-        for agent in agents:
+        for agent in possible_agents:
             obs_space = env.observation_space(agent)
             act_space = env.action_space(agent)
             obs_dict = gymnasium_space_to_dict(obs_space)
@@ -348,6 +398,7 @@ def describe_env_contract(
             "env": spec.get("env") or PILOT_ENV,
             "version": version,
             "agents": agents,
+            "possible_agents": possible,
             "roles": roles,
             "provides_masks": provides_masks,
             "interaction": interaction,

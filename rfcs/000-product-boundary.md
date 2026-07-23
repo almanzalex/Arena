@@ -1,7 +1,7 @@
 # RFC 000 — Product Boundary (RLX)
 
-**Status:** Accepted; Stages **0.1, 0.2, and 0.3 done**
-**Date:** 2026-07-16 (updated 2026-07-21)
+**Status:** Accepted; Stages **0.1–0.3 released; 0.4 folded into 0.5; 0.5 implemented**
+**Date:** 2026-07-16 (updated 2026-07-22)
 
 ## Stage table
 
@@ -10,9 +10,13 @@
 | **0.1** | Done | Portable policy handoff, Parallel matches, trajectories, registries |
 | **0.2** | Done | Populations, versioned evaluation, AEC, slicing, eval bundles |
 | **0.3** | Done | OpenEnv, one OpenSpiel game, Gimitest provider, file/HF stores ([docs/0.3-complete.md](../docs/0.3-complete.md)) |
-| **0.4+** | Deferred | Training recipes, dataset export/reuse |
+| **0.4** | Folded into 0.5 | Dynamic AEC, portable datasets + behavior cloning, expanded frozen games/stores |
+| **0.5** | Implemented | Registry generalization, exact resume, semantic game families, provider isolation, qualification, authenticity |
+| **1.0** | Evidence gates open | Cross-platform/live/clean-room/soak/security/schema/performance closure; no required feature expansion |
 
-Handoff: [docs/0.2-complete.md](../docs/0.2-complete.md). Parked: [RFC 005 dynamic agents](005-dynamic-agents.md).
+Handoff: [docs/0.2-complete.md](../docs/0.2-complete.md). Current boundary:
+[docs/0.5-boundaries.md](../docs/0.5-boundaries.md). 1.0 gates:
+[docs/1.0-readiness.md](../docs/1.0-readiness.md).
 
 ## Native pilot pair (frozen)
 
@@ -45,12 +49,12 @@ Conformance fixtures F1–F4 exercise Gymnasium-compatible observation/action co
 ## What RLX does not own (MVP exclusions)
 
 - Hosted services, auth, billing, telemetry, dashboards
-- Training algorithms or recipe execution
+- Training algorithms beyond registered and separately qualified recipe cases
 - OpenEnv, OpenSpiel, and Gimitest internals (0.3 owns adapters only, not upstream cores)
 - Hosted registries / cloud services (0.3 mirrors to user-owned file/HF stores; local `.rlx/` remains default)
 - Populations / cross-play / AEC are **0.2** (done; see RFC 003/004)
-- Dynamic agent lifecycle: **fail loud** until RFC 005 is implemented and qualified
-- Training recipes: **0.4** (not 0.3)
+- Dynamic lifecycle outside qualified `dynamic_aec` tasks or without explicit join eligibility
+- OpenSpiel game IDs outside a qualified semantic-family fixture
 - Guarantees of bit-identical numerics across arbitrary hardware (tolerances are declared)
 
 ## Artifact definitions
@@ -91,7 +95,7 @@ Conformance fixtures F1–F4 exercise Gymnasium-compatible observation/action co
 
 - Schema ids: `rlx.policy/v0alpha1`, `rlx.match/v0alpha1`, `rlx.trajectory/v0alpha1`
 - Unknown manifest fields are preserved where possible (forward compatibility)
-- Package version tracks the CLI/SDK release (0.3.0 for external integrations)
+- Package version tracks the CLI/SDK release (0.5.0 for the generalization milestone)
 
 ## Acceptance gates (testable)
 

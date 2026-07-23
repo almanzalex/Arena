@@ -38,7 +38,13 @@ def load_task_spec(ref: str | Path | dict[str, Any]) -> dict[str, Any]:
     if text.startswith("pettingzoo://"):
         return {"adapter": "pettingzoo-parallel", "env": text.removeprefix("pettingzoo://")}
     if text.startswith("openspiel://"):
-        return {"adapter": "openspiel", "env": text, "interaction": "aec"}
+        from rlx.adapters.task_openspiel import interaction_for_game
+
+        return {
+            "adapter": "openspiel",
+            "env": text,
+            "interaction": interaction_for_game(text),
+        }
     raise SchemaError(f"cannot load task reference {text!r}; pass a task YAML or registered URI")
 
 
@@ -82,6 +88,7 @@ def import_openenv_task(
     except Exception as e:  # noqa: BLE001
         raise SchemaError(f"cannot pin OpenEnv /schema at {base_url}: {e}") from e
     schema_digest = digest_uri(sha256_bytes(canonical_json(upstream_schema)))
+    contract_digest = digest_uri(sha256_bytes(canonical_json(contract)))
     manifest = {
         "schema": TASK_SCHEMA,
         "name": name,
@@ -96,6 +103,17 @@ def import_openenv_task(
             "schema_digest": schema_digest,
             "connect_timeout_seconds": timeout_seconds,
             "message_timeout_seconds": 60,
+            "protocol": {
+                "schema": "rlx.openenv-capabilities/v1",
+                "interaction": "parallel",
+                "features": [
+                    "seeded_reset",
+                    "joint_action",
+                    "typed_contract",
+                    "failure_taxonomy",
+                ],
+                "contract_digest": contract_digest,
+            },
         },
         "contract": contract,
     }
@@ -126,7 +144,7 @@ def capture_task_trace(task: dict[str, Any], suite: dict[str, Any]) -> list[dict
         try:
             seed = int(episode.get("seed", 0))
             events: list[dict[str, Any]] = []
-            if interaction == "aec":
+            if interaction in {"aec", "dynamic_aec"}:
                 env.reset(seed=seed)
                 events.append(
                     {
