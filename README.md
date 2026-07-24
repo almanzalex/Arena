@@ -1,10 +1,53 @@
-# RLX 0.5
+# RLX 1.0.0rc1
 
-Local-first Python CLI/SDK for **portable RL policy handoff**, **versioned
-evaluation**, reproducible trajectory training, and verified external
-runtime/provider/store integrations.
+Local-first Python CLI/SDK for **verifiable RL policy and evaluation handoff**
+across native and qualified external task runtimes, evaluation providers, and
+artifact stores.
 
 Export a custom PyTorch policy, hand it to a collaborator without the training repository, run a seeded PettingZoo Parallel (or AEC) match, evaluate populations with cross-play, and inspect complete joint trajectories.
+
+The 1.0 release candidate freezes legacy identities, separates semantic
+evaluation intent from execution binding, publishes outputs transactionally,
+supervises hard-budget evaluation workers, emits versioned diagnostics, and
+binds release claims to signed evidence. The final `v1.0.0` tag is intentionally
+blocked until the public-distribution, live Hugging Face, separate-service
+OpenEnv, isolated Gimitest, claimed-platform CI, and independent-user evidence
+gates are all attached to the exact release commit.
+
+## Three-command verified handoff
+
+```bash
+python -m pip install 'rlx[quickstart]==1.0.0rc1'
+rlx demo handoff --out ./rlx-demo
+rlx inspect ./rlx-demo/restored-policy.rlx
+```
+
+The demo is source-free and network-free after installation. It exports a
+packaged reference policy, verifies it, mirrors it through `file://`, pulls it
+to a new path, proves the digest is unchanged, and prints an evaluation-intent
+digest plus the next external-runtime step. It stages the entire destination,
+so interruption cannot leave `./rlx-demo` looking complete.
+
+## 1.0 support truth
+
+The installed [`rlx/support-matrix.json`](rlx/support-matrix.json) is the source
+of truth used by `rlx doctor`; [`rlx/schema-registry.json`](rlx/schema-registry.json)
+freezes the reader/writer compatibility contract.
+
+| Capability | RC status | Final 1.0 condition |
+|---|---|---|
+| Core identity/inspect, native runtime, `file://`, quickstart | stable | Claimed-platform release CI |
+| OpenSpiel frozen qualified cases | stable | Claimed-platform release CI |
+| OpenEnv | preview, target stable | Fresh separate-service qualification |
+| Gimitest | preview, target stable | Non-no-op isolated-interpreter qualification |
+| Hugging Face | preview, required stable | Fresh credentialed immutable-revision round trip |
+| OCI, W&B, MLflow | preview | May remain preview; never simulated into a live claim |
+
+```bash
+rlx --version
+rlx doctor --json
+rlx schema list --json
+```
 
 ## MVP workflow (0.1 portable policy)
 
@@ -53,7 +96,10 @@ See [docs/populations.md](docs/populations.md), [docs/evaluation.md](docs/evalua
 **0.4 evidence:** [docs/0.4-evidence.md](docs/0.4-evidence.md).
 **0.5 generalization boundary:** [docs/0.5-boundaries.md](docs/0.5-boundaries.md).
 **0.5 evidence:** [docs/0.5-evidence.md](docs/0.5-evidence.md).
-**Before 1.0:** [docs/1.0-readiness.md](docs/1.0-readiness.md).
+**1.0 release program:** [docs/1.0-readiness.md](docs/1.0-readiness.md).
+**Latest local RC evidence:** [docs/1.0-rc-local-evidence.md](docs/1.0-rc-local-evidence.md).
+**Executable 1.0 value flows:** [docs/1.0-user-flows.md](docs/1.0-user-flows.md).
+**Signed release procedure:** [docs/releasing.md](docs/releasing.md).
 Deferred items: [docs/0.2-revisit.md](docs/0.2-revisit.md).
 
 ## External integration workflow (0.3)
@@ -279,11 +325,11 @@ rlx/
     eval_gimitest/
 ```
 
-## Honest remaining boundaries (0.5)
+## Deliberate 1.0 boundaries
 
 No hosted RLX service/auth, provider billing/dashboard replacement, universal OpenSpiel
 catalog, arbitrary online RL algorithm, silent lifecycle inference, artifact certificate
 authority/revocation service, or silent Elo-only ranking. Live remote smokes require the
 user's own credentials and are never conflated with `?simulate=` evidence. The exact
-remaining release gates—not vague future scope—are tracked in
+release gates—not vague future scope—are tracked in
 [docs/1.0-readiness.md](docs/1.0-readiness.md).

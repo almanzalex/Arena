@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import json
+import math
 from pathlib import Path
 from typing import Any
 
 import yaml
+from yaml.events import AliasEvent
 
 from rlx.core.errors import SchemaError
-from rlx.core.identity import canonical_json, digest_uri, sha256_bytes
+from rlx.core.identity import canonical_json, digest_uri, parse_digest, sha256_bytes
+from rlx.core.io import DEFAULT_MAX_BYTES, atomic_write_bytes, read_text_bounded
 
 POLICY_SCHEMA = "rlx.policy/v0alpha1"
 MATCH_SCHEMA = "rlx.match/v0alpha1"
@@ -18,41 +22,120 @@ POPULATION_SCHEMA = "rlx.population/v0alpha1"
 EVALUATION_SCHEMA = "rlx.evaluation/v0alpha1"
 EVAL_RUN_SCHEMA = "rlx.eval-run/v0alpha1"
 EVAL_REPORT_SCHEMA = "rlx.eval-report/v0alpha1"
+EVALUATION_INTENT_SCHEMA = "rlx.evaluation-intent/v1"
+EVALUATION_BINDING_SCHEMA = "rlx.evaluation-binding/v1"
+EVAL_RUN_V1_SCHEMA = "rlx.eval-run/v1"
+EVAL_REPORT_V1_SCHEMA = "rlx.eval-report/v1"
 DATASET_SCHEMA = "rlx.dataset/v0alpha1"
 EVAL_BUNDLE_SCHEMA = "rlx.eval-bundle/v0alpha1"
 TASK_SCHEMA = "rlx.task/v0alpha1"
 TRACE_SUITE_SCHEMA = "rlx.trace-suite/v1"
+MAX_MANIFEST_DEPTH = 128
 
 
-def load_manifest(path: Path | str) -> dict[str, Any]:
+class _StrictSafeLoader(yaml.SafeLoader):
+    """Safe YAML loader that rejects aliases, merge keys, and duplicate keys."""
+
+    def compose_node(self, parent: Any, index: Any) -> Any:
+        if self.check_event(AliasEvent):
+            event = self.peek_event()
+            raise SchemaError(
+                f"YAML aliases are not allowed in identity-bearing manifests: {event.anchor!r}"
+            )
+        return super().compose_node(parent, index)
+
+    def construct_mapping(self, node: Any, deep: bool = False) -> dict[Any, Any]:
+        if not isinstance(node, yaml.MappingNode):
+            raise SchemaError("expected a YAML mapping node")
+        mapping: dict[Any, Any] = {}
+        for key_node, value_node in node.value:
+            if (
+                isinstance(key_node, yaml.ScalarNode)
+                and key_node.tag == "tag:yaml.org,2002:merge"
+            ):
+                raise SchemaError("YAML merge keys are not allowed in manifests")
+            key = self.construct_object(key_node, deep=deep)
+            try:
+                duplicate = key in mapping
+            except TypeError as exc:
+                raise SchemaError("manifest mapping keys must be scalar/hashable") from exc
+            if duplicate:
+                raise SchemaError(f"duplicate manifest key: {key!r}")
+            mapping[key] = self.construct_object(value_node, deep=deep)
+        return mapping
+
+
+_StrictSafeLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+    _StrictSafeLoader.construct_mapping,
+)
+
+
+def _json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise SchemaError(f"duplicate manifest key: {key!r}")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> None:
+    raise SchemaError(f"non-finite JSON number is not allowed: {value}")
+
+
+def _validate_depth(value: Any, *, depth: int = 0) -> None:
+    if depth > MAX_MANIFEST_DEPTH:
+        raise SchemaError(f"manifest exceeds maximum nesting depth {MAX_MANIFEST_DEPTH}")
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise SchemaError(
+                    f"manifest mapping keys must be strings, got {type(key).__name__}"
+                )
+            _validate_depth(item, depth=depth + 1)
+    elif isinstance(value, list):
+        for item in value:
+            _validate_depth(item, depth=depth + 1)
+
+
+def load_manifest(
+    path: Path | str,
+    *,
+    max_bytes: int = DEFAULT_MAX_BYTES,
+) -> dict[str, Any]:
     path = Path(path)
-    text = path.read_text(encoding="utf-8")
-    if path.suffix.lower() in {".yaml", ".yml"}:
-        data = yaml.safe_load(text)
-    else:
-        import json
-
-        data = json.loads(text)
+    text = read_text_bounded(path, max_bytes=max_bytes)
+    try:
+        if path.suffix.lower() in {".yaml", ".yml"}:
+            # The custom loader subclasses SafeLoader and only adds rejection.
+            data = yaml.load(text, Loader=_StrictSafeLoader)  # nosec B506
+        else:
+            data = json.loads(
+                text,
+                object_pairs_hook=_json_object,
+                parse_constant=_reject_json_constant,
+            )
+    except SchemaError:
+        raise
+    except (json.JSONDecodeError, yaml.YAMLError) as exc:
+        raise SchemaError(f"invalid manifest syntax in {path}: {exc}") from exc
     if not isinstance(data, dict):
         raise SchemaError(f"manifest root must be a mapping: {path}")
+    _validate_depth(data)
+    canonical_json(data)
     return data
 
 
 def dump_yaml(data: dict[str, Any], path: Path | str) -> None:
     path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with tmp.open("w", encoding="utf-8") as f:
-        yaml.safe_dump(data, f, sort_keys=False, allow_unicode=True)
-    tmp.replace(path)
+    canonical_json(data)
+    payload = yaml.safe_dump(data, sort_keys=False, allow_unicode=True).encode("utf-8")
+    atomic_write_bytes(path, payload)
 
 
 def dump_json(data: dict[str, Any], path: Path | str) -> None:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_bytes(canonical_json(data) + b"\n")
-    tmp.replace(path)
+    atomic_write_bytes(path, canonical_json(data) + b"\n")
 
 
 def validate_policy_manifest(data: dict[str, Any]) -> dict[str, Any]:
@@ -239,8 +322,9 @@ def resolve_artifact_path(path: Path | str) -> Path:
 
 def _require_digest(value: str, *, field: str) -> str:
     text = str(value).strip()
-    if not text.startswith("sha256:") or len(text) < 15:
+    if not text.startswith("sha256:"):
         raise SchemaError(f"{field} must be a sha256: digest, got {value!r}")
+    parse_digest(text)
     return text
 
 
@@ -314,6 +398,9 @@ def validate_evaluation_manifest(data: dict[str, Any]) -> dict[str, Any]:
 
     ensure_plugins_loaded()
     EVAL_PROVIDERS.get(provider)
+    declared_task_intent = data.get("task_intent_digest")
+    if declared_task_intent is not None:
+        _require_digest(declared_task_intent, field="task_intent_digest")
     interaction = data.get("interaction", "parallel")
     if interaction not in {"parallel", "aec", "dynamic_aec"}:
         raise SchemaError("interaction must be parallel|aec|dynamic_aec")
@@ -345,6 +432,28 @@ def validate_evaluation_manifest(data: dict[str, Any]) -> dict[str, Any]:
     metrics = data["metrics"]
     if not isinstance(metrics, list) or not metrics:
         raise SchemaError("metrics must be a non-empty list")
+    budgets = data.get("budgets") or {}
+    if not isinstance(budgets, dict):
+        raise SchemaError("budgets must be a mapping")
+    if "executor" in budgets and budgets["executor"] not in {"process", "thread"}:
+        raise SchemaError("budgets.executor must be process|thread")
+    if "timeout_seconds" in budgets:
+        timeout = budgets["timeout_seconds"]
+        if isinstance(timeout, bool):
+            raise SchemaError("budgets.timeout_seconds must be a finite number > 0")
+        try:
+            timeout_value = float(timeout)
+        except (TypeError, ValueError) as exc:
+            raise SchemaError(
+                "budgets.timeout_seconds must be a finite number > 0"
+            ) from exc
+        if not math.isfinite(timeout_value) or timeout_value <= 0:
+            raise SchemaError("budgets.timeout_seconds must be a finite number > 0")
+    for field in ("max_stdout_bytes", "max_stderr_bytes"):
+        if field in budgets:
+            value = budgets[field]
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise SchemaError(f"budgets.{field} must be an integer > 0")
     swaps = data.get("role_swaps", [])
     if swaps is not None and not isinstance(swaps, list):
         raise SchemaError("role_swaps must be a list")
@@ -356,10 +465,34 @@ def validate_evaluation_manifest(data: dict[str, Any]) -> dict[str, Any]:
                 f"role_swaps[{i}] requires declared transform "
                 "(incompatible swaps must not silently rematch)"
             )
+    failure_policy = data.get("failure_policy") or {}
+    if not isinstance(failure_policy, dict):
+        raise SchemaError("failure_policy must be a mapping")
+    missingness = failure_policy.get("missingness", "fail")
+    if missingness not in {"fail", "allow"}:
+        raise SchemaError("failure_policy.missingness must be fail|allow")
+    max_failed = failure_policy.get("max_failed_episodes", 0)
+    if isinstance(max_failed, bool):
+        raise SchemaError("failure_policy.max_failed_episodes must be an integer >= 0")
+    try:
+        max_failed_int = int(max_failed)
+    except (TypeError, ValueError) as exc:
+        raise SchemaError(
+            "failure_policy.max_failed_episodes must be an integer >= 0"
+        ) from exc
+    if max_failed_int < 0 or max_failed_int != max_failed:
+        raise SchemaError("failure_policy.max_failed_episodes must be an integer >= 0")
     return data
 
 
 def evaluation_content_digest(data: dict[str, Any]) -> str:
+    """Return the legacy-frozen v0alpha1 evaluation digest.
+
+    This projection is intentionally unchanged from the 0.5 implementation.
+    New code should additionally record :func:`evaluation_intent_digest` and
+    :func:`evaluation_binding_digest`; changing this function would invalidate
+    artifacts produced by earlier RLX releases.
+    """
     identity: dict[str, Any] = {
         "schema": EVALUATION_SCHEMA,
         "task": data.get("task"),
@@ -385,18 +518,204 @@ def evaluation_content_digest(data: dict[str, Any]) -> str:
     return digest_uri(sha256_bytes(canonical_json(identity)))
 
 
+_OPERATIONAL_KEYS = frozenset(
+    {
+        "allow_external",
+        "auth",
+        "base_url",
+        "connect_timeout_seconds",
+        "container",
+        "credential",
+        "credentials",
+        "endpoint",
+        "executor",
+        "host",
+        "isolation",
+        "message_timeout_seconds",
+        "process",
+        "python",
+        "retry",
+        "timeout_seconds",
+        "token",
+        "workers",
+    }
+)
+
+
+def _semantic_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            str(key): _semantic_value(item)
+            for key, item in value.items()
+            if not str(key).startswith("_") and str(key) not in _OPERATIONAL_KEYS
+        }
+    if isinstance(value, list):
+        return [_semantic_value(item) for item in value]
+    return value
+
+
+def _operational_value(value: Any) -> Any:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(key): item
+        for key, item in value.items()
+        if str(key).startswith("_") or str(key) in _OPERATIONAL_KEYS
+    }
+
+
+def task_intent_projection(task: dict[str, Any]) -> dict[str, Any]:
+    """Project a task onto semantics shared across execution boundaries."""
+    if not isinstance(task, dict):
+        raise SchemaError("evaluation task must be a mapping")
+    semantic = task.get("semantic")
+    if semantic is not None:
+        if not isinstance(semantic, dict):
+            raise SchemaError("task.semantic must be a mapping")
+        projected = _semantic_value(semantic)
+    else:
+        projected = _semantic_value(
+            {
+                key: value
+                for key, value in task.items()
+                if key not in {"adapter", "digest", "name", "packaging", "schema"}
+            }
+        )
+        packaging = _semantic_value(task.get("packaging") or {})
+        if packaging:
+            projected["packaging"] = packaging
+    return {
+        "schema": "rlx.task-intent/v1",
+        "canonicalization": "rlx-canonical-json/v1",
+        "semantics": projected,
+    }
+
+
+def task_intent_digest(task: dict[str, Any]) -> str:
+    return digest_uri(sha256_bytes(canonical_json(task_intent_projection(task))))
+
+
+def evaluation_intent_projection(data: dict[str, Any]) -> dict[str, Any]:
+    """Return stable semantic intent, excluding how and where it executes."""
+    provider_config = data.get("provider_config") or {}
+    if not isinstance(provider_config, dict):
+        raise SchemaError("evaluation provider_config must be a mapping")
+    semantic_provider = provider_config.get("semantic")
+    if semantic_provider is not None:
+        if not isinstance(semantic_provider, dict):
+            raise SchemaError("provider_config.semantic must be a mapping")
+        semantic_provider = _semantic_value(semantic_provider)
+    else:
+        semantic_provider = _semantic_value(provider_config)
+    declared_task_intent = data.get("task_intent_digest")
+    if declared_task_intent is not None:
+        _require_digest(declared_task_intent, field="task_intent_digest")
+    return {
+        "schema": EVALUATION_INTENT_SCHEMA,
+        "canonicalization": "rlx-canonical-json/v1",
+        "task_intent_digest": declared_task_intent
+        or task_intent_digest(data.get("task") or {}),
+        "interaction": data.get("interaction", "parallel"),
+        "assignments": data.get("assignments"),
+        "seeds": data.get("seeds"),
+        "action_mode": data.get("action_mode"),
+        "metrics": data.get("metrics"),
+        "budgets": _semantic_value(data.get("budgets") or {}),
+        "role_swaps": data.get("role_swaps", []),
+        "failure_policy": {
+            **_semantic_value(data.get("failure_policy") or {}),
+            "missingness": (data.get("failure_policy") or {}).get("missingness", "fail"),
+            "max_failed_episodes": (data.get("failure_policy") or {}).get(
+                "max_failed_episodes", 0
+            ),
+        },
+        "sampling": data.get("sampling"),
+        "recording": data.get("recording"),
+        "provider_semantics": semantic_provider,
+    }
+
+
+def evaluation_intent_digest(data: dict[str, Any]) -> str:
+    return digest_uri(sha256_bytes(canonical_json(evaluation_intent_projection(data))))
+
+
+def evaluation_binding_projection(
+    data: dict[str, Any],
+    *,
+    provider: str | None = None,
+    workers: int = 1,
+) -> dict[str, Any]:
+    """Return operational execution choices that must be recorded, not conflated."""
+    task = data.get("task") or {}
+    provider_config = data.get("provider_config") or {}
+    task_binding: dict[str, Any] = {
+        "adapter": task.get("adapter") if isinstance(task, dict) else None,
+    }
+    if isinstance(task, dict):
+        task_binding.update(_operational_value(task))
+        packaging = _operational_value(task.get("packaging") or {})
+        if packaging:
+            task_binding["packaging"] = packaging
+    if "semantic" in provider_config:
+        provider_binding = {
+            key: value
+            for key, value in provider_config.items()
+            if key != "semantic" and not str(key).startswith("_")
+        }
+    else:
+        provider_binding = _operational_value(provider_config)
+    return {
+        "schema": EVALUATION_BINDING_SCHEMA,
+        "canonicalization": "rlx-canonical-json/v1",
+        "provider": provider or data.get("provider", "native"),
+        "provider_config": provider_binding,
+        "task": task_binding,
+        "budgets": _operational_value(data.get("budgets") or {}),
+        "workers": int(workers),
+    }
+
+
+def evaluation_binding_digest(
+    data: dict[str, Any],
+    *,
+    provider: str | None = None,
+    workers: int = 1,
+) -> str:
+    projection = evaluation_binding_projection(data, provider=provider, workers=workers)
+    return digest_uri(sha256_bytes(canonical_json(projection)))
+
+
 def validate_eval_run_manifest(data: dict[str, Any]) -> dict[str, Any]:
-    if data.get("schema") != EVAL_RUN_SCHEMA:
-        raise SchemaError(f"expected schema {EVAL_RUN_SCHEMA}, got {data.get('schema')!r}")
+    schema = data.get("schema")
+    if schema not in {EVAL_RUN_SCHEMA, EVAL_RUN_V1_SCHEMA}:
+        raise SchemaError(
+            f"expected schema {EVAL_RUN_SCHEMA} or {EVAL_RUN_V1_SCHEMA}, got {schema!r}"
+        )
     for key in ("evaluation_digest", "sampling_ledger", "cells"):
         if key not in data:
             raise SchemaError(f"eval-run missing required field: {key}")
+    if schema == EVAL_RUN_V1_SCHEMA:
+        for key in (
+            "evaluation_intent_digest",
+            "execution_binding_digest",
+            "state",
+            "denominators",
+            "semantic_result_digest",
+        ):
+            if key not in data:
+                raise SchemaError(f"eval-run/v1 missing required field: {key}")
+        if data["state"] not in {"complete", "incomplete", "failed", "cancelled"}:
+            raise SchemaError("eval-run/v1 state is invalid")
     return data
 
 
 def validate_eval_report_manifest(data: dict[str, Any]) -> dict[str, Any]:
-    if data.get("schema") != EVAL_REPORT_SCHEMA:
-        raise SchemaError(f"expected schema {EVAL_REPORT_SCHEMA}, got {data.get('schema')!r}")
+    schema = data.get("schema")
+    if schema not in {EVAL_REPORT_SCHEMA, EVAL_REPORT_V1_SCHEMA}:
+        raise SchemaError(
+            f"expected schema {EVAL_REPORT_SCHEMA} or {EVAL_REPORT_V1_SCHEMA}, "
+            f"got {schema!r}"
+        )
     for key in ("evaluation_digest", "eval_run_digest", "metrics"):
         if key not in data:
             raise SchemaError(f"eval-report missing required field: {key}")

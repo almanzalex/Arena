@@ -3,21 +3,124 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import sys
+import traceback
 from pathlib import Path
 from typing import Any
 
+from rlx.core.errors import (
+    CliUsageError,
+    RlxError,
+    diagnostic_from_exception,
+    exit_code_for_exception,
+    redact,
+)
+
+
+class _RlxArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise CliUsageError(
+            message,
+            repair=f"Run `{self.prog} --help` and use the documented argument grammar.",
+            context={"program": self.prog},
+        )
+
+
+def _global_options(argv: list[str]) -> tuple[list[str], bool, bool, bool]:
+    cleaned: list[str] = []
+    as_json = False
+    debug = False
+    show_version = False
+    for token in argv:
+        if token == "--json":
+            as_json = True
+        elif token == "--debug":
+            debug = True
+        elif token == "--version":
+            show_version = True
+        else:
+            cleaned.append(token)
+    return cleaned, as_json, debug, show_version
+
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    clean_argv, global_json, debug, show_version = _global_options(raw_argv)
+    nested_commands = {
+        "attest",
+        "data",
+        "demo",
+        "eval",
+        "match",
+        "policy",
+        "population",
+        "release",
+        "schema",
+        "store",
+        "task",
+    }
+    command_parts = clean_argv[:1]
+    if (
+        command_parts
+        and command_parts[0] in nested_commands
+        and len(clean_argv) > 1
+        and not clean_argv[1].startswith("-")
+    ):
+        command_parts.append(clean_argv[1])
+    command_label = " ".join(command_parts) or "rlx"
+    if show_version:
+        from rlx import __version__
+
+        if global_json:
+            print(
+                json.dumps(
+                    {
+                        "schema": "rlx.cli-result/v1",
+                        "ok": True,
+                        "command": "version",
+                        "data": {"version": __version__},
+                        "warnings": [],
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            print(f"rlx {__version__}")
+        return 0
+
+    parser = _RlxArgumentParser(
         prog="rlx",
         description=(
-            "RLX 0.5 — portable policies/evaluation, extensible lifecycle and training, "
-            "qualified external runtimes, and authenticated artifact identity"
+            "RLX 1.0 — verifiable policy/evaluation handoff across native and "
+            "qualified external runtimes, providers, and stores"
         ),
     )
-    sub = parser.add_subparsers(dest="command", required=True)
+    parser.add_argument("--json", action="store_true", help="Emit a versioned JSON result")
+    parser.add_argument("--debug", action="store_true", help="Emit a redacted traceback")
+    parser.add_argument("--version", action="store_true", help="Show the installed RLX version")
+    sub = parser.add_subparsers(
+        dest="command",
+        required=True,
+        parser_class=_RlxArgumentParser,
+    )
+
+    p_doctor = sub.add_parser(
+        "doctor",
+        help="Report release support, local dependencies, and repairs without authenticating",
+    )
+    p_doctor.add_argument("--capability", default=None)
+
+    p_demo = sub.add_parser("demo", help="Packaged source-free value demonstrations")
+    p_dem = p_demo.add_subparsers(dest="demo_command", required=True)
+    p_dh = p_dem.add_parser("handoff", help="Build, mirror, pull, and verify a policy locally")
+    p_dh.add_argument("--out", default="./rlx-demo")
+
+    p_schema = sub.add_parser("schema", help="Inspect the installed compatibility registry")
+    p_sch = p_schema.add_subparsers(dest="schema_command", required=True)
+    p_sch.add_parser("list", help="List stable and legacy-frozen manifest schemas")
 
     p_init = sub.add_parser("init", help="Create a local .rlx workspace")
     p_init.add_argument("--path", default=".", help="Workspace root")
@@ -311,12 +414,44 @@ def main(argv: list[str] | None = None) -> int:
     p_eb.add_argument("--out", required=True)
     p_eb.add_argument("--report", default=None, help="Optional report.json to include")
 
-    p_release = sub.add_parser("release", help="Release bundle commands (0.2 eval-scoped)")
+    p_release = sub.add_parser(
+        "release",
+        help="Evaluation bundles and signed 1.0 release-evidence commands",
+    )
     p_rel = p_release.add_subparsers(dest="release_command", required=True)
     p_rb = p_rel.add_parser("build", help="Build an evaluation release bundle")
     p_rb.add_argument("--eval", required=True, dest="eval_run", help="Eval run directory")
     p_rb.add_argument("--out", required=True)
     p_rb.add_argument("--report", default=None)
+    p_ra = p_rel.add_parser(
+        "assemble",
+        help="Content-bind R-01..R-14 evidence and exact release artifacts",
+    )
+    p_ra.add_argument("--release", required=True)
+    p_ra.add_argument("--tag", required=True)
+    p_ra.add_argument("--commit", required=True)
+    p_ra.add_argument(
+        "--gate",
+        action="append",
+        default=[],
+        metavar="R-NN=PATH",
+        help="Repeat once for every mandatory release gate",
+    )
+    p_ra.add_argument("--artifact", action="append", default=[], required=True)
+    p_ra.add_argument("--out", required=True)
+    p_rs = p_rel.add_parser("sign", help="Sign a release evidence index or current ledger")
+    p_rs.add_argument("document")
+    p_rs.add_argument("--key", required=True)
+    p_rs.add_argument("--out", required=True)
+    p_rv = p_rel.add_parser("verify", help="Verify a signed RLX release-evidence index")
+    p_rv.add_argument("evidence_index")
+    p_rv.add_argument("--signature", required=True)
+    p_rv.add_argument("--key", required=True)
+    release_mode = p_rv.add_mutually_exclusive_group(required=True)
+    release_mode.add_argument("--at-release", action="store_true")
+    release_mode.add_argument("--current-ledger", default=None)
+    p_rv.add_argument("--ledger-signature", default=None)
+    p_rv.add_argument("--ledger-key", default=None)
 
     p_adapter = sub.add_parser(
         "adapter",
@@ -393,68 +528,319 @@ def main(argv: list[str] | None = None) -> int:
     p_sq.add_argument("destination", help="Registered store URI")
     p_sq.add_argument("--out", required=True, help="Qualification report JSON")
 
-    args = parser.parse_args(argv)
+    parse_output = io.StringIO()
     try:
-        if args.command == "init":
-            return cmd_init(args)
-        if args.command == "inspect":
-            return cmd_inspect(args)
-        if args.command == "check":
-            return cmd_check(args)
-        if args.command == "policy":
-            if args.policy_command == "export":
-                return cmd_policy_export(args)
-            if args.policy_command == "verify":
-                return cmd_policy_verify(args)
-        if args.command == "match" and args.match_command == "run":
-            return cmd_match_run(args)
-        if args.command == "task":
-            if args.task_command == "import":
-                return cmd_task_import(args)
-            if args.task_command == "verify-equivalence":
-                return cmd_task_verify_equivalence(args)
-        if args.command == "data":
-            if args.data_command == "inspect":
-                return cmd_data_inspect(args)
-            if args.data_command == "select":
-                return cmd_data_select(args)
-            if args.data_command == "materialize":
-                return cmd_data_materialize(args)
-        if args.command == "train":
-            return cmd_train(args)
-        if args.command == "population":
-            if args.population_command == "create":
-                return cmd_population_create(args)
-            if args.population_command == "inspect":
-                return cmd_population_inspect(args)
-        if args.command == "eval":
-            if args.eval_command == "validate":
-                return cmd_eval_validate(args)
-            if args.eval_command == "run":
-                return cmd_eval_run(args)
-            if args.eval_command == "report":
-                return cmd_eval_report(args)
-            if args.eval_command == "bundle":
-                return cmd_eval_bundle(args)
-        if args.command == "release" and args.release_command == "build":
-            return cmd_release_build(args)
-        if args.command == "adapter" and args.adapter_command == "qualify":
-            return cmd_adapter_qualify(args)
-        if args.command == "capture":
-            return cmd_capture(args)
-        if args.command == "attest":
-            return cmd_attest(args)
-        if args.command == "push":
-            return cmd_push(args)
-        if args.command == "pull":
-            return cmd_pull(args)
-        if args.command == "store" and args.store_command == "qualify":
-            return cmd_store_qualify(args)
+        if global_json:
+            with contextlib.redirect_stdout(parse_output):
+                args = parser.parse_args(clean_argv)
+        else:
+            args = parser.parse_args(clean_argv)
+        args.json = bool(global_json)
+        args.debug = bool(debug)
+        if global_json:
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                result_code = _dispatch(args)
+            rendered = output.getvalue().strip()
+            try:
+                data = json.loads(rendered) if rendered else {}
+            except json.JSONDecodeError:
+                data = {"output": rendered}
+            if result_code != 0:
+                diagnostic = {
+                    "schema": "rlx.diagnostic/v1",
+                    "ok": False,
+                    "code": "COMMAND_FAILED",
+                    "category": "schema_compatibility",
+                    "message": "The command completed with a non-success result.",
+                    "cause": data,
+                    "repair": "Inspect the structured command result and apply its suggested repairs.",
+                    "docs_url": "https://github.com/rlx-project/rlx/blob/main/docs/errors.md#command_failed",
+                    "context": {"result": data},
+                    "command": command_label,
+                }
+                print(json.dumps(diagnostic, ensure_ascii=False, default=str))
+                return result_code if result_code in {2, 3, 4, 5, 6, 70} else 3
+            envelope = {
+                "schema": "rlx.cli-result/v1",
+                "ok": True,
+                "command": command_label,
+                "data": data,
+                "warnings": [],
+            }
+            # Preserve the pre-1.0 top-level result keys as additive aliases while
+            # the versioned envelope becomes the stable automation contract.
+            if isinstance(data, dict):
+                for key, value in data.items():
+                    envelope.setdefault(key, value)
+            print(json.dumps(envelope, ensure_ascii=False, default=str))
+            return 0
+        return _dispatch(args)
+    except SystemExit as exc:
+        if exc.code in {0, None}:
+            if global_json:
+                print(
+                    json.dumps(
+                        {
+                            "schema": "rlx.cli-result/v1",
+                            "ok": True,
+                            "command": command_label,
+                            "data": {"help": parse_output.getvalue()},
+                            "warnings": [],
+                        },
+                        ensure_ascii=False,
+                    )
+                )
+            return 0
+        if isinstance(exc.code, str):
+            error: BaseException = CliUsageError(
+                exc.code,
+                repair=f"Run `rlx {command_label} --help` for valid usage.",
+            )
+        else:
+            error = CliUsageError(
+                f"command exited before completion (status {exc.code})",
+                repair=f"Run `rlx {command_label} --help` for valid usage.",
+            )
+        return _emit_error(error, as_json=global_json, debug=debug, command=command_label)
     except Exception as e:  # noqa: BLE001
-        print(f"error: {e}", file=sys.stderr)
-        return 1
-    parser.error(f"unknown command {args.command}")
-    return 2
+        return _emit_error(e, as_json=global_json, debug=debug, command=command_label)
+
+
+def _emit_error(
+    error: BaseException,
+    *,
+    as_json: bool,
+    debug: bool,
+    command: str,
+) -> int:
+    diagnostic = diagnostic_from_exception(error, command=command, debug=debug)
+    if as_json:
+        print(json.dumps(diagnostic, ensure_ascii=False, default=str))
+    else:
+        print(
+            f"error [{diagnostic['code']}]: {diagnostic['message']}",
+            file=sys.stderr,
+        )
+        if diagnostic.get("cause"):
+            print(f"cause: {diagnostic['cause']}", file=sys.stderr)
+        if diagnostic.get("repair"):
+            print(f"repair: {diagnostic['repair']}", file=sys.stderr)
+        if debug:
+            print(str(redact(traceback.format_exc())), file=sys.stderr)
+    return exit_code_for_exception(error)
+
+
+def _dispatch(args: argparse.Namespace) -> int:
+    if args.command == "doctor":
+        return cmd_doctor(args)
+    if args.command == "demo" and args.demo_command == "handoff":
+        return cmd_demo_handoff(args)
+    if args.command == "schema" and args.schema_command == "list":
+        return cmd_schema_list(args)
+    if args.command == "init":
+        return cmd_init(args)
+    if args.command == "inspect":
+        return cmd_inspect(args)
+    if args.command == "check":
+        return cmd_check(args)
+    if args.command == "policy":
+        if args.policy_command == "export":
+            return cmd_policy_export(args)
+        if args.policy_command == "verify":
+            return cmd_policy_verify(args)
+    if args.command == "match" and args.match_command == "run":
+        return cmd_match_run(args)
+    if args.command == "task":
+        if args.task_command == "import":
+            return cmd_task_import(args)
+        if args.task_command == "verify-equivalence":
+            return cmd_task_verify_equivalence(args)
+    if args.command == "data":
+        if args.data_command == "inspect":
+            return cmd_data_inspect(args)
+        if args.data_command == "select":
+            return cmd_data_select(args)
+        if args.data_command == "materialize":
+            return cmd_data_materialize(args)
+    if args.command == "train":
+        return cmd_train(args)
+    if args.command == "population":
+        if args.population_command == "create":
+            return cmd_population_create(args)
+        if args.population_command == "inspect":
+            return cmd_population_inspect(args)
+    if args.command == "eval":
+        if args.eval_command == "validate":
+            return cmd_eval_validate(args)
+        if args.eval_command == "run":
+            return cmd_eval_run(args)
+        if args.eval_command == "report":
+            return cmd_eval_report(args)
+        if args.eval_command == "bundle":
+            return cmd_eval_bundle(args)
+    if args.command == "release":
+        if args.release_command == "build":
+            return cmd_release_build(args)
+        if args.release_command == "assemble":
+            return cmd_release_assemble(args)
+        if args.release_command == "sign":
+            return cmd_release_sign(args)
+        if args.release_command == "verify":
+            return cmd_release_verify(args)
+    if args.command == "adapter" and args.adapter_command == "qualify":
+        return cmd_adapter_qualify(args)
+    if args.command == "capture":
+        return cmd_capture(args)
+    if args.command == "attest":
+        return cmd_attest(args)
+    if args.command == "push":
+        return cmd_push(args)
+    if args.command == "pull":
+        return cmd_pull(args)
+    if args.command == "store" and args.store_command == "qualify":
+        return cmd_store_qualify(args)
+    raise CliUsageError(f"unknown command {args.command!r}")
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    from rlx.core.support import doctor_report
+
+    report = doctor_report(args.capability)
+    _print(report, as_json=bool(args.json))
+    return 0
+
+
+def cmd_schema_list(args: argparse.Namespace) -> int:
+    from rlx.core.support import load_schema_registry
+
+    _print(load_schema_registry(), as_json=bool(args.json))
+    return 0
+
+
+def cmd_demo_handoff(args: argparse.Namespace) -> int:
+    from rlx.adapters.policy_custom_torch import (
+        build_module,
+        export_from_checkpoint,
+        verify_bundle_self,
+    )
+    from rlx.core.identity import canonical_json, digest_uri, sha256_bytes
+    from rlx.core.io import publish_directory
+    from rlx.core.manifests import dump_json
+    from rlx.core.mirror import pull_artifact, push_artifact
+    from rlx.core.sdk import Policy
+
+    destination = Path(args.out).resolve()
+    result: dict[str, Any] = {}
+
+    def build(stage: Path) -> None:
+        import torch
+
+        architecture = {
+            "type": "mlp_categorical",
+            "observation_dim": 4,
+            "hidden_dims": [16, 16],
+            "action_n": 3,
+        }
+        torch.manual_seed(0)
+        checkpoint = stage / ".reference-checkpoint.pt"
+        torch.save(build_module(architecture).state_dict(), checkpoint)
+        source = export_from_checkpoint(
+            source=checkpoint,
+            out=stage / "source-policy.rlx",
+            role="agent",
+            name="rlx-quickstart-reference",
+            architecture=architecture,
+            observation={
+                "type": "Box",
+                "shape": [4],
+                "dtype": "float32",
+                "low": -10.0,
+                "high": 10.0,
+            },
+            action={
+                "type": "Discrete",
+                "n": 3,
+                "dtype": "int64",
+                "masks": "none",
+            },
+            preprocessing={"id": "normalize_v0", "mean": 0.0, "std": 1.0},
+        )
+        checkpoint.unlink()
+        verification = verify_bundle_self(source)
+        source_policy = Policy.load(source)
+        pushed = push_artifact(source, (stage / "store").as_uri(), verify=True)
+        restored_path = stage / "restored-policy.rlx"
+        pulled = pull_artifact(pushed["uri"], restored_path, verify=True)
+        restored_policy = Policy.load(restored_path)
+        if restored_policy.digest != source_policy.digest:
+            raise RlxError(
+                "quickstart handoff changed policy identity",
+                code="DEMO_IDENTITY_MISMATCH",
+                repair="Report this as an RLX integrity defect; do not use the restored artifact.",
+            )
+        intent = {
+            "schema": "rlx.evaluation-intent/v1",
+            "task": {
+                "env": "rlx/quickstart-reference-v1",
+                "interaction": "offline-reference",
+            },
+            "policy": source_policy.digest,
+            "metric": "reference-case-conformance",
+            "tolerance": {"atol": 1e-6, "rtol": 1e-6},
+        }
+        result.update(
+            {
+                "schema": "rlx.demo-handoff/v1",
+                "ok": True,
+                "source_policy": "source-policy.rlx",
+                "restored_policy": "restored-policy.rlx",
+                "source_digest": source_policy.digest,
+                "restored_digest": restored_policy.digest,
+                "verification": verification,
+                "evaluation_intent_digest": digest_uri(
+                    sha256_bytes(canonical_json(intent))
+                ),
+                "capabilities": {
+                    "runtime": "native:stable",
+                    "store": "file:stable",
+                    "provider": "reference-conformance:stable",
+                },
+                "next": (
+                    "Run `rlx doctor --capability openenv` before the external "
+                    "runtime equivalence journey."
+                ),
+                "pull": {
+                    "identity": pulled["identity"],
+                    "kind": pulled["kind"],
+                    "out": "restored-policy.rlx",
+                    "files": [
+                        {
+                            **entry,
+                            "path": str(
+                                Path("restored-policy.rlx")
+                                / Path(entry["path"]).relative_to(restored_path)
+                            ),
+                        }
+                        for entry in pulled["files"]
+                    ],
+                    "verified": pulled["verified"],
+                    "content_verified": pulled["content_verified"],
+                    "identity_verified": pulled["identity_verified"],
+                },
+            }
+        )
+        dump_json(result, stage / "result.json")
+
+    def verify(stage: Path) -> None:
+        restored = Policy.load(stage / "restored-policy.rlx")
+        if restored.digest != result.get("source_digest"):
+            raise RlxError("staged quickstart result failed final identity verification")
+
+    publish_directory(destination, build, verify=verify, replace=True)
+    rendered = {**result, "out": str(destination)}
+    _print(rendered, as_json=bool(args.json))
+    return 0
 
 
 def cmd_init(args: argparse.Namespace) -> int:
@@ -507,6 +893,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
 
 
 def cmd_check(args: argparse.Namespace) -> int:
+    from rlx.core.errors import CompatibilityError
     from rlx.core.sdk import Policy, check
 
     config = _parse_json_arg(args.config) if getattr(args, "config", None) else None
@@ -515,11 +902,16 @@ def cmd_check(args: argparse.Namespace) -> int:
     task = _load_task_arg(args.task, config=config)
     policy = Policy.load(args.policy)
     report = check(task, policy.as_role(args.role), action_mode=args.action_mode)
+    if not report.ok:
+        raise CompatibilityError(
+            report.format_human(),
+            context=report.to_dict(),
+        )
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))
     else:
         print(report.format_human())
-    return 0 if report.ok else 1
+    return 0
 
 
 def cmd_policy_export(args: argparse.Namespace) -> int:
@@ -686,6 +1078,7 @@ def cmd_policy_verify(args: argparse.Namespace) -> int:
 
 
 def cmd_match_run(args: argparse.Namespace) -> int:
+    from rlx.core.errors import IncompleteExecutionError
     from rlx.core.manifests import expand_seeds, load_manifest, validate_match_manifest
     from rlx.core.sdk import Match, Policy, Task
 
@@ -721,11 +1114,21 @@ def cmd_match_run(args: argparse.Namespace) -> int:
     record = not args.no_record
     out = args.out
     result = match.run(seeds=expand_seeds(data["seeds"]), record=record, out=out)
+    if result["outcome"]["failure_count"]:
+        raise IncompleteExecutionError(
+            "match did not complete every requested episode",
+            code="MATCH_INCOMPLETE",
+            context={
+                "run_id": result["run_id"],
+                "outcome": result["outcome"],
+                "output": out,
+            },
+        )
     print(f"Match complete: {result['run_id']}")
-    print(f"  completed={result['outcome']['episodes_completed']} failures={result['outcome']['failure_count']}")
+    print(f"  completed={result['outcome']['episodes_completed']} failures=0")
     if out:
         print(f"  output={out}")
-    return 0 if result["outcome"]["failure_count"] == 0 else 1
+    return 0
 
 
 def cmd_task_import(args: argparse.Namespace) -> int:
@@ -788,11 +1191,18 @@ def cmd_task_verify_equivalence(args: argparse.Namespace) -> int:
 
 
 def cmd_data_inspect(args: argparse.Namespace) -> int:
+    from rlx.core.errors import IncompleteExecutionError
     from rlx.runtime.trajectory import inspect_trajectory
 
     info = inspect_trajectory(args.trajectory)
+    if not info.get("completeness", {}).get("ok", True):
+        raise IncompleteExecutionError(
+            "trajectory is incomplete",
+            code="TRAJECTORY_INCOMPLETE",
+            context=info,
+        )
     _print(info, as_json=args.json)
-    return 0 if info.get("completeness", {}).get("ok", True) else 1
+    return 0
 
 
 def cmd_data_select(args: argparse.Namespace) -> int:
@@ -880,8 +1290,12 @@ def cmd_population_inspect(args: argparse.Namespace) -> int:
 
 
 def cmd_eval_validate(args: argparse.Namespace) -> int:
-    from rlx.core.manifests import evaluation_content_digest
+    from rlx.core.manifests import (
+        evaluation_content_digest,
+        evaluation_intent_digest,
+    )
     from rlx.core.population import load_population
+    from rlx.core.sdk import Policy
     from rlx.core.store import LocalStore
     from rlx.runtime.evaluation import load_evaluation, validate_evaluation
 
@@ -913,16 +1327,50 @@ def cmd_eval_validate(args: argparse.Namespace) -> int:
                 populations[pref] = pop
                 populations[str(cand)] = pop
                 populations[pop["digest"]] = pop
-    validate_evaluation(suite, populations=populations)
-    print("ok")
-    if args.json:
-        _print({"evaluation_digest": evaluation_content_digest(suite)}, as_json=True)
+    identity_assignments: dict[str, Any] = {}
+    for role, spec in suite["assignments"].items():
+        if isinstance(spec, str):
+            candidate = Path(spec) if Path(spec).is_absolute() else base / spec
+            identity_assignments[role] = (
+                Policy.load(candidate).digest if candidate.exists() else spec
+            )
+        elif isinstance(spec, dict) and spec.get("kind", "policy") == "policy":
+            key = "policy" if "policy" in spec else "ref"
+            ref = str(spec[key])
+            candidate = Path(ref) if Path(ref).is_absolute() else base / ref
+            identity_assignments[role] = {
+                **spec,
+                key: Policy.load(candidate).digest if candidate.exists() else ref,
+            }
+        elif isinstance(spec, dict) and spec.get("kind") in {
+            "population",
+            "crossplay",
+        }:
+            ref = str(spec["population"])
+            population = populations.get(ref)
+            identity_assignments[role] = {
+                **spec,
+                "population": population["digest"] if population else ref,
+            }
+        else:
+            identity_assignments[role] = spec
+    identity_suite = {**suite, "assignments": identity_assignments}
+    validate_evaluation(identity_suite, populations=populations)
+    _print(
+        {
+            "ok": True,
+            "evaluation_digest": evaluation_content_digest(identity_suite),
+            "evaluation_intent_digest": evaluation_intent_digest(identity_suite),
+        },
+        as_json=bool(args.json),
+    )
     return 0
 
 
 def cmd_eval_run(args: argparse.Namespace) -> int:
     from pathlib import Path
 
+    from rlx.core.errors import IncompleteExecutionError
     from rlx.core.population import load_population
     from rlx.core.store import LocalStore
     from rlx.runtime.evaluation import load_evaluation, run_evaluation
@@ -1002,9 +1450,25 @@ def cmd_eval_run(args: argparse.Namespace) -> int:
         "run_id": result["run_id"],
         "run_dir": result["run_dir"],
         "evaluation_digest": result["evaluation_digest"],
+        "evaluation_intent_digest": result.get("evaluation_intent_digest"),
+        "execution_binding_digest": result.get("execution_binding_digest"),
+        "semantic_result_digest": result.get("semantic_result_digest"),
+        "state": result.get("state", "complete"),
+        "denominators": result.get("denominators"),
         "cells": len(result["cells"]),
         "sampling_ledger": result["sampling_ledger"],
     }
+    if result.get("state", "complete") != "complete":
+        raise IncompleteExecutionError(
+            "evaluation did not complete every declared attempt",
+            code="EVALUATION_INCOMPLETE",
+            cause=str(result.get("state")),
+            repair=(
+                f"Inspect {result['run_dir']}/eval_run.json, repair the recorded "
+                "failures, and retry to a new output path."
+            ),
+            context=summary,
+        )
     _print(summary, as_json=args.json)
     return 0
 
@@ -1090,11 +1554,81 @@ def cmd_release_build(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_release_verify(args: argparse.Namespace) -> int:
+    from rlx.core.release import verify_release_evidence
+
+    result = verify_release_evidence(
+        args.evidence_index,
+        signature=args.signature,
+        public_key=args.key,
+        current_ledger=args.current_ledger,
+        current_ledger_signature=args.ledger_signature,
+        current_ledger_key=args.ledger_key,
+    )
+    _print(result, as_json=bool(args.json))
+    return 0
+
+
+def cmd_release_assemble(args: argparse.Namespace) -> int:
+    from rlx.core.release import assemble_release_evidence
+
+    gates: dict[str, str] = {}
+    for item in args.gate:
+        if "=" not in item:
+            raise CliUsageError("--gate must be R-NN=PATH")
+        gate_id, path = item.split("=", 1)
+        if gate_id in gates:
+            raise CliUsageError(f"duplicate --gate {gate_id}")
+        gates[gate_id] = path
+    result = assemble_release_evidence(
+        release=args.release,
+        tag=args.tag,
+        commit=args.commit,
+        gates=gates,
+        artifacts=args.artifact,
+        out=args.out,
+    )
+    _print(result, as_json=bool(args.json))
+    return 0
+
+
+def cmd_release_sign(args: argparse.Namespace) -> int:
+    from rlx.core.manifests import load_manifest
+    from rlx.core.release import (
+        CURRENT_SCHEMA,
+        EVIDENCE_SCHEMA,
+        sign_qualification_ledger,
+        sign_release_evidence,
+    )
+
+    schema = load_manifest(args.document).get("schema")
+    if schema == EVIDENCE_SCHEMA:
+        result = sign_release_evidence(
+            args.document,
+            private_key=args.key,
+            out=args.out,
+        )
+    elif schema == CURRENT_SCHEMA:
+        result = sign_qualification_ledger(
+            args.document,
+            private_key=args.key,
+            out=args.out,
+        )
+    else:
+        raise RlxError(
+            f"release sign does not support schema {schema!r}",
+            code="RELEASE_DOCUMENT_UNSUPPORTED",
+        )
+    _print(result, as_json=bool(args.json))
+    return 0
+
+
 def cmd_adapter_qualify(args: argparse.Namespace) -> int:
     from rlx.conformance.qualification import (
         qualify_adapter_fixture,
         qualify_task_fixture,
     )
+    from rlx.core.errors import ConformanceError
 
     if args.trace_suite:
         report = qualify_task_fixture(
@@ -1105,8 +1639,14 @@ def cmd_adapter_qualify(args: argparse.Namespace) -> int:
         )
     else:
         report = qualify_adapter_fixture(args.fixture, report_path=args.out)
-    print(json.dumps(report, indent=2))
-    return 0 if report["ok"] else 1
+    if not report["ok"]:
+        raise ConformanceError(
+            "adapter qualification failed",
+            code="ADAPTER_QUALIFICATION_FAILED",
+            context=report,
+        )
+    _print(report, as_json=bool(args.json))
+    return 0
 
 
 def cmd_capture(args: argparse.Namespace) -> int:
@@ -1179,14 +1719,21 @@ def cmd_pull(args: argparse.Namespace) -> int:
 
 def cmd_store_qualify(args: argparse.Namespace) -> int:
     from rlx.conformance.qualification import qualify_store
+    from rlx.core.errors import ConformanceError
 
     report = qualify_store(
         args.source,
         destination=args.destination,
         report_path=args.out,
     )
-    print(json.dumps(report, indent=2))
-    return 0 if report["ok"] else 1
+    if not report["ok"]:
+        raise ConformanceError(
+            "store qualification failed",
+            code="STORE_QUALIFICATION_FAILED",
+            context=report,
+        )
+    _print(report, as_json=bool(args.json))
+    return 0
 
 
 def _load_task_arg(task_arg: str, *, config: dict[str, Any] | None = None) -> Any:

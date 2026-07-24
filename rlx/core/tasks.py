@@ -70,6 +70,13 @@ def import_openenv_task(
             "OpenEnv URI must include a server, e.g. "
             "openenv://127.0.0.1:8000/rlx/competitive_rps_v0"
         )
+    if parsed.username is not None or parsed.password is not None:
+        raise SchemaError(
+            "OpenEnv URI must not embed credentials; configure transport "
+            "authentication outside the task identity"
+        )
+    if parsed.fragment:
+        raise SchemaError("OpenEnv URI must not contain a fragment")
     base_url = f"{transport}://{parsed.netloc}"
     env_path = unquote(parsed.path.lstrip("/"))
     env_uri = f"openenv://{env_path}" if env_path else source.split("?", 1)[0]
@@ -83,7 +90,10 @@ def import_openenv_task(
             "pass --contract for non-pilot environments"
         )
     try:
-        with urlopen(f"{base_url}/schema", timeout=timeout_seconds) as response:  # noqa: S310
+        # ``transport`` is restricted to http/https and ``netloc`` is required above.
+        with urlopen(  # nosec B310
+            f"{base_url}/schema", timeout=timeout_seconds
+        ) as response:
             upstream_schema = json.loads(response.read().decode("utf-8"))
     except Exception as e:  # noqa: BLE001
         raise SchemaError(f"cannot pin OpenEnv /schema at {base_url}: {e}") from e
@@ -268,6 +278,21 @@ def verify_task_equivalence(
         "diffs": diffs,
         "episodes": len(left),
         "captured_trace_digest": left_trace_digest,
+        "shared_task_intent_digest": digest_uri(
+            sha256_bytes(
+                canonical_json(
+                    {
+                        "schema": "rlx.verified-task-intent/v1",
+                        "interaction": suite.get("interaction", "parallel"),
+                        "trace_suite_digest": digest_uri(
+                            sha256_bytes(canonical_json(suite))
+                        ),
+                        "trace_result_digest": left_trace_digest,
+                        "tolerance": tolerance,
+                    }
+                )
+            )
+        ),
     }
     if diffs:
         raise ConformanceError(json.dumps(result, sort_keys=True))

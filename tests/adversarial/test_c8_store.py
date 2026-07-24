@@ -7,6 +7,7 @@ leftover temp file never masquerades as a real object.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -26,15 +27,16 @@ def test_interrupted_write_leaves_no_partial_object(tmp_path: Path, monkeypatch)
     digest_hex = sha256_bytes(payload)
     obj_dir = store.objects / digest_hex[:2]
 
-    real_replace = Path.replace
+    real_link = os.link
 
-    def boom_replace(self, target):  # noqa: ANN001
+    def boom_link(source, target):  # noqa: ANN001
+        del source, target
         raise OSError("simulated crash before atomic publish")
 
-    monkeypatch.setattr(Path, "replace", boom_replace)
+    monkeypatch.setattr(os, "link", boom_link)
     with pytest.raises(OSError):
         store.put_bytes(payload)
-    monkeypatch.setattr(Path, "replace", real_replace)
+    monkeypatch.setattr(os, "link", real_link)
 
     # The object was never published...
     dest = store.objects / digest_hex[:2] / digest_hex[2:]
@@ -74,7 +76,7 @@ def test_leftover_temp_file_not_resolved_as_object(tmp_path: Path) -> None:
     # The genuine object still resolves and verifies.
     assert store.get_bytes(digest) == b"genuine"
     # A bogus digest (the temp file's name) is not resolvable as an object.
-    with pytest.raises(StoreError, match="not found"):
+    with pytest.raises(StoreError, match="invalid object digest"):
         store.get_bytes("sha256:tmp_garbage_leftover")
 
 

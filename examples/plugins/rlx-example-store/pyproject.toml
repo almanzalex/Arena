@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rlx-example-store"
+version = "1.0.0"
+description = "Minimal out-of-tree RLX 1.x store plugin contract fixture"
+requires-python = ">=3.12,<3.14"
+dependencies = ["rlx>=1.0.0rc1,<2"]
+
+[project.entry-points."rlx.plugins.v1"]
+"external_store:example" = "rlx_example_store:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rlx_example_store"]

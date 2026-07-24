@@ -9,6 +9,7 @@ from rlx.core.compatibility import compose_check
 from rlx.core.errors import CompatibilityReport, SchemaError
 from rlx.core.manifests import (
     evaluation_content_digest,
+    evaluation_intent_digest,
     load_manifest,
     policy_content_digest,
     population_content_digest,
@@ -267,6 +268,7 @@ class Evaluation:
     def __init__(self, manifest: dict[str, Any]) -> None:
         self.manifest = validate_evaluation_manifest(manifest)
         self.digest = evaluation_content_digest(self.manifest)
+        self.intent_digest = evaluation_intent_digest(self.manifest)
 
     @classmethod
     def load(cls, path: str | Path) -> Evaluation:

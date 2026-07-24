@@ -7,13 +7,19 @@ with an extension recipe — never silently coerce into a neighboring case.
 
 from __future__ import annotations
 
+import contextlib
+import sys
+import threading
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
-from rlx.core.errors import SchemaError
+from rlx.core.errors import PluginError, SchemaError
 
 T = TypeVar("T")
+_LOADED_ENTRY_POINTS: set[tuple[str, str]] = set()
+_LOADING_ENTRY_POINTS: set[tuple[str, str]] = set()
+_PLUGIN_LOCK = threading.RLock()
 
 
 @dataclass(frozen=True)
@@ -83,6 +89,10 @@ class Registry(Generic[T]):
         self._cases.pop(kind, None)
 
     def get(self, kind: str) -> T:
+        if kind in self._cases:
+            return self._cases[kind]
+        ensure_plugins_loaded()
+        load_entry_points_for(self.axis, str(kind))
         if kind in self._cases:
             return self._cases[kind]
         raise UnknownKindError(
@@ -191,7 +201,8 @@ LIFECYCLE_RESOLVERS: Registry[Any] = Registry(
 
 
 def ensure_plugins_loaded() -> None:
-    """Idempotently register built-in cases (import side-effect safe)."""
+    """Idempotently register built-ins without importing optional plugins."""
+
     from rlx.plugins import builtins as _builtins
 
     _builtins.ensure_registered()
@@ -214,7 +225,7 @@ def capability_matrix() -> dict[str, list[str]]:
     }
 
 
-def register_entry_points(group: str = "rlx.plugins") -> list[str]:
+def register_entry_points(group: str = "rlx.plugins.v1") -> list[str]:
     """Load optional third-party plugins via importlib entry points.
 
     Returns the names of loaded entry points. Failures raise SchemaError so a
@@ -230,11 +241,112 @@ def register_entry_points(group: str = "rlx.plugins") -> list[str]:
     for ep in selected:
         try:
             loader: Callable[[], Any] = ep.load()
-            loader()
+            if not callable(loader):
+                raise TypeError("entry point did not resolve to a callable")
+            # Plugins may report progress, but JSON stdout belongs exclusively to
+            # RLX's versioned result envelope.
+            with contextlib.redirect_stdout(sys.stderr):
+                loader()
         except Exception as e:  # noqa: BLE001
-            raise SchemaError(
-                f"failed loading entry-point plugin {ep.name!r} from group "
-                f"{group!r}: {e}"
+            distribution = getattr(getattr(ep, "dist", None), "name", "unknown")
+            version = getattr(getattr(ep, "dist", None), "version", "unknown")
+            raise PluginError(
+                f"failed loading entry-point plugin {ep.name!r} from "
+                f"{distribution}=={version}: {e}",
+                code="PLUGIN_LOAD_FAILED",
+                repair=(
+                    f"Uninstall or repair {distribution}=={version}; RLX core remains "
+                    "usable when the plugin is not referenced."
+                ),
+                context={
+                    "entry_point": ep.name,
+                    "group": group,
+                    "distribution": distribution,
+                    "version": version,
+                },
             ) from e
         loaded.append(ep.name)
     return loaded
+
+
+def load_entry_points_for(axis: str, kind: str) -> list[str]:
+    """Load only the v1 plugin named ``<axis>:<kind>`` on a registry miss.
+
+    The old unversioned group is retained for 1.x compatibility and is consulted
+    only after a miss. New plugins must use the explicit name so unrelated or
+    broken distributions cannot affect core startup or another registry kind.
+    """
+    try:
+        from importlib.metadata import entry_points
+    except ImportError:  # pragma: no cover
+        return []
+    target = f"{axis}:{kind}"
+    loaded: list[str] = []
+    with _PLUGIN_LOCK:
+        key = ("rlx.plugins.v1", target)
+        if key in _LOADED_ENTRY_POINTS or key in _LOADING_ENTRY_POINTS:
+            return []
+        eps = entry_points()
+        selected = (
+            eps.select(group="rlx.plugins.v1")
+            if hasattr(eps, "select")
+            else eps.get("rlx.plugins.v1", [])
+        )
+        matches = [ep for ep in selected if ep.name == target]
+        if matches:
+            if len(matches) > 1:
+                raise PluginError(
+                    f"multiple plugins claim {target!r}",
+                    code="PLUGIN_NAME_COLLISION",
+                )
+            _LOADING_ENTRY_POINTS.add(key)
+            try:
+                _load_entry_point(matches[0], group="rlx.plugins.v1")
+                _LOADED_ENTRY_POINTS.add(key)
+                loaded.append(target)
+            finally:
+                _LOADING_ENTRY_POINTS.discard(key)
+            return loaded
+
+        # Legacy 0.5 entry points had no naming convention. Import them only on
+        # a registry miss and only once apiece.
+        legacy = (
+            eps.select(group="rlx.plugins")
+            if hasattr(eps, "select")
+            else eps.get("rlx.plugins", [])
+        )
+        for ep in legacy:
+            legacy_key = ("rlx.plugins", ep.name)
+            if legacy_key in _LOADED_ENTRY_POINTS:
+                continue
+            _load_entry_point(ep, group="rlx.plugins")
+            _LOADED_ENTRY_POINTS.add(legacy_key)
+            loaded.append(ep.name)
+    return loaded
+
+
+def _load_entry_point(ep: Any, *, group: str) -> None:
+    try:
+        loader: Callable[[], Any] = ep.load()
+        if not callable(loader):
+            raise TypeError("entry point did not resolve to a callable")
+        with contextlib.redirect_stdout(sys.stderr):
+            loader()
+    except Exception as e:  # noqa: BLE001
+        distribution = getattr(getattr(ep, "dist", None), "name", "unknown")
+        version = getattr(getattr(ep, "dist", None), "version", "unknown")
+        raise PluginError(
+            f"failed loading entry-point plugin {ep.name!r} from "
+            f"{distribution}=={version}: {e}",
+            code="PLUGIN_LOAD_FAILED",
+            repair=(
+                f"Uninstall or repair {distribution}=={version}; RLX core remains "
+                "usable when the plugin is not referenced."
+            ),
+            context={
+                "entry_point": ep.name,
+                "group": group,
+                "distribution": distribution,
+                "version": version,
+            },
+        ) from e

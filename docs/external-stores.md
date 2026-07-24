@@ -2,7 +2,8 @@
 
 Stores mirror bytes; they do not create a new RLX artifact identity. A directory mirror
 stores a small `rlx.mirror/v1` descriptor plus every file under its SHA-256 object key.
-`pull --verify` rehashes each blob and reloads policies to prove their original identity.
+Every pull rehashes each known-hash blob and validates artifact identity;
+`pull --verify` additionally requests the backend's explicit verification flow.
 
 ## Filesystem reference backend
 
@@ -24,7 +25,9 @@ rlx pull 'hf://models/org/repo/rlx#sha256:…' --verify
 ```
 
 Use `datasets` or `spaces` instead of `models` for another repo type, and
-`?revision=branch` when needed. RLX never stores tokens or remaps digests. The HF API
+`?revision=branch` when needed. RLX resolves a movable ref exactly once, fetches
+the descriptor and all blobs from that immutable 40-hex commit, and returns the
+pinned revision in the artifact URI. RLX never stores tokens or remaps digests. The HF API
 boundary is covered with deterministic simulation; a live authenticated smoke is
 user/account-specific.
 
@@ -48,6 +51,10 @@ rlx push policy.rlx \
 The returned URI retains `simulate=`, so it cannot be mistaken for remote evidence.
 Use `examples/boundaries/live_store_smoke.py` after authenticating for an actual
 push/pull verification; that script intentionally refuses simulation URIs.
+
+OCI extraction rejects absolute/parent paths, links, special files, case and
+Unicode-normalization collisions, excessive members, and expanded-byte bombs.
+ORAS itself runs under the shared process supervisor.
 
 ## Comparable qualification evidence
 

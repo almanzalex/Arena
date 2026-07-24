@@ -9,6 +9,7 @@ from typing import Any
 
 from rlx.core.errors import SchemaError
 from rlx.core.identity import canonical_json, digest_uri, sha256_bytes, sha256_file
+from rlx.core.io import publish_directory
 from rlx.core.manifests import (
     EVAL_BUNDLE_SCHEMA,
     dump_json,
@@ -25,12 +26,31 @@ def build_eval_bundle(
     evaluation_digest: str | None = None,
     extra_artifacts: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Copy locked evidence into a bundle directory and write manifest."""
+    """Copy locked evidence into an atomically replaceable bundle directory."""
+    final = Path(out_dir)
+
+    def build(stage: Path) -> dict[str, Any]:
+        return _build_eval_bundle_into(
+            eval_run_dir=eval_run_dir,
+            report=report,
+            out_dir=stage,
+            evaluation_digest=evaluation_digest,
+            extra_artifacts=extra_artifacts,
+        )
+
+    return publish_directory(final, build, replace=True)
+
+
+def _build_eval_bundle_into(
+    *,
+    eval_run_dir: Path | str,
+    report: dict[str, Any] | None,
+    out_dir: Path,
+    evaluation_digest: str | None,
+    extra_artifacts: dict[str, str] | None,
+) -> dict[str, Any]:
+    """Build a complete bundle inside a private staging directory."""
     eval_run_dir = Path(eval_run_dir)
-    out_dir = Path(out_dir)
-    if out_dir.exists():
-        raise SchemaError(f"bundle out_dir already exists: {out_dir}")
-    out_dir.mkdir(parents=True)
 
     artifacts: dict[str, str] = {}
     # Lock eval_run record

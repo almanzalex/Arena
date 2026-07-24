@@ -1,6 +1,13 @@
-# Evaluation suites (RLX 0.2)
+# Evaluation suites (legacy intent, stable 1.0 runs)
 
 Versioned suites expand to match jobs (`run_match` or AEC), record a sampling ledger, and produce reports that keep payoff matrices primary.
+
+The `rlx.evaluation/v0alpha1` suite schema is legacy-frozen so earlier digests
+remain valid. RLX 1.0 additionally projects it into
+`rlx.evaluation-intent/v1` and records `rlx.evaluation-binding/v1`. Endpoint,
+interpreter, worker count, and timeout implementation change the binding digest,
+not semantic intent. Seeds, assignments, metrics, provider semantics, and
+missingness policy change intent.
 
 ## Workflow
 
@@ -23,7 +30,20 @@ rlx eval bundle ./eval-runs/crossplay --out ./bundles/crossplay
 - **Compose check:** every assignment is checked before any run directory is written (E-01). Role swaps require a declared `transform`.
 - **Metrics:** `mean_return`, `win_rate`, `payoff_matrix` (+ Wilson / bootstrap uncertainty). If a ranking is requested and a cycle is detected, emit `nontransitivity_warning` and keep the matrix primary (MET-03 / E-04).
 - **Evidence:** summary cells carry `evidence_refs` to trajectory digests (E-05).
-- **Interaction:** `parallel` (default) or `aec` (Phase 5 runner). Dynamic agent birth/removal fails loud in 0.2.0.
+- **State:** `eval-run/v1` records `complete|incomplete|failed|cancelled` plus
+  attempted/completed/failed denominators and a semantic result digest.
+- **Missingness:** reports refuse non-complete runs unless
+  `failure_policy.missingness: allow` and `max_failed_episodes` explicitly permit
+  the recorded failures.
+- **Hard budgets:** `budgets.timeout_seconds` defaults the cell executor to a
+  supervised process. `budgets.executor: thread` is cooperative and should be
+  used only for trusted calls that cannot cross JSON.
+- **Interaction:** `parallel`, `aec`, or the qualified `dynamic_aec` lifecycle.
+
+After `rlx task verify-equivalence`, copy the returned
+`shared_task_intent_digest` into both evaluation suites as
+`task_intent_digest`. Verified native and external tasks can then share one
+evaluation-intent digest while retaining different execution bindings.
 
 See [RFC 004](../rfcs/004-evaluation.md) and [populations.md](populations.md).
 

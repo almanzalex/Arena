@@ -11,12 +11,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             python-version: "3.12"
-          - os: ubuntu-latest
+            expected-arch: x86_64
+          - os: ubuntu-24.04
             python-version: "3.13"
-          - os: macos-latest
+            expected-arch: x86_64
+          - os: macos-15
             python-version: "3.12"
+            expected-arch: arm64
+          - os: macos-15
+            python-version: "3.13"
+            expected-arch: arm64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -34,8 +40,15 @@ jobs:
           # provider against the already-resolved native stack without allowing
           # that pin to downgrade PettingZoo's runtime dependency.
           pip install --no-deps gimitest==1.0
+      - name: Assert claimed runner
+        env:
+          EXPECTED_ARCH: ${{ matrix.expected-arch }}
+        run: |
+          python -c "import os, platform; actual=platform.machine().lower(); expected=os.environ['EXPECTED_ARCH']; assert actual == expected, (actual, expected)"
       - name: Ruff
         run: ruff check .
+      - name: Release truth
+        run: python scripts/check_release_truth.py
       - name: Pytest (fast default selection)
         run: pytest -q
 
@@ -43,7 +56,7 @@ jobs:
     # Full "never-trained machine" U-01 gate: build a wheel, install it into a
     # fresh network-isolated venv, and run the doc-parsed commands. Also runs the
     # Docker `--network none` variant (Docker is available on ubuntu runners).
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         python-version: ["3.12"]

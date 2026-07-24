@@ -2,18 +2,61 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
+
+
+def normalize_bound_value(value: Any) -> Any:
+    """Encode unbounded Box limits without non-finite JSON numbers."""
+
+    if hasattr(value, "tolist"):
+        value = value.tolist()
+    if isinstance(value, (list, tuple)):
+        return [normalize_bound_value(item) for item in value]
+    if isinstance(value, float) and math.isinf(value):
+        return "inf" if value > 0 else "-inf"
+    return value
+
+
+def decode_bound_value(value: Any) -> Any:
+    """Decode RLX's explicit JSON-safe Box-bound sentinels."""
+
+    if isinstance(value, list):
+        return [decode_bound_value(item) for item in value]
+    if value == "inf":
+        return math.inf
+    if value == "-inf":
+        return -math.inf
+    return value
+
+
+def normalize_space_descriptor(data: dict[str, Any]) -> dict[str, Any]:
+    """Copy a typed space and normalize all nested Box bounds."""
+
+    result = dict(data)
+    if result.get("type") == "Box":
+        for key in ("low", "high"):
+            if key in result:
+                result[key] = normalize_bound_value(result[key])
+    if result.get("type") == "Dict" and isinstance(result.get("spaces"), dict):
+        result["spaces"] = {
+            str(key): normalize_space_descriptor(value)
+            for key, value in result["spaces"].items()
+        }
+    return result
 
 
 def space_from_dict(data: dict[str, Any]) -> dict[str, Any]:
     """Normalize a space dict; unknown fields preserved."""
     if "type" not in data:
         raise ValueError("space requires 'type'")
-    return dict(data)
+    return normalize_space_descriptor(data)
 
 
 def spaces_compatible(expected: dict[str, Any], actual: dict[str, Any]) -> list[str]:
     """Return list of mismatch messages (empty if compatible)."""
+    expected = normalize_space_descriptor(expected)
+    actual = normalize_space_descriptor(actual)
     mismatches: list[str] = []
     if expected.get("type") != actual.get("type"):
         mismatches.append(f"type {actual.get('type')!r} != {expected.get('type')!r}")
@@ -93,11 +136,11 @@ def gymnasium_space_to_dict(space: Any) -> dict[str, Any]:
         low_v: Any
         high_v: Any
         if np.allclose(low, low.flat[0]) and np.allclose(high, high.flat[0]):
-            low_v = float(low.flat[0])
-            high_v = float(high.flat[0])
+            low_v = normalize_bound_value(float(low.flat[0]))
+            high_v = normalize_bound_value(float(high.flat[0]))
         else:
-            low_v = low.tolist()
-            high_v = high.tolist()
+            low_v = normalize_bound_value(low)
+            high_v = normalize_bound_value(high)
         return {
             "type": "Box",
             "shape": list(shape),

@@ -8,13 +8,16 @@ result onto the existing Parallel match contract.
 from __future__ import annotations
 
 import asyncio
-import functools
 import json
+import math
+import warnings
 from typing import Any
+from urllib.parse import urlparse
 from urllib.request import urlopen
 
 from rlx.core.errors import RlxError, SchemaError, TaskRuntimeError
 from rlx.core.identity import canonical_json, digest_uri, sha256_bytes
+from rlx.core.spaces import decode_bound_value
 
 PILOT_ENV = "openenv://rlx/competitive_rps_v0"
 PILOT_AGENTS = ("player_0", "player_1")
@@ -47,8 +50,8 @@ def _space_from_contract(data: dict[str, Any]) -> Any:
         return spaces.Discrete(int(data["n"]))
     if kind == "Box":
         return spaces.Box(
-            low=data.get("low", -np.inf),
-            high=data.get("high", np.inf),
+            low=decode_bound_value(data.get("low", -np.inf)),
+            high=decode_bound_value(data.get("high", np.inf)),
             shape=tuple(data["shape"]),
             dtype=np.dtype(data.get("dtype", "float32")),
         )
@@ -121,11 +124,26 @@ def _transport_error(exc: Exception, *, operation: str) -> TaskRuntimeError:
     )
 
 
-@functools.lru_cache(maxsize=32)
 def _verify_schema_pin(base_url: str, expected: str, timeout_seconds: float) -> None:
     """Refuse an imported endpoint whose advertised protocol schema drifted."""
+    parsed = urlparse(base_url)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise SchemaError(
+            "OpenEnv packaging.base_url must be an http(s) URL without "
+            "embedded credentials, query, or fragment"
+        )
     try:
-        with urlopen(f"{base_url.rstrip('/')}/schema", timeout=timeout_seconds) as response:  # noqa: S310
+        # The URL scheme and credential boundary are validated immediately above.
+        with urlopen(  # nosec B310
+            f"{base_url.rstrip('/')}/schema", timeout=timeout_seconds
+        ) as response:
             schema = json.loads(response.read().decode("utf-8"))
     except Exception as e:  # noqa: BLE001
         raise _transport_error(e, operation="schema verification") from e
@@ -136,6 +154,123 @@ def _verify_schema_pin(base_url: str, expected: str, timeout_seconds: float) -> 
             kind="protocol_error",
             details={"expected_schema_digest": expected, "actual_schema_digest": actual},
         )
+
+
+def _require_exact_agents(
+    value: Any,
+    *,
+    field: str,
+    expected: list[str],
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise TaskRuntimeError(
+            f"OpenEnv response {field} must be a mapping",
+            kind="protocol_error",
+            details={"field": field, "type": type(value).__name__},
+        )
+    if set(value) != set(expected):
+        raise TaskRuntimeError(
+            f"OpenEnv response {field} does not match active agents",
+            kind="protocol_error",
+            details={
+                "field": field,
+                "expected": sorted(expected),
+                "actual": sorted(map(str, value)),
+            },
+        )
+    return value
+
+
+def _validate_observation(
+    env: OpenEnvParallelEnv,
+    *,
+    agent: str,
+    value: Any,
+) -> None:
+    space = env.observation_space(agent)
+    try:
+        valid = bool(space.contains(value))
+    except Exception:
+        valid = False
+    if not valid:
+        raise TaskRuntimeError(
+            f"OpenEnv observation for {agent!r} violates the pinned space",
+            kind="protocol_error",
+            details={
+                "field": f"observations.{agent}",
+                "space": repr(space),
+                "value_type": type(value).__name__,
+            },
+        )
+
+
+def _validate_step_payload(
+    env: OpenEnvParallelEnv,
+    data: dict[str, Any],
+    *,
+    expected: list[str],
+) -> tuple[
+    dict[str, Any],
+    dict[str, float],
+    dict[str, bool],
+    dict[str, bool],
+    dict[str, Any],
+]:
+    observations = _require_exact_agents(
+        data.get("observations"), field="observations", expected=expected
+    )
+    rewards_raw = _require_exact_agents(
+        data.get("rewards"), field="rewards", expected=expected
+    )
+    terminations_raw = _require_exact_agents(
+        data.get("terminations"), field="terminations", expected=expected
+    )
+    truncations_raw = _require_exact_agents(
+        data.get("truncations"), field="truncations", expected=expected
+    )
+    infos = _require_exact_agents(
+        data.get("infos") or {agent: {} for agent in expected},
+        field="infos",
+        expected=expected,
+    )
+    rewards: dict[str, float] = {}
+    terminations: dict[str, bool] = {}
+    truncations: dict[str, bool] = {}
+    for agent in expected:
+        _validate_observation(env, agent=agent, value=observations[agent])
+        reward = rewards_raw[agent]
+        if isinstance(reward, bool) or not isinstance(reward, (int, float)):
+            raise TaskRuntimeError(
+                f"OpenEnv reward for {agent!r} must be a finite number",
+                kind="protocol_error",
+                details={"field": f"rewards.{agent}", "value": repr(reward)},
+            )
+        numeric_reward = float(reward)
+        if not math.isfinite(numeric_reward):
+            raise TaskRuntimeError(
+                f"OpenEnv reward for {agent!r} must be finite",
+                kind="protocol_error",
+                details={"field": f"rewards.{agent}", "value": repr(reward)},
+            )
+        rewards[agent] = numeric_reward
+        for label, raw, target in (
+            ("terminations", terminations_raw, terminations),
+            ("truncations", truncations_raw, truncations),
+        ):
+            if not isinstance(raw[agent], bool):
+                raise TaskRuntimeError(
+                    f"OpenEnv {label} for {agent!r} must be boolean",
+                    kind="protocol_error",
+                    details={"field": f"{label}.{agent}", "value": repr(raw[agent])},
+                )
+            target[agent] = raw[agent]
+        if not isinstance(infos[agent], dict):
+            raise TaskRuntimeError(
+                f"OpenEnv infos for {agent!r} must be a mapping",
+                kind="protocol_error",
+                details={"field": f"infos.{agent}"},
+            )
+    return observations, rewards, terminations, truncations, infos
 
 
 class OpenEnvParallelEnv:
@@ -154,6 +289,7 @@ class OpenEnvParallelEnv:
         self.contract = contract
         self.possible_agents = list(contract.get("agents") or contract["roles"].keys())
         self.agents: list[str] = []
+        self.cleanup_diagnostics: list[dict[str, Any]] = []
         self._client_context: Any | None = None
         client_factory = packaging.get("_client_factory")
         try:
@@ -208,26 +344,38 @@ class OpenEnvParallelEnv:
             raise
         except Exception as e:  # noqa: BLE001
             raise _transport_error(e, operation="reset") from e
-        observations = data.get("observations")
-        if not isinstance(observations, dict):
-            raise TaskRuntimeError(
-                "OpenEnv reset response missing observations mapping",
-                kind="protocol_error",
-            )
-        if set(observations) != set(self.possible_agents):
-            raise TaskRuntimeError(
-                "OpenEnv reset observations do not match pinned contract agents",
-                kind="protocol_error",
-                details={
-                    "expected": sorted(self.possible_agents),
-                    "actual": sorted(observations),
-                },
-            )
+        observations = _require_exact_agents(
+            data.get("observations"),
+            field="observations",
+            expected=self.possible_agents,
+        )
+        for agent in self.possible_agents:
+            _validate_observation(self, agent=agent, value=observations[agent])
         self.agents = list(self.possible_agents)
-        infos = data.get("infos") or {agent: {} for agent in self.agents}
+        infos = _require_exact_agents(
+            data.get("infos") or {agent: {} for agent in self.agents},
+            field="infos",
+            expected=self.agents,
+        )
+        if any(not isinstance(infos[agent], dict) for agent in self.agents):
+            raise TaskRuntimeError(
+                "OpenEnv reset infos values must be mappings",
+                kind="protocol_error",
+                details={"field": "infos"},
+            )
         return observations, infos
 
     def step(self, actions: dict[str, Any]):
+        expected = list(self.agents)
+        _require_exact_agents(actions, field="actions", expected=expected)
+        for agent in expected:
+            space = self.action_space(agent)
+            if not bool(space.contains(actions[agent])):
+                raise TaskRuntimeError(
+                    f"OpenEnv action for {agent!r} violates the pinned action space",
+                    kind="protocol_error",
+                    details={"field": f"actions.{agent}", "space": repr(space)},
+                )
         try:
             result = self._client.step({"actions": _wire_value(actions)})
             data = _payload(result)
@@ -235,27 +383,22 @@ class OpenEnvParallelEnv:
             raise
         except Exception as e:  # noqa: BLE001
             raise _transport_error(e, operation="step") from e
-        required = ("observations", "rewards", "terminations", "truncations")
-        missing = [key for key in required if not isinstance(data.get(key), dict)]
-        if missing:
-            raise TaskRuntimeError(
-                f"OpenEnv step response missing mappings: {', '.join(missing)}",
-                kind="protocol_error",
-                details={"missing": missing},
-            )
-        terminations = data["terminations"]
-        truncations = data["truncations"]
+        observations, rewards, terminations, truncations, infos = _validate_step_payload(
+            self,
+            data,
+            expected=expected,
+        )
         if self.agents and (
             all(bool(terminations.get(a, False)) for a in self.agents)
             or all(bool(truncations.get(a, False)) for a in self.agents)
         ):
             self.agents = []
         return (
-            data["observations"],
-            data["rewards"],
+            observations,
+            rewards,
             terminations,
             truncations,
-            data.get("infos") or {},
+            infos,
         )
 
     def render(self) -> None:
@@ -272,9 +415,20 @@ class OpenEnvParallelEnv:
                 context.__exit__(None, None, None)
             elif hasattr(context, "close"):
                 context.close()
-        except Exception:
+        except Exception as exc:
             # A close-time disconnect must not overwrite already-recorded episode evidence.
-            pass
+            diagnostic = {
+                "schema": "rlx.cleanup-diagnostic/v1",
+                "code": "OPENENV_CLOSE_FAILED",
+                "message": str(exc),
+                "operation": "close",
+            }
+            self.cleanup_diagnostics.append(diagnostic)
+            warnings.warn(
+                f"OpenEnv close failed after episode evidence was retained: {exc}",
+                ResourceWarning,
+                stacklevel=2,
+            )
 
 
 class OpenEnvPackager:

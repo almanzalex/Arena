@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-import json
+import sys
+import tempfile
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,13 +12,17 @@ from typing import Any
 
 from rlx.adapters.task_pettingzoo.adapter import describe_task
 from rlx.core.compatibility import compose_check
-from rlx.core.errors import CompatibilityError, SchemaError
+from rlx.core.errors import CompatibilityError, SchemaError, redact
 from rlx.core.identity import canonical_json, digest_uri, sha256_bytes, sha256_canonical
+from rlx.core.io import atomic_write_bytes, publish_directory
 from rlx.core.manifests import (
-    EVAL_RUN_SCHEMA,
+    EVAL_RUN_V1_SCHEMA,
     dump_json,
     dump_yaml,
+    evaluation_binding_digest,
     evaluation_content_digest,
+    evaluation_intent_digest,
+    evaluation_intent_projection,
     expand_seeds,
     load_manifest,
     task_content_digest,
@@ -26,6 +32,7 @@ from rlx.core.manifests import (
 from rlx.core.population import assert_members_compatible_with_role, load_population
 from rlx.core.sdk import Policy, Task
 from rlx.core.store import LocalStore
+from rlx.core.supervisor import run_supervised
 from rlx.plugins import metrics as metrics_plugins
 from rlx.plugins import samplers as sampler_plugins
 
@@ -211,6 +218,186 @@ def expand_evaluation_cells(
     return cells, ledger
 
 
+def _execute_evaluation_cell(
+    *,
+    cell: dict[str, Any],
+    suite: dict[str, Any],
+    task_spec: dict[str, Any],
+    task_info: dict[str, Any],
+    task_digest: str,
+    provider_lineage: dict[str, Any],
+    policy_index: dict[str, Path],
+    run_root: Path,
+    record: bool,
+) -> dict[str, Any]:
+    from rlx.plugins.interactions import get_interaction
+
+    assignments: dict[str, Policy] = {}
+    for role, pref in cell["assignments"].items():
+        policy = _policy_from_digest_or_path(str(pref), policy_index=policy_index)
+        meta = task_info["roles"].get(role)
+        if meta is None:
+            raise CompatibilityError(
+                f"assignment role {role!r} not in task agents {list(task_info['roles'])}"
+            )
+        report = compose_check(
+            policy=policy.manifest,
+            role=role,
+            expected_obs=meta.get("observation"),
+            expected_act=meta.get("action"),
+            action_mode=suite.get("action_mode"),
+            task_provides_masks=bool(task_info.get("provides_masks")),
+        )
+        if not report.ok:
+            raise CompatibilityError(str(report))
+        assignments[role] = policy
+    match_out = run_root / cell["cell_id"]
+    result = get_interaction(suite.get("interaction", "parallel")).run_match(
+        task_spec=task_spec,
+        assignments=assignments,
+        seeds=list(cell["seeds"]),
+        action_mode=suite.get("action_mode", "deterministic"),
+        record=record,
+        out_dir=match_out,
+        failure_policy=suite.get("failure_policy"),
+    )
+    episodes = []
+    evidence_refs = []
+    traj_dir = match_out / "trajectories"
+    if traj_dir.exists():
+        for ep_path in sorted(traj_dir.glob("episode_*.json")):
+            ep = load_manifest(ep_path)
+            episodes.append(
+                {
+                    "path": str(ep_path),
+                    "seed": ep.get("seed"),
+                    "returns": ep.get("returns") or _episode_returns(ep),
+                    "outcomes": ep.get("outcomes") or {},
+                }
+            )
+            evidence_refs.append(str(ep_path.relative_to(run_root)))
+        bundle = traj_dir / "bundle.json"
+        if bundle.exists():
+            evidence_refs.insert(0, str(bundle.relative_to(run_root)))
+    return {
+        **cell,
+        "run": result,
+        "episodes": episodes,
+        "evidence_refs": evidence_refs,
+        "failures": len(result.get("failures") or []),
+        "lineage": {
+            "policy_digests": sorted(set(cell["assignments"].values())),
+            "task_digest": task_digest,
+            "provider": provider_lineage,
+        },
+    }
+
+
+def _supervised_cell_failure(
+    *,
+    cell: dict[str, Any],
+    task_digest: str,
+    provider_lineage: dict[str, Any],
+    exc: BaseException,
+) -> dict[str, Any]:
+    safe_message = str(redact(str(exc)))
+    failures = [
+        {
+            "episode_index": index,
+            "seed": seed,
+            "kind": "executor_failure",
+            "message": safe_message,
+        }
+        for index, seed in enumerate(cell["seeds"])
+    ]
+    return {
+        **cell,
+        "run": {
+            "failures": failures,
+            "outcome": {
+                "episodes_requested": len(cell["seeds"]),
+                "episodes_completed": 0,
+                "failure_count": len(failures),
+            },
+        },
+        "episodes": [],
+        "evidence_refs": [],
+        "failures": len(failures),
+        "lineage": {
+            "policy_digests": sorted(set(cell["assignments"].values())),
+            "task_digest": task_digest,
+            "provider": provider_lineage,
+        },
+    }
+
+
+def _run_cell_supervised(
+    *,
+    cell: dict[str, Any],
+    suite: dict[str, Any],
+    task_spec: dict[str, Any],
+    task_info: dict[str, Any],
+    task_digest: str,
+    provider_lineage: dict[str, Any],
+    policy_index: dict[str, Path],
+    run_root: Path,
+    record: bool,
+    timeout_seconds: float,
+    max_stdout_bytes: int,
+    max_stderr_bytes: int,
+) -> dict[str, Any]:
+    request_id = str(uuid.uuid4())
+    request: dict[str, Any] = {
+        "schema": "rlx.eval-cell-request/v1",
+        "request_id": request_id,
+        "cell": cell,
+        "suite": suite,
+        "task_spec": task_spec,
+        "task_info": task_info,
+        "task_digest": task_digest,
+        "provider_lineage": provider_lineage,
+        "policy_index": {
+            key: str(value.resolve()) for key, value in policy_index.items()
+        },
+        "run_root": str(run_root.resolve()),
+        "record": bool(record),
+    }
+    request_digest = digest_uri(sha256_bytes(canonical_json(request)))
+    request["request_digest"] = request_digest
+    with tempfile.TemporaryDirectory(prefix="rlx-eval-cell-") as raw:
+        request_path = Path(raw) / "request.json"
+        response_path = Path(raw) / "response.json"
+        atomic_write_bytes(request_path, canonical_json(request) + b"\n")
+        completed = run_supervised(
+            [
+                sys.executable,
+                "-m",
+                "rlx.runtime.eval_worker",
+                str(request_path),
+                str(response_path),
+            ],
+            timeout_seconds=timeout_seconds,
+            max_stdout_bytes=max_stdout_bytes,
+            max_stderr_bytes=max_stderr_bytes,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError(
+                f"evaluation cell worker exited {completed.returncode}: "
+                f"{completed.stderr[-2000:]}"
+            )
+        response = load_manifest(response_path, max_bytes=64 * 1024 * 1024)
+    if response.get("schema") != "rlx.eval-cell-response/v1":
+        raise RuntimeError("evaluation cell worker returned an unsupported response")
+    if response.get("request_id") != request_id:
+        raise RuntimeError("evaluation cell worker request_id mismatch")
+    if response.get("request_digest") != request_digest:
+        raise RuntimeError("evaluation cell worker request digest mismatch")
+    result = response.get("result")
+    if response.get("ok") is not True or not isinstance(result, dict):
+        raise RuntimeError("evaluation cell worker returned an invalid result")
+    return result
+
+
 def run_evaluation(
     suite: dict[str, Any],
     *,
@@ -254,6 +441,72 @@ def _run_native_evaluation(
     provider_lineage: dict[str, Any] | None = None,
     identity_suite: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """Publish an explicit evaluation output only after the run is coherent.
+
+    Match writers operate inside a same-parent staging directory. A crash or
+    validation failure removes that staging tree; readers can therefore never
+    confuse a partially written explicit ``--out`` path for a completed run.
+    """
+    if out_dir is None:
+        return _run_native_evaluation_impl(
+            suite,
+            policy_index=policy_index,
+            populations=populations,
+            store=store,
+            out_dir=None,
+            workers=workers,
+            record=record,
+            provider_lineage=provider_lineage,
+            identity_suite=identity_suite,
+        )
+    final = Path(out_dir)
+    stage_used: Path | None = None
+
+    def build(stage: Path) -> dict[str, Any]:
+        nonlocal stage_used
+        stage_used = stage
+        return _run_native_evaluation_impl(
+            suite,
+            policy_index=policy_index,
+            populations=populations,
+            store=store,
+            out_dir=stage,
+            workers=workers,
+            record=record,
+            provider_lineage=provider_lineage,
+            identity_suite=identity_suite,
+        )
+
+    result = publish_directory(final, build, replace=True)
+    if stage_used is None:  # pragma: no cover - publish_directory always invokes build
+        raise RuntimeError("evaluation publication did not invoke its builder")
+    old = str(stage_used)
+    new = str(final)
+
+    def published(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {key: published(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [published(item) for item in value]
+        if isinstance(value, str) and value.startswith(old):
+            return new + value[len(old) :]
+        return value
+
+    return published(result)
+
+
+def _run_native_evaluation_impl(
+    suite: dict[str, Any],
+    *,
+    policy_index: dict[str, Path],
+    populations: dict[str, dict[str, Any]] | None = None,
+    store: LocalStore | None = None,
+    out_dir: Path | None = None,
+    workers: int = 1,
+    record: bool = True,
+    provider_lineage: dict[str, Any] | None = None,
+    identity_suite: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Validate, expand, run match jobs, and write an eval-run record.
 
     Independent cells may execute concurrently. ``executor.map`` and the final
@@ -264,13 +517,21 @@ def _run_native_evaluation(
         raise SchemaError("evaluation workers must be >= 1")
     populations = populations or {}
     suite = validate_evaluation(suite, populations=populations, policy_index=policy_index)
-    from rlx.plugins.interactions import get_interaction
-
     interaction = suite.get("interaction", "parallel")
-    _run = get_interaction(interaction).run_match
     cells, ledger = expand_evaluation_cells(suite, populations=populations)
-    suite_digest = evaluation_content_digest(identity_suite or suite)
-    run_id = f"eval-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{sha256_canonical(suite_digest)[:8]}"
+    semantic_suite = identity_suite or suite
+    suite_digest = evaluation_content_digest(semantic_suite)
+    intent_digest = evaluation_intent_digest(semantic_suite)
+    binding_digest = evaluation_binding_digest(
+        suite,
+        provider=str(suite.get("provider", "native")),
+        workers=workers,
+    )
+    run_id = (
+        "eval-"
+        + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        + f"-{sha256_canonical(suite_digest)[:8]}"
+    )
     if out_dir is not None:
         run_root = Path(out_dir)
         run_root.mkdir(parents=True, exist_ok=True)
@@ -293,7 +554,7 @@ def _run_native_evaluation(
     task_digest = task_content_digest(identity_task)
     provider_lineage = provider_lineage or {
         "kind": "native",
-        "version": "rlx-native-0.5",
+        "version": "rlx-native-1",
         "config_digest": digest_uri(
             sha256_bytes(canonical_json((identity_suite or suite).get("provider_config") or {}))
         ),
@@ -308,79 +569,132 @@ def _run_native_evaluation(
             "interaction=dynamic_aec requires a task whose contract declares dynamic_agents=true"
         )
     def run_cell(cell: dict[str, Any]) -> dict[str, Any]:
-        assignments: dict[str, Policy] = {}
-        for role, pref in cell["assignments"].items():
-            policy = _policy_from_digest_or_path(str(pref), policy_index=policy_index)
-            meta = task_info["roles"].get(role)
-            if meta is None:
-                raise CompatibilityError(
-                    f"assignment role {role!r} not in task agents {list(task_info['roles'])}"
-                )
-            report = compose_check(
-                policy=policy.manifest,
-                role=role,
-                expected_obs=meta.get("observation"),
-                expected_act=meta.get("action"),
-                action_mode=suite.get("action_mode"),
-                task_provides_masks=bool(task_info.get("provides_masks")),
-            )
-            if not report.ok:
-                raise CompatibilityError(str(report))
-            assignments[role] = policy
-        match_out = run_root / cell["cell_id"]
-        result = _run(
+        return _execute_evaluation_cell(
+            cell=cell,
+            suite=suite,
             task_spec=task_spec,
-            assignments=assignments,
-            seeds=list(cell["seeds"]),
-            action_mode=suite.get("action_mode", "deterministic"),
+            task_info=task_info,
+            task_digest=task_digest,
+            provider_lineage=provider_lineage,
+            policy_index=policy_index,
+            run_root=run_root,
             record=record,
-            out_dir=match_out,
-            failure_policy=suite.get("failure_policy"),
         )
-        episodes = []
-        evidence_refs = []
-        traj_dir = match_out / "trajectories"
-        if traj_dir.exists():
-            for ep_path in sorted(traj_dir.glob("episode_*.json")):
-                ep = json.loads(ep_path.read_text(encoding="utf-8"))
-                episodes.append(
-                    {
-                        "path": str(ep_path),
-                        "seed": ep.get("seed"),
-                        "returns": ep.get("returns") or _episode_returns(ep),
-                        "outcomes": ep.get("outcomes") or {},
-                    }
-                )
-                evidence_refs.append(str(ep_path))
-            bundle = traj_dir / "bundle.json"
-            if bundle.exists():
-                evidence_refs.insert(0, str(bundle))
-        return {
-            **cell,
-            "run": result,
-            "episodes": episodes,
-            "evidence_refs": evidence_refs,
-            "failures": len(result.get("failures") or []),
-            "lineage": {
-                "policy_digests": sorted(set(cell["assignments"].values())),
-                "task_digest": task_digest,
-                "provider": provider_lineage,
-            },
-        }
+
+    budgets = suite.get("budgets") or {}
+    if not isinstance(budgets, dict):
+        raise SchemaError("evaluation budgets must be a mapping")
+    hard_timeout = budgets.get("timeout_seconds")
+    executor_kind = budgets.get(
+        "executor", "process" if hard_timeout is not None else "thread"
+    )
+    if executor_kind not in {"process", "thread"}:
+        raise SchemaError("evaluation budgets.executor must be process|thread")
+    if executor_kind == "process" and hard_timeout is None:
+        raise SchemaError(
+            "evaluation process executor requires budgets.timeout_seconds"
+        )
+
+    def run_cell_with_budget(cell: dict[str, Any]) -> dict[str, Any]:
+        if executor_kind == "thread":
+            return run_cell(cell)
+        try:
+            return _run_cell_supervised(
+                cell=cell,
+                suite=suite,
+                task_spec=task_spec,
+                task_info=task_info,
+                task_digest=task_digest,
+                provider_lineage=provider_lineage,
+                policy_index=policy_index,
+                run_root=run_root,
+                record=record,
+                timeout_seconds=float(hard_timeout),
+                max_stdout_bytes=int(budgets.get("max_stdout_bytes", 1_048_576)),
+                max_stderr_bytes=int(budgets.get("max_stderr_bytes", 1_048_576)),
+            )
+        except Exception as exc:  # noqa: BLE001 - every attempt is accounted.
+            return _supervised_cell_failure(
+                cell=cell,
+                task_digest=task_digest,
+                provider_lineage=provider_lineage,
+                exc=exc,
+            )
 
     if workers == 1 or len(cells) <= 1:
-        cell_results = [run_cell(cell) for cell in cells]
+        cell_results = [run_cell_with_budget(cell) for cell in cells]
     else:
         with ThreadPoolExecutor(
             max_workers=min(workers, len(cells)),
             thread_name_prefix="rlx-eval",
         ) as executor:
-            cell_results = list(executor.map(run_cell, cells))
+            cell_results = list(executor.map(run_cell_with_budget, cells))
 
+    attempted = sum(len(cell["seeds"]) for cell in cell_results)
+    completed = sum(
+        int((cell.get("run") or {}).get("outcome", {}).get("episodes_completed", 0))
+        for cell in cell_results
+    )
+    failed = sum(int(cell.get("failures", 0)) for cell in cell_results)
+    state = (
+        "complete"
+        if completed == attempted and failed == 0
+        else ("incomplete" if completed > 0 else "failed")
+    )
+    semantic_cells = [
+        {
+            "cell_id": cell["cell_id"],
+            "assignments": cell["assignments"],
+            "seeds": cell["seeds"],
+            "episodes": [
+                {
+                    "seed": episode.get("seed"),
+                    "returns": episode.get("returns") or {},
+                    "outcomes": episode.get("outcomes") or {},
+                }
+                for episode in cell.get("episodes") or []
+            ],
+            "failures": [
+                {
+                    "seed": failure.get("seed"),
+                    "kind": failure.get("kind"),
+                    "episode_index": failure.get("episode_index"),
+                }
+                for failure in (cell.get("run") or {}).get("failures") or []
+            ],
+        }
+        for cell in cell_results
+    ]
+    semantic_result_digest = digest_uri(
+        sha256_bytes(
+            canonical_json(
+                {
+                    "schema": "rlx.evaluation-result/v1",
+                    "evaluation_intent_digest": intent_digest,
+                    "state": state,
+                    "denominators": {
+                        "attempted": attempted,
+                        "completed": completed,
+                        "failed": failed,
+                    },
+                    "cells": semantic_cells,
+                }
+            )
+        )
+    )
     eval_run = {
-        "schema": EVAL_RUN_SCHEMA,
+        "schema": EVAL_RUN_V1_SCHEMA,
         "run_id": run_id,
         "evaluation_digest": suite_digest,
+        "evaluation_intent_digest": intent_digest,
+        "execution_binding_digest": binding_digest,
+        "semantic_result_digest": semantic_result_digest,
+        "state": state,
+        "denominators": {
+            "attempted": attempted,
+            "completed": completed,
+            "failed": failed,
+        },
         "evaluation_name": suite.get("name"),
         "interaction": interaction,
         "sampling_ledger": ledger,
@@ -406,6 +720,7 @@ def _run_native_evaluation(
     dump_yaml(eval_run, run_root / "eval_run.yaml")
     dump_json(eval_run, run_root / "eval_run.json")
     dump_yaml(identity_suite or suite, run_root / "suite.yaml")
+    dump_json(evaluation_intent_projection(semantic_suite), run_root / "intent.json")
     # Attach rich cell results for metrics (not all duplicated into schema-minimal yaml).
     eval_run["cell_results"] = cell_results
     eval_run["suite"] = suite
@@ -427,8 +742,19 @@ def _episode_returns(ep: dict[str, Any]) -> dict[str, float]:
 
 
 def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
-    metrics_plugins.register_builtins()
+    state = eval_run.get("state", "complete")
     suite = eval_run.get("suite") or {}
+    failure_policy = suite.get("failure_policy") or {}
+    allow_missing = failure_policy.get("missingness", "fail") == "allow"
+    failed = int((eval_run.get("denominators") or {}).get("failed", 0))
+    max_failed = int(failure_policy.get("max_failed_episodes", 0))
+    if state != "complete" and (not allow_missing or failed > max_failed):
+        raise SchemaError(
+            "refusing to report an incomplete evaluation: "
+            f"state={state}, failed={failed}; set failure_policy.missingness=allow "
+            "with an explicit max_failed_episodes threshold to opt in"
+        )
+    metrics_plugins.register_builtins()
     metric_kinds = suite.get("metrics") or ["payoff_matrix", "mean_return"]
     cells = eval_run.get("cell_results") or []
     # Enrich cells from minimal eval_run if needed.
@@ -440,8 +766,13 @@ def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
         metric = metrics_plugins.METRICS.get(str(name))
         computed[str(name)] = metric.compute(cells)
     report = {
-        "schema": "rlx.eval-report/v0alpha1",
+        "schema": "rlx.eval-report/v1",
         "evaluation_digest": eval_run["evaluation_digest"],
+        "evaluation_intent_digest": eval_run.get("evaluation_intent_digest"),
+        "execution_binding_digest": eval_run.get("execution_binding_digest"),
+        "semantic_result_digest": eval_run.get("semantic_result_digest"),
+        "state": state,
+        "denominators": eval_run.get("denominators"),
         "eval_run_digest": eval_run.get("object_digest")
         or digest_uri(sha256_bytes(canonical_json(eval_run.get("cells")))),
         "metrics": computed,

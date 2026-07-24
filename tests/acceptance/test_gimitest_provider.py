@@ -22,6 +22,7 @@ def test_i01_gimitest_provider_records_complete_lineage(tmp_path: Path) -> None:
     rock = Path("examples/eval/demo/rock.rlx").resolve()
     paper = Path("examples/eval/demo/paper.rlx").resolve()
     provider_config = {
+        "semantic": {},
         "suite": "base-hooks",
         "test_class": "gimitest.gtest:GTest",
         "parameters": {"purpose": "RLX provider qualification"},
@@ -55,6 +56,16 @@ def test_i01_gimitest_provider_records_complete_lineage(tmp_path: Path) -> None:
     assert len(lineage["policy_digests"]) == 2
     assert result["cells"][0]["failures"] == 0
 
+    native = run_evaluation(
+        suite,
+        policy_index={},
+        out_dir=tmp_path / "native-run",
+        provider="native",
+    )
+    assert result["evaluation_intent_digest"] == native["evaluation_intent_digest"]
+    assert result["execution_binding_digest"] != native["execution_binding_digest"]
+    assert result["semantic_result_digest"] == native["semantic_result_digest"]
+
     report = build_eval_report(result)
     assert report["provider"] == result["provider"]
     assert report["task_digest"] == result["task_digest"]
@@ -66,6 +77,43 @@ def test_external_gimitest_class_requires_explicit_trust() -> None:
 
     with pytest.raises(SchemaError, match="execute Python"):
         _resolve_test_class("tests.some_lab:Scenario", allow_external=False)
+
+
+@pytest.mark.acceptance
+@pytest.mark.requires_gimitest
+def test_gimitest_non_noop_scenario_changes_recorded_reward(tmp_path: Path) -> None:
+    suite = {
+        "schema": "rlx.evaluation/v0alpha1",
+        "name": "gimitest-non-noop",
+        "provider": "gimitest",
+        "provider_config": {
+            "test_class": (
+                "rlx.adapters.eval_gimitest.scenarios:RewardTransformScenario"
+            ),
+            "parameters": {"reward_scale": -1.0},
+        },
+        "interaction": "parallel",
+        "task": {
+            "adapter": "pettingzoo-parallel",
+            "env": "rlx/competitive_rps_v0",
+            "interaction": "parallel",
+            "config": {"max_cycles": 1},
+        },
+        "assignments": {
+            "player_0": str(Path("examples/eval/demo/rock.rlx").resolve()),
+            "player_1": str(Path("examples/eval/demo/paper.rlx").resolve()),
+        },
+        "seeds": [0],
+        "action_mode": "deterministic",
+        "metrics": ["mean_return"],
+    }
+    result = run_evaluation(
+        suite,
+        policy_index={},
+        out_dir=tmp_path / "transformed",
+    )
+    returns = result["cell_results"][0]["episodes"][0]["returns"]
+    assert returns == {"player_0": 1.0, "player_1": -1.0}
 
 
 @pytest.mark.acceptance

@@ -7,13 +7,13 @@ not invent accounts, certificate authorities, revocation, or transparency logs.
 from __future__ import annotations
 
 import base64
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from rlx.core.errors import ConformanceError, RlxError, SchemaError
 from rlx.core.identity import canonical_json, digest_uri, sha256_bytes
+from rlx.core.io import atomic_write_bytes
 from rlx.core.manifests import dump_json, load_manifest
 from rlx.core.mirror import build_mirror_artifact
 
@@ -36,7 +36,7 @@ def _crypto() -> tuple[Any, Any, Any, Any]:
 
 
 def _refuse_existing(path: Path) -> None:
-    if path.exists():
+    if path.exists() or path.is_symlink():
         raise SchemaError(f"refusing to overwrite existing path: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -63,9 +63,14 @@ def generate_signing_keypair(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-    private_path.write_bytes(private_bytes)
-    os.chmod(private_path, 0o600)
-    public_path.write_bytes(public_bytes)
+    # Publish the non-secret half first. A process death can at worst leave an
+    # orphan public key; the private key is a single fsync+rename operation.
+    atomic_write_bytes(public_path, public_bytes, mode=0o644)
+    try:
+        atomic_write_bytes(private_path, private_bytes, mode=0o600)
+    except BaseException:
+        public_path.unlink(missing_ok=True)
+        raise
     key_id = public_key_id(public_path)
     return {
         "algorithm": "ed25519",

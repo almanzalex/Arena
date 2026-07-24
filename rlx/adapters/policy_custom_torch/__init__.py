@@ -32,6 +32,7 @@ from rlx.core.manifests import (
     policy_content_digest,
     validate_policy_manifest,
 )
+from rlx.core.spaces import normalize_space_descriptor
 
 ADAPTER_NAME = "custom-pytorch"
 
@@ -431,7 +432,8 @@ def _write_bundle_into(
     if preprocessing and preprocessing.get("clip") is not None:
         prep["clip"] = preprocessing["clip"]
 
-    action = dict(action)
+    observation = normalize_space_descriptor(observation)
+    action = normalize_space_descriptor(action)
     action.setdefault("masks", "none")
 
     # None → defaults; explicit [] must stay empty (do not coerce via `or`).
@@ -871,7 +873,10 @@ def load_checkpoint_file(
             "Only use this for checkpoints you fully trust.",
             stacklevel=2,
         )
-        return torch.load(source, map_location="cpu", weights_only=False)
+        # Explicit trusted-source opt-in; the safe weights-only path is always first.
+        return torch.load(  # nosec B614
+            source, map_location="cpu", weights_only=False
+        )
 
 
 def _jsonable_action(action: Any) -> Any:

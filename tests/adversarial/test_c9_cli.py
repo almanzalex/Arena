@@ -48,8 +48,8 @@ def test_missing_args_error_cleanly(argv, capsys) -> None:
 
 def test_inspect_nonexistent_artifact(tmp_path: Path, capsys) -> None:
     code, _out, err = _run(["inspect", str(tmp_path / "nope.rlx")], capsys)
-    assert code == 1
-    assert err.startswith("error:")
+    assert code == 3
+    assert err.startswith("error [")
     assert "Traceback" not in err
 
 
@@ -57,8 +57,8 @@ def test_inspect_malformed_manifest(tmp_path: Path, capsys) -> None:
     bad = tmp_path / "manifest.yaml"
     bad.write_text("- just\n- a\n- list\n", encoding="utf-8")  # root is not a mapping
     code, _out, err = _run(["inspect", str(bad)], capsys)
-    assert code == 1
-    assert err.startswith("error:")
+    assert code == 3
+    assert err.startswith("error [")
     assert "Traceback" not in err
 
 
@@ -66,7 +66,7 @@ def test_inspect_unparseable_yaml(tmp_path: Path, capsys) -> None:
     bad = tmp_path / "manifest.yaml"
     bad.write_text("key: : : [unbalanced\n", encoding="utf-8")
     code, _out, err = _run(["inspect", str(bad)], capsys)
-    assert code == 1
+    assert code == 3
     assert "Traceback" not in err
 
 
@@ -93,8 +93,8 @@ def test_match_run_wrong_schema_no_partial_write(tmp_path: Path, monkeypatch, ca
 
 def test_match_run_missing_manifest_file(tmp_path: Path, capsys) -> None:
     code, _out, err = _run(["match", "run", str(tmp_path / "absent.yaml")], capsys)
-    assert code == 1
-    assert err.startswith("error:")
+    assert code == 3
+    assert err.startswith("error [")
     assert "Traceback" not in err
 
 

@@ -3,9 +3,10 @@ name: rps-gimitest-robustness
 provider: gimitest
 provider_config:
   suite: base-hooks
-  test_class: gimitest.gtest:GTest
+  test_class: rlx.adapters.eval_gimitest.scenarios:RewardTransformScenario
   parameters:
-    purpose: RLX provider lineage qualification
+    purpose: RLX non-no-op provider qualification
+    reward_scale: -1.0
 interaction: parallel
 task:
   adapter: pettingzoo-parallel

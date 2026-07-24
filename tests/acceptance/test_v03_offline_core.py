@@ -61,4 +61,4 @@ print(rlx.__version__)
         check=False,
     )
     assert proc.returncode == 0, proc.stderr
-    assert proc.stdout.strip() == "0.5.0"
+    assert proc.stdout.strip() == "1.0.0rc1"

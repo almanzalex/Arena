@@ -1,0 +1,33 @@
+{
+  "schema": "rlx.schema-registry/v1",
+  "release": "1.0.0rc1",
+  "compatibility": {
+    "legacy_read_through": "1.x",
+    "stable_removal": "2.0",
+    "identity_migration": "creates-new-artifact-with-source-digest"
+  },
+  "schemas": [
+    {"kind": "policy", "id": "rlx.policy/v0alpha1", "status": "legacy-frozen", "readers": ">=0.1,<2", "writers": ">=0.1,<2", "unknown_fields": "declared-by-validator"},
+    {"kind": "match", "id": "rlx.match/v0alpha1", "status": "legacy-frozen", "readers": ">=0.1,<2", "writers": ">=0.1,<2", "unknown_fields": "declared-by-validator"},
+    {"kind": "trajectory", "id": "rlx.trajectory/v0alpha1", "status": "legacy-frozen", "readers": ">=0.1,<2", "writers": ">=0.1,<2", "unknown_fields": "preserved"},
+    {"kind": "run", "id": "rlx.run/v0alpha1", "status": "legacy-frozen", "readers": ">=0.1,<2", "writers": ">=0.1,<2", "unknown_fields": "preserved"},
+    {"kind": "population", "id": "rlx.population/v0alpha1", "status": "legacy-frozen", "readers": ">=0.2,<2", "writers": ">=0.2,<2", "unknown_fields": "declared-by-validator"},
+    {"kind": "evaluation", "id": "rlx.evaluation/v0alpha1", "status": "legacy-frozen", "readers": ">=0.2,<2", "writers": ">=0.2,<2", "unknown_fields": "declared-by-validator"},
+    {"kind": "eval-run", "id": "rlx.eval-run/v0alpha1", "status": "legacy-frozen", "readers": ">=0.2,<2", "writers": ">=0.2,<1", "unknown_fields": "preserved"},
+    {"kind": "eval-report", "id": "rlx.eval-report/v0alpha1", "status": "legacy-frozen", "readers": ">=0.2,<2", "writers": ">=0.2,<1", "unknown_fields": "preserved"},
+    {"kind": "dataset", "id": "rlx.dataset/v0alpha1", "status": "legacy-frozen", "readers": ">=0.2,<2", "writers": ">=0.2,<2", "unknown_fields": "declared-by-validator"},
+    {"kind": "eval-bundle", "id": "rlx.eval-bundle/v0alpha1", "status": "legacy-frozen", "readers": ">=0.2,<2", "writers": ">=0.2,<2", "unknown_fields": "preserved"},
+    {"kind": "task", "id": "rlx.task/v0alpha1", "status": "legacy-frozen", "readers": ">=0.3,<2", "writers": ">=0.3,<2", "unknown_fields": "declared-by-validator"},
+    {"kind": "trace-suite", "id": "rlx.trace-suite/v1", "status": "stable", "readers": ">=0.3,<2", "writers": ">=0.3,<2", "unknown_fields": "declared-by-validator"},
+    {"kind": "mirror", "id": "rlx.mirror/v1", "status": "stable", "readers": ">=0.3,<2", "writers": ">=0.3,<2", "unknown_fields": "reject-at-boundary"},
+    {"kind": "attestation", "id": "rlx.attestation/v1", "status": "stable", "readers": ">=0.5,<2", "writers": ">=0.5,<2", "unknown_fields": "preserved-outside-signed-statement"},
+    {"kind": "evaluation-intent", "id": "rlx.evaluation-intent/v1", "status": "stable", "readers": ">=1,<2", "writers": ">=1,<2", "unknown_fields": "reject"},
+    {"kind": "evaluation-binding", "id": "rlx.evaluation-binding/v1", "status": "stable", "readers": ">=1,<2", "writers": ">=1,<2", "unknown_fields": "reject"},
+    {"kind": "eval-run", "id": "rlx.eval-run/v1", "status": "stable", "readers": ">=1,<2", "writers": ">=1,<2", "unknown_fields": "additive"},
+    {"kind": "eval-report", "id": "rlx.eval-report/v1", "status": "stable", "readers": ">=1,<2", "writers": ">=1,<2", "unknown_fields": "additive"},
+    {"kind": "diagnostic", "id": "rlx.diagnostic/v1", "status": "stable", "readers": ">=1,<2", "writers": ">=1,<2", "unknown_fields": "additive"},
+    {"kind": "cli-result", "id": "rlx.cli-result/v1", "status": "stable", "readers": ">=1,<2", "writers": ">=1,<2", "unknown_fields": "additive"},
+    {"kind": "release-evidence", "id": "rlx.release-evidence/v1", "status": "stable", "readers": ">=1,<2", "writers": ">=1,<2", "unknown_fields": "signed"},
+    {"kind": "qualification-ledger", "id": "rlx.qualification-ledger/v1", "status": "stable", "readers": ">=1,<2", "writers": ">=1,<2", "unknown_fields": "signed"}
+  ]
+}

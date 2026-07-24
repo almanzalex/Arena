@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import importlib
-import json
-import subprocess
 import sys
 import tempfile
+import uuid
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
 from rlx.core.errors import RlxError, SchemaError
 from rlx.core.identity import canonical_json, digest_uri, sha256_bytes
+from rlx.core.io import atomic_write_bytes
+from rlx.core.manifests import load_manifest
+from rlx.core.supervisor import run_supervised
 
 
 def _resolve_test_class(ref: str, *, allow_external: bool) -> type[Any]:
@@ -20,7 +22,9 @@ def _resolve_test_class(ref: str, *, allow_external: bool) -> type[Any]:
         raise SchemaError("gimitest provider_config.test_class must be module:Class")
     module_name, attr = ref.split(":", 1)
     if not allow_external and not (
-        module_name == "gimitest" or module_name.startswith("gimitest.")
+        module_name == "gimitest"
+        or module_name.startswith("gimitest.")
+        or module_name == "rlx.adapters.eval_gimitest.scenarios"
     ):
         raise SchemaError(
             "external Gimitest test classes execute Python. Set "
@@ -76,7 +80,11 @@ class GimitestEvalProvider:
         return self._run_in_process(suite, **kwargs)
 
     def _run_in_process(
-        self, suite: dict[str, Any], **kwargs: Any
+        self,
+        suite: dict[str, Any],
+        *,
+        _worker_lineage: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         config = suite.get("provider_config") or {}
         try:
@@ -98,6 +106,8 @@ class GimitestEvalProvider:
             "version": provider_version,
             "config_digest": config_digest,
         }
+        if _worker_lineage is not None:
+            provider_lineage["worker"] = _worker_lineage
         from rlx.runtime.evaluation import _run_native_evaluation
 
         identity_suite = kwargs.pop("identity_suite", suite)
@@ -140,6 +150,7 @@ class GimitestEvalProvider:
             )
         request = {
             "schema": "rlx.eval-provider-request/v1",
+            "request_id": str(uuid.uuid4()),
             "suite": suite,
             "identity_suite": kwargs.get("identity_suite", suite),
             "policy_index": policy_index,
@@ -151,7 +162,9 @@ class GimitestEvalProvider:
         with tempfile.TemporaryDirectory(prefix="rlx-gimitest-worker-") as raw:
             request_path = Path(raw) / "request.json"
             response_path = Path(raw) / "response.json"
-            request_path.write_text(json.dumps(request), encoding="utf-8")
+            request_digest = digest_uri(sha256_bytes(canonical_json(request)))
+            request["request_digest"] = request_digest
+            atomic_write_bytes(request_path, canonical_json(request) + b"\n")
             command = [
                 str(python),
                 "-m",
@@ -159,18 +172,12 @@ class GimitestEvalProvider:
                 str(request_path),
                 str(response_path),
             ]
-            try:
-                completed = subprocess.run(
-                    command,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    timeout=float(isolation.get("timeout_seconds", 300)),
-                )
-            except subprocess.TimeoutExpired as exc:
-                raise RlxError(
-                    f"Gimitest subprocess exceeded timeout: {exc.timeout}s"
-                ) from exc
+            completed = run_supervised(
+                command,
+                timeout_seconds=float(isolation.get("timeout_seconds", 300)),
+                max_stdout_bytes=int(isolation.get("max_stdout_bytes", 1_048_576)),
+                max_stderr_bytes=int(isolation.get("max_stderr_bytes", 1_048_576)),
+            )
             if completed.returncode != 0:
                 raise RlxError(
                     "Gimitest subprocess failed: "
@@ -178,7 +185,22 @@ class GimitestEvalProvider:
                 )
             if not response_path.is_file():
                 raise RlxError("Gimitest subprocess did not produce a response")
-            result = json.loads(response_path.read_text(encoding="utf-8"))
+            response = load_manifest(response_path, max_bytes=16 * 1024 * 1024)
+        if response.get("schema") != "rlx.eval-provider-response/v1":
+            raise RlxError("Gimitest subprocess returned an unsupported response envelope")
+        if response.get("request_id") != request["request_id"]:
+            raise RlxError("Gimitest subprocess response request_id mismatch")
+        if response.get("request_digest") != request_digest:
+            raise RlxError("Gimitest subprocess response request digest mismatch")
+        if response.get("ok") is not True or not isinstance(response.get("result"), dict):
+            raise RlxError("Gimitest subprocess returned an invalid success response")
+        result = response["result"]
         if result.get("provider", {}).get("kind") != "gimitest":
             raise RlxError("Gimitest subprocess response lost provider lineage")
+        result["provider"]["worker"] = {
+            "protocol": "rlx.eval-provider/v1",
+            "rlx_version": response.get("rlx_version"),
+            "python": response.get("python"),
+            "duration_seconds": round(completed.duration_seconds, 6),
+        }
         return result

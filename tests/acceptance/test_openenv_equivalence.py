@@ -101,6 +101,8 @@ def test_t01_t02_real_openenv_transport_equivalence(tmp_path: Path) -> None:
             "player_1": str(Path("examples/eval/demo/paper.rlx").resolve()),
         }
 
+        shared_task_intent = result["shared_task_intent_digest"]
+
         def evaluate(task, out):
             return run_evaluation(
                 {
@@ -109,6 +111,7 @@ def test_t01_t02_real_openenv_transport_equivalence(tmp_path: Path) -> None:
                     "provider": "native",
                     "interaction": "parallel",
                     "task": task,
+                    "task_intent_digest": shared_task_intent,
                     "assignments": policies,
                     "seeds": [0],
                     "action_mode": "deterministic",
@@ -124,6 +127,14 @@ def test_t01_t02_real_openenv_transport_equivalence(tmp_path: Path) -> None:
         assert (
             native_eval["cell_results"][0]["episodes"][0]["returns"]
             == openenv_eval["cell_results"][0]["episodes"][0]["returns"]
+        )
+        assert (
+            native_eval["evaluation_intent_digest"]
+            == openenv_eval["evaluation_intent_digest"]
+        )
+        assert (
+            native_eval["execution_binding_digest"]
+            != openenv_eval["execution_binding_digest"]
         )
     finally:
         proc.terminate()

@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import os
-import tempfile
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from rlx.core.errors import StoreError
+from rlx.core.errors import SchemaError, StoreError
 from rlx.core.identity import digest_uri, parse_digest, sha256_bytes, sha256_file
+from rlx.core.io import atomic_create_bytes, atomic_write_bytes, verify_regular_file
 
 WORKSPACE_DIR = ".rlx"
 WORKSPACE_TOML = "workspace.toml"
@@ -48,9 +47,11 @@ class LocalStore:
                 "task": ["pettingzoo-parallel"],
             },
         }
-        (self.rlx / WORKSPACE_TOML).write_text(
-            "# RLX local workspace\n" + yaml.safe_dump(config, sort_keys=False),
-            encoding="utf-8",
+        atomic_write_bytes(
+            self.rlx / WORKSPACE_TOML,
+            (
+                "# RLX local workspace\n" + yaml.safe_dump(config, sort_keys=False)
+            ).encode("utf-8"),
         )
         return self.rlx
 
@@ -61,19 +62,14 @@ class LocalStore:
         digest_hex = sha256_bytes(data)
         dest = self._object_path(digest_hex)
         if dest.exists():
+            verify_regular_file(dest, root=self.objects)
+            existing = sha256_bytes(dest.read_bytes())
+            if existing != digest_hex:
+                raise StoreError(
+                    f"refusing corrupt pre-existing object at sha256:{digest_hex}"
+                )
             return digest_uri(digest_hex)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_name = tempfile.mkstemp(dir=dest.parent)
-        try:
-            with os.fdopen(fd, "wb") as f:
-                f.write(data)
-            Path(tmp_name).replace(dest)
-        except Exception:
-            try:
-                Path(tmp_name).unlink(missing_ok=True)
-            except OSError:
-                pass
-            raise
+        atomic_create_bytes(dest, data)
         return digest_uri(digest_hex)
 
     def put_file(self, path: Path | str) -> str:
@@ -87,20 +83,24 @@ class LocalStore:
         return self.put_bytes(data)
 
     def get_bytes(self, digest: str, *, verify: bool = True) -> bytes:
-        digest_hex = parse_digest(digest)
+        del verify  # Content-addressed bytes are unconditionally verified in 1.0.
+        try:
+            digest_hex = parse_digest(digest)
+        except SchemaError as exc:
+            raise StoreError(f"invalid object digest {digest!r}: {exc}") from exc
         path = self._object_path(digest_hex)
         if not path.exists():
             raise StoreError(f"object not found: {digest}")
+        verify_regular_file(path, root=self.objects)
         data = path.read_bytes()
         # Content-addressed integrity: a stored object must hash to its own name.
         # Detect on-disk corruption/tampering instead of silently trusting bytes.
-        if verify:
-            actual = sha256_bytes(data)
-            if actual != digest_hex:
-                raise StoreError(
-                    "object integrity check failed (content does not match digest): "
-                    f"requested sha256:{digest_hex}, on-disk content is sha256:{actual}"
-                )
+        actual = sha256_bytes(data)
+        if actual != digest_hex:
+            raise StoreError(
+                "object integrity check failed (content does not match digest): "
+                f"requested sha256:{digest_hex}, on-disk content is sha256:{actual}"
+            )
         return data
 
     def verify_object(self, digest: str) -> bool:
@@ -109,10 +109,15 @@ class LocalStore:
         return True
 
     def open_path(self, digest: str) -> Path:
-        digest_hex = parse_digest(digest)
+        try:
+            digest_hex = parse_digest(digest)
+        except SchemaError as exc:
+            raise StoreError(f"invalid object digest {digest!r}: {exc}") from exc
         path = self._object_path(digest_hex)
         if not path.exists():
             raise StoreError(f"object not found: {digest}")
+        verify_regular_file(path, root=self.objects)
+        self.get_bytes(digest)
         return path
 
     def _ref_path(self, name: str) -> Path:
@@ -138,9 +143,12 @@ class LocalStore:
         return path
 
     def set_ref(self, name: str, digest: str) -> None:
+        try:
+            canonical = digest_uri(parse_digest(digest))
+        except SchemaError as exc:
+            raise StoreError(f"ref value must be a valid SHA-256 digest: {digest!r}") from exc
         path = self._ref_path(name)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(digest.strip() + "\n", encoding="utf-8")
+        atomic_write_bytes(path, (canonical + "\n").encode("utf-8"))
 
     def get_ref(self, name: str) -> str:
         path = self._ref_path(name)
