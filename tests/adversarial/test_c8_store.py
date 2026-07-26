@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from rlx.core.errors import StoreError
-from rlx.core.identity import parse_digest, sha256_bytes
-from rlx.core.store import LocalStore
+from arena.core.errors import StoreError
+from arena.core.identity import parse_digest, sha256_bytes
+from arena.core.store import LocalStore
 
 
 def test_interrupted_write_leaves_no_partial_object(tmp_path: Path, monkeypatch) -> None:
@@ -81,5 +81,5 @@ def test_leftover_temp_file_not_resolved_as_object(tmp_path: Path) -> None:
 
 
 def test_find_without_workspace_errors(tmp_path: Path) -> None:
-    with pytest.raises(StoreError, match="no .rlx"):
+    with pytest.raises(StoreError, match="no .arena"):
         LocalStore.find(tmp_path)

@@ -12,20 +12,20 @@ Use after [clean-room.md](clean-room.md) when validating **evaluation** handoff 
 ## Commands
 
 The fenced block below is the canonical eval clean-room flow. It is tagged
-`rlx-eval-clean-room` so the hermetic gate can parse and execute these commands.
-Friendly `--policy rock=./rock.rlx` names are rewritten to digests by the gate;
-in a real lab, pass `sha256:…=./rock.rlx` (or generate digests via `rlx inspect`).
+`arena-eval-clean-room` so the hermetic gate can parse and execute these commands.
+Friendly `--policy rock=./rock.arena` names are rewritten to digests by the gate;
+in a real lab, pass `sha256:…=./rock.arena` (or generate digests via `arena inspect`).
 
-```bash rlx-eval-clean-room
-rlx init
-rlx population create ./population.yaml --ref populations/opp
-rlx eval validate ./evaluation.yaml --population ./population.yaml
-rlx eval run ./evaluation.yaml \
-  --policy rock=./rock.rlx --policy paper=./paper.rlx --policy scissors=./scissors.rlx \
+```bash arena-eval-clean-room
+arena init
+arena population create ./population.yaml --ref populations/opp
+arena eval validate ./evaluation.yaml --population ./population.yaml
+arena eval run ./evaluation.yaml \
+  --policy rock=./rock.arena --policy paper=./paper.arena --policy scissors=./scissors.arena \
   --population ./population.yaml --out ./eval-run
-rlx eval report ./eval-run --out ./eval-run
-rlx data select ./eval-run --out ./slice --outcome loss --role player_0
-rlx eval bundle ./eval-run --out ./bundle --report ./eval-run/report.json
+arena eval report ./eval-run --out ./eval-run
+arena data select ./eval-run --out ./slice --outcome loss --role player_0
+arena eval bundle ./eval-run --out ./bundle --report ./eval-run/report.json
 ```
 
 ## Pass criteria

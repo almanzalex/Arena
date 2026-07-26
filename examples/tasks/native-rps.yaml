@@ -1,11 +1,11 @@
-schema: rlx.task/v0alpha1
+schema: arena.task/v0alpha1
 name: task:rps-native@0.3
 adapter: pettingzoo-parallel
-env: rlx/competitive_rps_v0
+env: arena/competitive_rps_v0
 interaction: parallel
 version: pilot
 packaging:
   kind: pettingzoo_wrappers
 config:
   max_cycles: 1
-digest: sha256:57b40d0ece36bef78460294180415ecdde15bb044527f58aa79e1aff84d56bdd
+digest: sha256:c4b6056d3fa4337443a135d9597b7f74e66f176d549d6c196b0d6e86352e00a3

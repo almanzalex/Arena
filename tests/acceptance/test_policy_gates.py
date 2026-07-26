@@ -12,17 +12,17 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from rlx.adapters.policy_custom_torch import (  # noqa: E402
+from arena.adapters.policy_custom_torch import (  # noqa: E402
     load_runtime,
     verify_bundle_self,
 )
-from rlx.conformance.fixtures import (  # noqa: E402
+from arena.conformance.fixtures import (  # noqa: E402
     build_f1_deterministic,
     build_f2_stochastic,
     build_f3_recurrent,
     build_f4_masked,
 )
-from rlx.core.errors import ConformanceError  # noqa: E402
+from arena.core.errors import ConformanceError  # noqa: E402
 
 
 @pytest.mark.acceptance
@@ -123,8 +123,8 @@ def test_p04_action_mask_handling(tmp_path: Path) -> None:
 @pytest.mark.requires_torch
 def test_p01_independent_source_vs_export(tmp_path: Path) -> None:
     """Genuine source-vs-export: an independent source model (direct forward+argmax)
-    must match the exported RLX runtime's full act() pipeline on fixed observations."""
-    from rlx.adapters.policy_custom_torch import build_module, export_from_checkpoint
+    must match the exported Arena runtime's full act() pipeline on fixed observations."""
+    from arena.adapters.policy_custom_torch import build_module, export_from_checkpoint
 
     arch = {"type": "mlp_categorical", "observation_dim": 4, "hidden_dims": [16, 16], "action_n": 3}
     torch.manual_seed(1234)
@@ -135,7 +135,7 @@ def test_p01_independent_source_vs_export(tmp_path: Path) -> None:
 
     bundle = export_from_checkpoint(
         source=ckpt,
-        out=tmp_path / "exported.rlx",
+        out=tmp_path / "exported.arena",
         role="agent",
         architecture=arch,
         observation={"type": "Discrete", "n": 4, "dtype": "int64"},
@@ -192,7 +192,7 @@ def save_checkpoint(path):
 # trainer package is genuinely unreachable in this process.
 _CLEAN_RUN = '''\
 import sys
-from rlx.adapters.policy_custom_torch import load_runtime
+from arena.adapters.policy_custom_torch import load_runtime
 
 rt = load_runtime(sys.argv[1])
 rt.reset()
@@ -211,7 +211,7 @@ print("ACTION", action)
 _REQUIRES_TRAINER = '''\
 import sys
 import trainer_pkg  # a training-repo import; required here on purpose
-from rlx.adapters.policy_custom_torch import load_runtime
+from arena.adapters.policy_custom_torch import load_runtime
 
 print(load_runtime(sys.argv[1]).act(0, mode="deterministic"))
 '''
@@ -231,7 +231,7 @@ def test_p05_repository_independence(tmp_path: Path) -> None:
     import os
     import subprocess
 
-    from rlx.adapters.policy_custom_torch import export_from_checkpoint
+    from arena.adapters.policy_custom_torch import export_from_checkpoint
 
     # 1. Training repo containing the source model class.
     trainer_repo = tmp_path / "trainer_repo"
@@ -253,7 +253,7 @@ def test_p05_repository_independence(tmp_path: Path) -> None:
     arch = {"type": "mlp_categorical", "observation_dim": 4, "hidden_dims": [16, 16], "action_n": 3}
     exported = export_from_checkpoint(
         source=ckpt,
-        out=tmp_path / "exported.rlx",
+        out=tmp_path / "exported.arena",
         role="agent",
         architecture=arch,
         observation={"type": "Discrete", "n": 4, "dtype": "int64"},
@@ -264,7 +264,7 @@ def test_p05_repository_independence(tmp_path: Path) -> None:
     # 3. Move the bundle to a fresh directory and destroy the training repo + checkpoint.
     clean = tmp_path / "clean_room"
     clean.mkdir()
-    bundle = clean / "policy.rlx"
+    bundle = clean / "policy.arena"
     shutil.move(str(exported), str(bundle))
     shutil.rmtree(trainer_repo)
     ckpt.unlink()

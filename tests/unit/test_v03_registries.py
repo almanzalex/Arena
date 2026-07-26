@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import pytest
 
-from rlx.core.errors import SchemaError
-from rlx.core.manifests import (
+from arena.core.errors import SchemaError
+from arena.core.manifests import (
     evaluation_content_digest,
     load_manifest,
     validate_evaluation_manifest,
     validate_task_manifest,
 )
-from rlx.core.registry import (
+from arena.core.registry import (
     EVAL_PROVIDERS,
     EXTERNAL_STORES,
     TASK_PACKAGERS,
@@ -40,14 +40,14 @@ def test_v03_unknown_cases_have_extension_recipe(registry, kind: str, axis: str)
     message = str(exc.value)
     assert axis in message
     assert "register" in message
-    assert "rlx adapter qualify" in message
+    assert "arena adapter qualify" in message
 
 
 def test_native_provider_default_preserves_v02_evaluation_identity() -> None:
     suite = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "legacy-native-suite",
-        "task": {"adapter": "pettingzoo-parallel", "env": "rlx/competitive_rps_v0"},
+        "task": {"adapter": "pettingzoo-parallel", "env": "arena/competitive_rps_v0"},
         "assignments": {"player_0": "sha256:a", "player_1": "sha256:b"},
         "seeds": [0],
         "action_mode": "deterministic",

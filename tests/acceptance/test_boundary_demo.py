@@ -12,7 +12,7 @@ pytest.importorskip("pyspiel")
 
 def _demo_module():
     path = Path("examples/boundaries/run_demo.py").resolve()
-    spec = importlib.util.spec_from_file_location("rlx_boundary_demo", path)
+    spec = importlib.util.spec_from_file_location("arena_boundary_demo", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

@@ -21,9 +21,9 @@ pytest.importorskip("pettingzoo")
 
 from _adv_envs import make_discrete_policy  # noqa: E402
 
-from rlx.adapters.policy_custom_torch import load_runtime  # noqa: E402
-from rlx.conformance.fixtures import build_f4_masked  # noqa: E402
-from rlx.core.errors import ConformanceError  # noqa: E402
+from arena.adapters.policy_custom_torch import load_runtime  # noqa: E402
+from arena.conformance.fixtures import build_f4_masked  # noqa: E402
+from arena.core.errors import ConformanceError  # noqa: E402
 
 
 def _masked_runtime(tmp_path: Path, action_n: int = 4):
@@ -128,7 +128,7 @@ def test_f4_fixture_masks_all_legal(tmp_path: Path) -> None:
     and self-verify passes (masks reproduce across a re-load)."""
     import json
 
-    from rlx.adapters.policy_custom_torch import verify_bundle_self
+    from arena.adapters.policy_custom_torch import verify_bundle_self
 
     bundle = build_f4_masked(tmp_path / "f4")
     cases = json.loads((bundle / "payloads" / "reference_cases.json").read_text())["cases"]

@@ -18,17 +18,17 @@ EVAL_CLEAN_ROOM_DOC = REPO_ROOT / "docs" / "eval-clean-room.md"
 pytest_plugins = ["test_u01_hermetic"]
 
 EXPECTED_EVAL_COMMANDS: tuple[str, ...] = (
-    "rlx init",
-    "rlx population create ./population.yaml --ref populations/opp",
-    "rlx eval validate ./evaluation.yaml --population ./population.yaml",
+    "arena init",
+    "arena population create ./population.yaml --ref populations/opp",
+    "arena eval validate ./evaluation.yaml --population ./population.yaml",
     (
-        "rlx eval run ./evaluation.yaml "
-        "--policy rock=./rock.rlx --policy paper=./paper.rlx --policy scissors=./scissors.rlx "
+        "arena eval run ./evaluation.yaml "
+        "--policy rock=./rock.arena --policy paper=./paper.arena --policy scissors=./scissors.arena "
         "--population ./population.yaml --out ./eval-run"
     ),
-    "rlx eval report ./eval-run --out ./eval-run",
-    "rlx data select ./eval-run --out ./slice --outcome loss --role player_0",
-    "rlx eval bundle ./eval-run --out ./bundle --report ./eval-run/report.json",
+    "arena eval report ./eval-run --out ./eval-run",
+    "arena data select ./eval-run --out ./slice --outcome loss --role player_0",
+    "arena eval bundle ./eval-run --out ./bundle --report ./eval-run/report.json",
 )
 
 
@@ -40,9 +40,9 @@ def _parse_eval_cleanroom_commands(path: Path) -> list[str]:
     bodies = []
     for m in fence.finditer(text):
         info = m.group("info").strip().split()
-        if "rlx-eval-clean-room" in info:
+        if "arena-eval-clean-room" in info:
             bodies.append(m.group("body"))
-    assert bodies, f"missing rlx-eval-clean-room block in {path}"
+    assert bodies, f"missing arena-eval-clean-room block in {path}"
     assert len(bodies) == 1
     flat: list[str] = []
     buf = ""
@@ -122,7 +122,7 @@ def test_eval_hermetic_venv(
     (Path(site) / "sitecustomize.py").write_text(_NET_GUARD_SITECUSTOMIZE, encoding="utf-8")
 
     sandbox.mkdir()
-    for name in ("rock.rlx", "paper.rlx", "scissors.rlx"):
+    for name in ("rock.arena", "paper.arena", "scissors.arena"):
         shutil.copytree(fx["root"] / name, sandbox / name)
     shutil.copy2(fx["population"], sandbox / "population.yaml")
     shutil.copy2(fx["evaluation"], sandbox / "evaluation.yaml")
@@ -140,10 +140,10 @@ def test_eval_hermetic_venv(
         "OMP_NUM_THREADS": "1",
     }
     (tmp_path / "tmp").mkdir(exist_ok=True)
-    run_env = {**base_env, "RLX_CLEANROOM_NO_NET": "1", "PIP_NO_INDEX": "1"}
+    run_env = {**base_env, "ARENA_CLEANROOM_NO_NET": "1", "PIP_NO_INDEX": "1"}
 
     got = subprocess.run(
-        [str(vpython), "-c", "import rlx; print(rlx.__file__); print(rlx.__version__)"],
+        [str(vpython), "-c", "import arena; print(arena.__file__); print(arena.__version__)"],
         cwd=sandbox,
         env=base_env,
         capture_output=True,
@@ -160,9 +160,9 @@ def test_eval_hermetic_venv(
 
     for cmd in commands:
         argv = cmd.split()
-        assert argv[0] == "rlx"
+        assert argv[0] == "arena"
         proc = subprocess.run(
-            [str(vpython), "-m", "rlx", *argv[1:]],
+            [str(vpython), "-m", "arena", *argv[1:]],
             cwd=sandbox,
             env=run_env,
             capture_output=True,
@@ -170,11 +170,11 @@ def test_eval_hermetic_venv(
             check=False,
         )
         assert proc.returncode == 0, f"cmd failed: {cmd}\n{proc.stdout}\n{proc.stderr}"
-        if cmd.startswith("rlx eval run"):
+        if cmd.startswith("arena eval run"):
             # Prefer --out path; also accept store run_dir if printed.
             assert (sandbox / "eval-run").exists() or "run_dir" in proc.stdout, proc.stdout
 
-    assert (sandbox / "eval-run" / "eval_run.json").exists(), list((sandbox / ".rlx" / "runs").glob("*") if (sandbox / ".rlx" / "runs").exists() else [])
+    assert (sandbox / "eval-run" / "eval_run.json").exists(), list((sandbox / ".arena" / "runs").glob("*") if (sandbox / ".arena" / "runs").exists() else [])
     assert (sandbox / "eval-run" / "report.json").exists()
     assert (sandbox / "slice" / "dataset.json").exists()
     assert (sandbox / "bundle" / "bundle.json").exists()

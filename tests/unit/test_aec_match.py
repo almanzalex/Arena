@@ -10,12 +10,12 @@ import pytest
 pytest.importorskip("torch")
 pytest.importorskip("pettingzoo")
 
-from rlx.adapters.task_pettingzoo.adapter import describe_task
-from rlx.conformance.fixtures import build_fixed_action_rps_policy
-from rlx.core.errors import SchemaError
-from rlx.core.sdk import Policy
-from rlx.runtime.aec_match import run_aec_match
-from rlx.runtime.match import run_match
+from arena.adapters.task_pettingzoo.adapter import describe_task
+from arena.conformance.fixtures import build_fixed_action_rps_policy
+from arena.core.errors import SchemaError
+from arena.core.sdk import Policy
+from arena.runtime.aec_match import run_aec_match
+from arena.runtime.match import run_match
 
 
 @pytest.mark.requires_torch
@@ -34,13 +34,13 @@ def test_f6_aec_match_parity_with_parallel(tmp_path: Path) -> None:
     }
     parallel_spec = {
         "adapter": "pettingzoo-parallel",
-        "env": "rlx/competitive_rps_v0",
+        "env": "arena/competitive_rps_v0",
         "interaction": "parallel",
         "config": {"max_cycles": 1},
     }
     aec_spec = {
         "adapter": "pettingzoo-parallel",
-        "env": "rlx/competitive_rps_aec_v0",
+        "env": "arena/competitive_rps_aec_v0",
         "interaction": "aec",
         "config": {"max_cycles": 1},
     }
@@ -80,7 +80,7 @@ def test_aec_describe_task_and_dynamic_agents_flag() -> None:
     info = describe_task(
         {
             "adapter": "pettingzoo-parallel",
-            "env": "rlx/competitive_rps_aec_v0",
+            "env": "arena/competitive_rps_aec_v0",
             "interaction": "aec",
         }
     )
@@ -103,12 +103,12 @@ def test_dynamic_agents_fail_loud(tmp_path: Path, monkeypatch) -> None:
         base = describe_task(spec)
         return {**base, "dynamic_agents": True}
 
-    monkeypatch.setattr("rlx.runtime.aec_match.describe_task", _fake_describe)
+    monkeypatch.setattr("arena.runtime.aec_match.describe_task", _fake_describe)
     with pytest.raises(SchemaError, match="Dynamic agent"):
         run_aec_match(
             task_spec={
                 "adapter": "pettingzoo-parallel",
-                "env": "rlx/competitive_rps_aec_v0",
+                "env": "arena/competitive_rps_aec_v0",
                 "interaction": "aec",
             },
             assignments={

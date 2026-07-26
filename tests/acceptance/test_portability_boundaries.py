@@ -10,12 +10,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rlx.adapters.policy_custom_torch import (
+from arena.adapters.policy_custom_torch import (
     export_module_policy,
     load_runtime,
     verify_bundle_self,
 )
-from rlx.core.errors import SchemaError
+from arena.core.errors import SchemaError
 
 torch = pytest.importorskip("torch")
 nn = torch.nn
@@ -53,7 +53,7 @@ def _box_observation() -> dict[str, object]:
 @pytest.mark.requires_torch
 def test_scriptable_dynamic_control_flow_is_clean_room_portable(tmp_path: Path) -> None:
     bundle = export_module_policy(
-        out_dir=tmp_path / "dynamic.rlx",
+        out_dir=tmp_path / "dynamic.arena",
         name="dynamic",
         roles=["agent"],
         module=ScriptableDynamicActor(),
@@ -73,7 +73,7 @@ def test_scriptable_dynamic_control_flow_is_clean_room_portable(tmp_path: Path) 
     assert verify_bundle_self(bundle)["verify_mode"] == "source-conformance"
 
     child = (
-        "from rlx.adapters.policy_custom_torch import load_runtime; import numpy as np; "
+        "from arena.adapters.policy_custom_torch import load_runtime; import numpy as np; "
         f"r=load_runtime({str(bundle)!r}); "
         "print(r.act(np.array([2.,0.],dtype=np.float32)),"
         "r.act(np.array([-2.,0.],dtype=np.float32)))"
@@ -114,7 +114,7 @@ def test_scriptable_dynamic_control_flow_is_clean_room_portable(tmp_path: Path) 
 def test_rejected_action_spaces_publish_no_partial_bundle(
     tmp_path: Path, action: dict[str, object], message: str
 ) -> None:
-    out = tmp_path / "must-not-exist.rlx"
+    out = tmp_path / "must-not-exist.arena"
     with pytest.raises(SchemaError, match=message):
         export_module_policy(
             out_dir=out,
@@ -131,7 +131,7 @@ def test_rejected_action_spaces_publish_no_partial_bundle(
 @pytest.mark.requires_torch
 def test_stochastic_box_runtime_request_fails_without_sampling(tmp_path: Path) -> None:
     bundle = export_module_policy(
-        out_dir=tmp_path / "box.rlx",
+        out_dir=tmp_path / "box.arena",
         name="box",
         roles=["agent"],
         module=BoundedBoxActor(),
@@ -156,7 +156,7 @@ def test_stochastic_box_runtime_request_fails_without_sampling(tmp_path: Path) -
 
 @pytest.mark.requires_torch
 def test_unscriptable_python_actor_fails_before_publication(tmp_path: Path) -> None:
-    out = tmp_path / "must-not-exist.rlx"
+    out = tmp_path / "must-not-exist.arena"
     with pytest.raises(SchemaError, match="torch.export and bundled Python source"):
         export_module_policy(
             out_dir=out,

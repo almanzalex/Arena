@@ -10,12 +10,12 @@ import pytest
 torch = pytest.importorskip("torch")
 nn = torch.nn
 
-from rlx.adapters.policy_custom_torch import (  # noqa: E402
+from arena.adapters.policy_custom_torch import (  # noqa: E402
     export_module_policy,
     load_runtime,
     verify_bundle_self,
 )
-from rlx.core.action_cases import decode_action_from_params  # noqa: E402
+from arena.core.action_cases import decode_action_from_params  # noqa: E402
 
 
 class MultiDiscreteActor(nn.Module):
@@ -56,7 +56,7 @@ def _source(case: dict):
 def test_qualify_exercises_multidiscrete_registry_case(tmp_path: Path) -> None:
     """Source-conformance verify must stay green for a registered MultiDiscrete case."""
     bundle = export_module_policy(
-        out_dir=tmp_path / "md.rlx",
+        out_dir=tmp_path / "md.arena",
         name="md",
         roles=["agent"],
         module=MultiDiscreteActor(),
@@ -73,7 +73,7 @@ def test_qualify_exercises_multidiscrete_registry_case(tmp_path: Path) -> None:
     assert result["verify_mode"] == "source-conformance"
     rt = load_runtime(bundle)
     assert rt.manifest["action"]["type"] == "MultiDiscrete"
-    from rlx.core.registry import ACTION_CASES, ensure_plugins_loaded
+    from arena.core.registry import ACTION_CASES, ensure_plugins_loaded
 
     ensure_plugins_loaded()
     assert "MultiDiscrete" in ACTION_CASES

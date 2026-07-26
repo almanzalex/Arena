@@ -7,14 +7,14 @@ import pytest
 
 pytest.importorskip("cryptography")
 
-from rlx.cli.main import main
-from rlx.core.attestation import (
+from arena.cli.main import main
+from arena.core.attestation import (
     generate_signing_keypair,
     sign_artifact,
     verify_artifact_attestation,
 )
-from rlx.core.errors import ConformanceError, SchemaError
-from rlx.core.mirror import pull_artifact, push_artifact
+from arena.core.errors import ConformanceError, SchemaError
+from arena.core.mirror import pull_artifact, push_artifact
 
 
 def test_detached_signature_survives_identity_preserving_mirror(
@@ -29,7 +29,7 @@ def test_detached_signature_survives_identity_preserving_mirror(
     assert keys["key_id"].startswith("sha256:")
     assert private_key.stat().st_mode & 0o077 == 0
 
-    source = Path("examples/eval/demo/rock.rlx").resolve()
+    source = Path("examples/eval/demo/rock.arena").resolve()
     attestation = tmp_path / "rock.attestation.json"
     signed = sign_artifact(
         source,
@@ -47,7 +47,7 @@ def test_detached_signature_survives_identity_preserving_mirror(
     assert verified["issuer"] == "example-lab"
 
     pushed = push_artifact(source, (tmp_path / "mirror").as_uri(), verify=True)
-    restored = tmp_path / "restored.rlx"
+    restored = tmp_path / "restored.arena"
     pull_artifact(pushed["uri"], restored, verify=True)
     assert verify_artifact_attestation(
         restored,
@@ -62,8 +62,8 @@ def test_attestation_refuses_wrong_subject_and_tampered_signature(
     private_key = tmp_path / "private.pem"
     public_key = tmp_path / "public.pem"
     generate_signing_keypair(private_key=private_key, public_key=public_key)
-    rock = Path("examples/eval/demo/rock.rlx").resolve()
-    paper = Path("examples/eval/demo/paper.rlx").resolve()
+    rock = Path("examples/eval/demo/rock.arena").resolve()
+    paper = Path("examples/eval/demo/paper.arena").resolve()
     attestation = tmp_path / "artifact.json"
     sign_artifact(
         rock,
@@ -93,7 +93,7 @@ def test_attestation_cli(tmp_path: Path) -> None:
     private_key = tmp_path / "private.pem"
     public_key = tmp_path / "public.pem"
     attestation = tmp_path / "artifact.json"
-    source = "examples/eval/demo/rock.rlx"
+    source = "examples/eval/demo/rock.arena"
     assert main(
         [
             "attest",
@@ -144,7 +144,7 @@ def test_keygen_refuses_same_output_and_malformed_attestation(
     malformed.write_text(
         json.dumps(
             {
-                "schema": "rlx.attestation/v1",
+                "schema": "arena.attestation/v1",
                 "subject": {},
                 "predicate": {},
                 "signature": {"algorithm": "ed25519"},
@@ -154,7 +154,7 @@ def test_keygen_refuses_same_output_and_malformed_attestation(
     )
     with pytest.raises(SchemaError, match="signature.value"):
         verify_artifact_attestation(
-            "examples/eval/demo/rock.rlx",
+            "examples/eval/demo/rock.arena",
             attestation=malformed,
             public_key=public_key,
         )

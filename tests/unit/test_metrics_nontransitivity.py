@@ -9,12 +9,12 @@ import pytest
 pytest.importorskip("torch")
 pytest.importorskip("pettingzoo")
 
-from rlx.conformance.fixtures import build_fixed_action_rps_policy
-from rlx.core.population import create_population
-from rlx.core.sdk import Policy
-from rlx.core.store import LocalStore
-from rlx.plugins.metrics import PayoffMatrixMetric, detect_nontransitivity
-from rlx.runtime.evaluation import build_eval_report, run_evaluation
+from arena.conformance.fixtures import build_fixed_action_rps_policy
+from arena.core.population import create_population
+from arena.core.sdk import Policy
+from arena.core.store import LocalStore
+from arena.plugins.metrics import PayoffMatrixMetric, detect_nontransitivity
+from arena.runtime.evaluation import build_eval_report, run_evaluation
 
 
 @pytest.mark.requires_torch
@@ -46,12 +46,12 @@ def test_cyclic_rps_population_nontransitivity_warning(tmp_path: Path, monkeypat
         ref="populations/cyclic-rps",
     )
     suite = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "cyclic-matrix",
         "interaction": "parallel",
         "task": {
             "adapter": "pettingzoo-parallel",
-            "env": "rlx/competitive_rps_v0",
+            "env": "arena/competitive_rps_v0",
             "config": {"max_cycles": 1},
         },
         "assignments": {

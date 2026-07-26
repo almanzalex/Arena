@@ -36,7 +36,7 @@ jobs:
             pip install torch --index-url https://download.pytorch.org/whl/cpu
           fi
           pip install -e '.[dev]'
-          # Gimitest 1.0 publishes an obsolete Gymnasium pin. RLX tests the
+          # Gimitest 1.0 publishes an obsolete Gymnasium pin. Arena tests the
           # provider against the already-resolved native stack without allowing
           # that pin to downgrade PettingZoo's runtime dependency.
           pip install --no-deps gimitest==1.0
@@ -73,5 +73,5 @@ jobs:
       - name: Hermetic + doc-driven U-01 gate (venv + Docker)
         env:
           # Use the CPU wheel index inside the throwaway venv too.
-          RLX_TORCH_INDEX_URL: https://download.pytorch.org/whl/cpu
+          ARENA_TORCH_INDEX_URL: https://download.pytorch.org/whl/cpu
         run: pytest -m slow -q

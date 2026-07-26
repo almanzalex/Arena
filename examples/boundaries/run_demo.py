@@ -1,4 +1,4 @@
-"""Execute RLX 0.5 generalization boundaries as one local user journey."""
+"""Execute Arena 0.5 generalization boundaries as one local user journey."""
 
 from __future__ import annotations
 
@@ -8,23 +8,23 @@ import shutil
 from pathlib import Path
 from urllib.parse import quote
 
-from rlx.adapters.policy_custom_torch import (
+from arena.adapters.policy_custom_torch import (
     build_module,
     export_policy,
     verify_bundle_self,
 )
-from rlx.conformance.fixtures import build_fixed_action_rps_policy
-from rlx.core.attestation import (
+from arena.conformance.fixtures import build_fixed_action_rps_policy
+from arena.core.attestation import (
     generate_signing_keypair,
     sign_artifact,
     verify_artifact_attestation,
 )
-from rlx.core.dataset import materialize_dataset, select_episodes
-from rlx.core.manifests import dump_yaml, load_manifest
-from rlx.core.mirror import pull_artifact, push_artifact
-from rlx.core.sdk import Match, Policy, Task
-from rlx.core.tasks import verify_task_equivalence
-from rlx.runtime.training import run_training_recipe
+from arena.core.dataset import materialize_dataset, select_episodes
+from arena.core.manifests import dump_yaml, load_manifest
+from arena.core.mirror import pull_artifact, push_artifact
+from arena.core.sdk import Match, Policy, Task
+from arena.core.tasks import verify_task_equivalence
+from arena.runtime.training import run_training_recipe
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -93,7 +93,7 @@ def _training_recipe(
 ) -> None:
     dump_yaml(
         {
-            "schema": "rlx.train/v1",
+            "schema": "arena.train/v1",
             "name": "imitate-paper-from-trajectories",
             "algorithm": "behavior_cloning",
             "dataset": str(dataset),
@@ -136,7 +136,7 @@ def run_demo(out: Path) -> dict:
     # Flow 1: role-resolved removal/rejoin + joint birth with segment history.
     dynamic_policy = Policy.load(
         build_fixed_action_rps_policy(
-            out / "dynamic.rlx",
+            out / "dynamic.arena",
             role=["contestant"],
             action=0,
             name="dynamic-role-policy",
@@ -144,7 +144,7 @@ def run_demo(out: Path) -> dict:
     )
     dynamic_task = {
         "adapter": "pettingzoo-parallel",
-        "env": "rlx/dynamic_reentry_aec_v0",
+        "env": "arena/dynamic_reentry_aec_v0",
         "interaction": "dynamic_aec",
         "lifecycle": {
             "resolver": {
@@ -169,7 +169,7 @@ def run_demo(out: Path) -> dict:
     # Flow 2: trajectories -> deterministic splits -> train -> resume -> reuse.
     paper = Policy.load(
         build_fixed_action_rps_policy(
-            out / "paper.rlx",
+            out / "paper.arena",
             role=["player_0", "player_1"],
             action=1,
             name="paper-teacher",
@@ -177,7 +177,7 @@ def run_demo(out: Path) -> dict:
     )
     rock = Policy.load(
         build_fixed_action_rps_policy(
-            out / "rock.rlx",
+            out / "rock.arena",
             role=["player_0", "player_1"],
             action=0,
             name="rock-opponent",
@@ -186,7 +186,7 @@ def run_demo(out: Path) -> dict:
     rps_task = Task.load(
         {
             "adapter": "pettingzoo-parallel",
-            "env": "rlx/competitive_rps_v0",
+            "env": "arena/competitive_rps_v0",
             "interaction": "parallel",
             "config": {"max_cycles": 3},
         }
@@ -222,7 +222,7 @@ def run_demo(out: Path) -> dict:
         resume_from=out / "training-stage1",
     )
     training = run_training_recipe(resumed_recipe, out_dir=out / "training")
-    trained = Policy.load(out / "training" / "policy.rlx")
+    trained = Policy.load(out / "training" / "policy.arena")
     verification = verify_bundle_self(trained.root)
     reuse_run = Match(
         task=rps_task,
@@ -237,7 +237,7 @@ def run_demo(out: Path) -> dict:
         ("matrix_rps", "matrix-rps", 1, 3),
     ):
         game_policy = _openspiel_policy(
-            out / f"{file_stem}.rlx",
+            out / f"{file_stem}.arena",
             game=game,
             observation_dim=observation_dim,
             action_n=action_n,
@@ -276,7 +276,7 @@ def run_demo(out: Path) -> dict:
         trained.root,
         private_key=private_key,
         out=attestation_path,
-        issuer="rlx-0.5-demo-lab",
+        issuer="arena-0.5-demo-lab",
     )
     authenticity = verify_artifact_attestation(
         trained.root,
@@ -285,16 +285,16 @@ def run_demo(out: Path) -> dict:
     )
     store_results = {}
     destinations = {
-        "hf": "hf://models/lab/rlx",
-        "oci": "oci://registry.example/lab/rlx",
-        "wandb": "wandb://lab/project/rlx",
-        "mlflow": "mlflow://rlx-experiment",
+        "hf": "hf://models/lab/arena",
+        "oci": "oci://registry.example/lab/arena",
+        "wandb": "wandb://lab/project/arena",
+        "mlflow": "mlflow://arena-experiment",
     }
     for name, base in destinations.items():
         mirror_root = out / "mirrors" / name
         destination = f"{base}?simulate={quote(str(mirror_root.resolve()), safe='/')}"
         pushed = push_artifact(trained.root, destination, verify=True)
-        restored_path = out / "restored" / f"{name}.rlx"
+        restored_path = out / "restored" / f"{name}.arena"
         pulled = pull_artifact(pushed["uri"], restored_path, verify=True)
         restored = Policy.load(restored_path)
         restored_signature = verify_artifact_attestation(

@@ -1,10 +1,10 @@
-schema: rlx.evaluation/v0alpha1
+schema: arena.evaluation/v0alpha1
 name: rps-crossplay-v1
 interaction: parallel
 task:
   adapter: pettingzoo-parallel
-  env: rlx/competitive_rps_v0
-  version: rlx-pilot
+  env: arena/competitive_rps_v0
+  version: arena-pilot
   config:
     max_cycles: 1
 assignments:

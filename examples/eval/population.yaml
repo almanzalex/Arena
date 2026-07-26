@@ -1,4 +1,4 @@
-schema: rlx.population/v0alpha1
+schema: arena.population/v0alpha1
 name: rps-opponents-v1
 members:
   - policy: sha256:REPLACE_WITH_POLICY_DIGEST

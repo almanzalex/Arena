@@ -9,16 +9,16 @@ import pytest
 pytest.importorskip("torch")
 pytest.importorskip("pettingzoo")
 
-from rlx.conformance.fixtures import build_fixed_action_rps_policy, build_rps_policy
-from rlx.core.errors import CompatibilityError, SchemaError
-from rlx.core.manifests import population_content_digest
-from rlx.core.population import (
+from arena.conformance.fixtures import build_fixed_action_rps_policy, build_rps_policy
+from arena.core.errors import CompatibilityError, SchemaError
+from arena.core.manifests import population_content_digest
+from arena.core.population import (
     create_population,
     load_population,
     write_population_yaml,
 )
-from rlx.core.sdk import Policy, Population
-from rlx.core.store import LocalStore
+from arena.core.sdk import Policy, Population
+from arena.core.store import LocalStore
 
 
 @pytest.mark.requires_torch
@@ -86,7 +86,7 @@ def test_population_rejects_role_incompatible_members(tmp_path: Path, monkeypatc
         members=[{"policy": str(p), "roles": {"allowed": ["player_0"]}}],
         store=store,
     )
-    from rlx.core.population import assert_members_compatible_with_role
+    from arena.core.population import assert_members_compatible_with_role
 
     with pytest.raises(CompatibilityError, match="incompatible with role"):
         assert_members_compatible_with_role(pop, "player_1")
@@ -121,9 +121,9 @@ def test_population_object_immutable_when_ref_moves(tmp_path: Path, monkeypatch)
 
 @pytest.mark.requires_torch
 def test_population_schema_rejects_empty_members() -> None:
-    from rlx.core.manifests import validate_population_manifest
+    from arena.core.manifests import validate_population_manifest
 
     with pytest.raises(SchemaError):
         validate_population_manifest(
-            {"schema": "rlx.population/v0alpha1", "name": "x", "members": []}
+            {"schema": "arena.population/v0alpha1", "name": "x", "members": []}
         )

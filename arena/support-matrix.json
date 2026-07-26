@@ -1,0 +1,89 @@
+{
+  "schema": "arena.support-matrix/v1",
+  "release": "1.0.0rc1",
+  "python": [">=3.12", "<3.14"],
+  "platforms": [
+    {"os": "linux", "arch": "x86_64", "status": "stable"},
+    {"os": "darwin", "arch": "arm64", "status": "stable"}
+  ],
+  "capabilities": {
+    "core": {
+      "status": "stable",
+      "distributions": [],
+      "executables": [],
+      "install": "python -m pip install 'arena==1.0.0rc1'",
+      "credentials": false
+    },
+    "quickstart": {
+      "status": "stable",
+      "distributions": ["torch"],
+      "executables": [],
+      "install": "python -m pip install 'arena[quickstart]==1.0.0rc1'",
+      "credentials": false
+    },
+    "file": {
+      "status": "stable",
+      "distributions": [],
+      "executables": [],
+      "install": "python -m pip install 'arena==1.0.0rc1'",
+      "credentials": false
+    },
+    "openenv": {
+      "status": "preview",
+      "target_status": "stable",
+      "required_for_1_0": true,
+      "distributions": ["openenv", "pettingzoo", "gymnasium"],
+      "executables": [],
+      "install": "python -m pip install 'arena[openenv]==1.0.0rc1'",
+      "credentials": false
+    },
+    "openspiel": {
+      "status": "stable",
+      "distributions": ["open_spiel", "gymnasium"],
+      "executables": [],
+      "install": "python -m pip install 'arena[openspiel]==1.0.0rc1'",
+      "credentials": false
+    },
+    "gimitest": {
+      "status": "preview",
+      "target_status": "stable",
+      "required_for_1_0": true,
+      "distributions": [],
+      "executables": [],
+      "isolated_python_env": "ARENA_GIMITEST_PYTHON",
+      "isolated_distributions": ["arena", "gimitest", "torch", "pettingzoo", "pillow"],
+      "install": "python -m venv .venv-gimitest && .venv-gimitest/bin/python -m pip install 'arena[torch,pettingzoo,gimitest]==1.0.0rc1' && .venv-gimitest/bin/python -m pip install --no-deps gimitest==1.0",
+      "credentials": false
+    },
+    "hf": {
+      "status": "preview",
+      "target_status": "stable",
+      "required_for_1_0": true,
+      "distributions": ["huggingface_hub"],
+      "executables": [],
+      "install": "python -m pip install 'arena[hf]==1.0.0rc1'",
+      "credentials": true
+    },
+    "oci": {
+      "status": "preview",
+      "distributions": [],
+      "executables": ["oras"],
+      "install": "Install Arena and the ORAS CLI",
+      "credentials": true
+    },
+    "wandb": {
+      "status": "preview",
+      "distributions": ["wandb"],
+      "executables": [],
+      "install": "python -m pip install 'arena[wandb]==1.0.0rc1'",
+      "credentials": true
+    },
+    "mlflow": {
+      "status": "preview",
+      "distributions": ["mlflow"],
+      "executables": [],
+      "install": "python -m pip install 'arena[mlflow]==1.0.0rc1'",
+      "credentials": true
+    }
+  }
+}

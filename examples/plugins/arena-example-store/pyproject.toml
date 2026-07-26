@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "arena-example-store"
+version = "1.0.0"
+description = "Minimal out-of-tree Arena 1.x store plugin contract fixture"
+requires-python = ">=3.12,<3.14"
+dependencies = ["arena>=1.0.0rc1,<2"]
+
+[project.entry-points."arena.plugins.v1"]
+"external_store:example" = "arena_example_store:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/arena_example_store"]

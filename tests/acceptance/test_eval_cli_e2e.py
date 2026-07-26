@@ -12,9 +12,9 @@ pytest.importorskip("pettingzoo")
 
 from _eval_fixtures import build_cyclic_rps_eval_fixture
 
-from rlx.cli.main import main
-from rlx.core.sdk import Policy
-from rlx.core.store import LocalStore
+from arena.cli.main import main
+from arena.core.sdk import Policy
+from arena.core.store import LocalStore
 
 
 def _run(argv: list[str], capsys) -> tuple[int, str, str]:

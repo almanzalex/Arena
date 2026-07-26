@@ -1,4 +1,4 @@
-# RFC 004 — Versioned Evaluation (RLX 0.2)
+# RFC 004 — Versioned Evaluation (Arena 0.2)
 
 **Status:** Accepted for 0.2  
 **Date:** 2026-07-21  
@@ -12,11 +12,11 @@ Versioned **evaluation suites** that lock task(s), populations/policies, role ma
 
 | Schema | Purpose |
 |--------|---------|
-| `rlx.evaluation/v0alpha1` | Locked suite definition |
-| `rlx.eval-run/v0alpha1` | Immutable run record + sampling ledger + cell→episode map |
-| `rlx.eval-report/v0alpha1` | Metrics with evidence_refs; matrices primary |
-| `rlx.dataset/v0alpha1` | Lineage-preserving trajectory slice |
-| `rlx.eval-bundle/v0alpha1` | Locked digests for clean-room reproduce |
+| `arena.evaluation/v0alpha1` | Locked suite definition |
+| `arena.eval-run/v0alpha1` | Immutable run record + sampling ledger + cell→episode map |
+| `arena.eval-report/v0alpha1` | Metrics with evidence_refs; matrices primary |
+| `arena.dataset/v0alpha1` | Lineage-preserving trajectory slice |
+| `arena.eval-bundle/v0alpha1` | Locked digests for clean-room reproduce |
 
 ## Interaction
 

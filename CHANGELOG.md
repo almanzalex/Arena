@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.0rc1 — 2026-07-25
+
+- Rename the product, Python package, CLI, artifact suffix, schema namespace,
+  environment variables, plugin entry points, examples, and documentation to
+  Arena. This is an intentional pre-1.0 identity break; predecessor and current
+  artifact digests are not interchangeable.
+- Freeze strict content identities, evaluation intent/binding/result identities,
+  stable CLI JSON and exit contracts, bounded manifest parsing, transactional
+  publication, supervised evaluation workers, and signed release evidence.
+- Add a packaged support matrix and schema registry, source-free repeat-safe
+  handoff demo, public CleanRL producer proof, and cross-runtime native/OpenEnv/
+  Gimitest equivalence flow.
+- Build and test a lazy out-of-tree store plugin, immutable HF revision handling,
+  archive and mirror hardening, and GitHub release provenance/SBOM workflows.
+- Add a narrow `gimitest` support extra so the isolated provider worker gets
+  Pillow without accepting Gimitest 1.0's obsolete Gymnasium pin.
+
 ## 0.5.0 — 2026-07-22
 
 - Replace one-off training dispatch with a trainer registry and qualify behavior
@@ -22,7 +39,7 @@
 - Add qualified `dynamic_aec` lifecycle execution with explicit policy-digest birth
   eligibility, compatibility rechecks, state resets, and join/leave trajectory evidence.
 - Add portable dataset materialization and seeded behavior-cloning recipes through
-  `rlx train`, including episode-integrity checks and reusable policy output.
+  `arena train`, including episode-integrity checks and reusable policy output.
 - Expand the frozen OpenSpiel catalog to `connect_four` and `breakthrough` while
   continuing to reject chance, simultaneous, and unqualified games.
 - Add OCI/ORAS, W&B, and MLflow verified mirrors, deterministic local simulations,

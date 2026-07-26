@@ -12,18 +12,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> int:
     namespace: dict[str, str] = {}
-    exec((ROOT / "rlx" / "_version.py").read_text(encoding="utf-8"), namespace)
+    exec((ROOT / "arena" / "_version.py").read_text(encoding="utf-8"), namespace)
     version = namespace["VERSION"]
     support = json.loads(
-        (ROOT / "rlx" / "support-matrix.json").read_text(encoding="utf-8")
+        (ROOT / "arena" / "support-matrix.json").read_text(encoding="utf-8")
     )
     registry = json.loads(
-        (ROOT / "rlx" / "schema-registry.json").read_text(encoding="utf-8")
+        (ROOT / "arena" / "schema-registry.json").read_text(encoding="utf-8")
     )
     assert support["release"] == version
     assert registry["release"] == version
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert f"RLX {version}" in readme
+    assert f"Arena {version}" in readme
     workflow = yaml.safe_load(
         (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     )
@@ -46,7 +46,7 @@ def main() -> int:
         "actions/attest@v4",
         "cyclonedx-py environment",
         "check_pip_audit.py",
-        "bandit -q -r rlx -ll",
+        "bandit -q -r arena -ll",
         "check_secret_scan.py",
         "gimitest-boundary-proof.json",
         "SHA256SUMS",

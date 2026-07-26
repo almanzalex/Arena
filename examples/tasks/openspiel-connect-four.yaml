@@ -1,4 +1,4 @@
-schema: rlx.task/v0alpha1
+schema: arena.task/v0alpha1
 name: task:openspiel-connect-four@0.4
 adapter: openspiel
 env: openspiel://connect_four
@@ -6,4 +6,4 @@ interaction: aec
 version: open_spiel-2.0.1:connect_four
 packaging:
   kind: openspiel
-digest: sha256:c81157a644c99563d87e4de1f0752ccf9c61905f300dd56ee67e3c048d90184e
+digest: sha256:9b6ffe588b8bafdf7fbde93aeb22c56b8126c91d2f556463b77886a00959a45b

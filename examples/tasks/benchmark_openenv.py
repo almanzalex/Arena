@@ -1,4 +1,4 @@
-"""Measure RLX native versus OpenEnv loopback reset+step overhead (S-01)."""
+"""Measure Arena native versus OpenEnv loopback reset+step overhead (S-01)."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import json
 import statistics
 import time
 
-from rlx.adapters.task_openenv.adapter import PILOT_CONTRACT, OpenEnvParallelEnv
-from rlx.adapters.task_pettingzoo.pilot_env import CompetitiveRPSParallel
+from arena.adapters.task_openenv.adapter import PILOT_CONTRACT, OpenEnvParallelEnv
+from arena.adapters.task_pettingzoo.pilot_env import CompetitiveRPSParallel
 
 
 def _sample(env, iterations: int) -> list[float]:
@@ -40,7 +40,7 @@ def main() -> None:
     external = OpenEnvParallelEnv(
         {
             "adapter": "openenv",
-            "env": "openenv://rlx/competitive_rps_v0",
+            "env": "openenv://arena/competitive_rps_v0",
             "interaction": "parallel",
             "packaging": {"kind": "openenv", "base_url": args.base_url},
             "contract": PILOT_CONTRACT,

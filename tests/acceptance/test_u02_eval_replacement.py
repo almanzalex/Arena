@@ -19,7 +19,7 @@ def test_u02_crossplay_script_retired() -> None:
 def test_u02_docs_point_to_replacement() -> None:
     root = Path(__file__).resolve().parents[2]
     readme = (root / "examples" / "eval" / "README.md").read_text(encoding="utf-8")
-    assert "rlx eval run" in readme
+    assert "arena eval run" in readme
     assert "retired" in readme.lower() or "Replacement" in readme
     assert (root / "docs" / "evaluation.md").exists()
     assert (root / "docs" / "populations.md").exists()

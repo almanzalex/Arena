@@ -25,22 +25,22 @@ class Blocker(importlib.abc.MetaPathFinder):
 
 sys.meta_path.insert(0, Blocker())
 
-import rlx
-from rlx.adapters.task_pettingzoo.adapter import describe_task
-from rlx.core.manifests import validate_evaluation_manifest
-from rlx.core.registry import capability_matrix
+import arena
+from arena.adapters.task_pettingzoo.adapter import describe_task
+from arena.core.manifests import validate_evaluation_manifest
+from arena.core.registry import capability_matrix
 
 info = describe_task({
     "adapter": "pettingzoo-parallel",
-    "env": "rlx/competitive_rps_v0",
+    "env": "arena/competitive_rps_v0",
     "interaction": "parallel",
 })
 assert info["adapter"] == "pettingzoo-parallel"
 suite = validate_evaluation_manifest({
-    "schema": "rlx.evaluation/v0alpha1",
+    "schema": "arena.evaluation/v0alpha1",
     "name": "offline-native",
     "provider": "native",
-    "task": {"adapter": "pettingzoo-parallel", "env": "rlx/competitive_rps_v0"},
+    "task": {"adapter": "pettingzoo-parallel", "env": "arena/competitive_rps_v0"},
     "assignments": {"player_0": "sha256:" + "0" * 64},
     "seeds": [0],
     "action_mode": "deterministic",
@@ -49,7 +49,7 @@ suite = validate_evaluation_manifest({
 assert suite["provider"] == "native"
 matrix = capability_matrix()
 assert "native" in matrix["eval_provider"]
-print(rlx.__version__)
+print(arena.__version__)
 """,
         encoding="utf-8",
     )

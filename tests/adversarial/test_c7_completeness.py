@@ -22,8 +22,8 @@ from _adv_envs import (  # noqa: E402
     make_discrete_policy,
 )
 
-from rlx.core.sdk import Match, Policy, Task  # noqa: E402
-from rlx.runtime.trajectory import inspect_trajectory  # noqa: E402
+from arena.core.sdk import Match, Policy, Task  # noqa: E402
+from arena.runtime.trajectory import inspect_trajectory  # noqa: E402
 
 _REQUIRED_EP = {"schema", "seed", "task", "agents", "role_map", "policies", "steps"}
 _REQUIRED_STEP = {

@@ -8,11 +8,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from rlx.adapters.policy_custom_torch import (
+from arena.adapters.policy_custom_torch import (
     export_module_from_checkpoint,
     verify_bundle_self,
 )
-from rlx.core.sdk import Policy
+from arena.core.sdk import Policy
 
 PINNED_CLEANRL_COMMIT = "fe8d8a03c41a7ef5b523e2e354bd01c363e786bb"
 
@@ -68,14 +68,14 @@ def main(argv: list[str] | None = None) -> int:
     print(
         json.dumps(
             {
-                "schema": "rlx.cleanrl-export-proof/v1",
+                "schema": "arena.cleanrl-export-proof/v1",
                 "ok": True,
                 "cleanrl_commit": revision,
                 "policy_digest": policy.digest,
                 "verification": verification,
                 "out": str(Path(bundle).resolve()),
                 "consumer_command": (
-                    "python -c \"from rlx import Policy; "
+                    "python -c \"from arena import Policy; "
                     f"print(Policy.load('{Path(bundle).resolve()}').digest)\""
                 ),
             },

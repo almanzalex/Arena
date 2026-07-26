@@ -11,7 +11,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from rlx.adapters.policy_custom_torch import (  # noqa: E402
+from arena.adapters.policy_custom_torch import (  # noqa: E402
     PROVENANCE_SOURCE,
     _embed_reference_cases,
     build_module,
@@ -21,12 +21,12 @@ from rlx.adapters.policy_custom_torch import (  # noqa: E402
     load_runtime,
     verify_bundle_self,
 )
-from rlx.core.contracts import (  # noqa: E402
+from arena.core.contracts import (  # noqa: E402
     validate_architecture_spaces,
     validate_reference_case_action,
 )
-from rlx.core.errors import ConformanceError, SchemaError  # noqa: E402
-from rlx.core.manifests import load_manifest  # noqa: E402
+from arena.core.errors import ConformanceError, SchemaError  # noqa: E402
+from arena.core.manifests import load_manifest  # noqa: E402
 
 
 def _mlp(*, obs_dim: int = 4, action_n: int = 3) -> dict:
@@ -66,7 +66,7 @@ def test_export_rejects_action_n_desync(tmp_path: Path) -> None:
     torch.manual_seed(0)
     with pytest.raises(SchemaError, match="architecture.action_n"):
         export_policy(
-            out_dir=tmp_path / "bad.rlx",
+            out_dir=tmp_path / "bad.arena",
             name="bad",
             roles=["agent"],
             observation=_box(4),
@@ -113,7 +113,7 @@ def test_export_rejects_non_discrete_actions(tmp_path: Path, action: dict) -> No
     torch.manual_seed(1)
     with pytest.raises(SchemaError, match="deliberately rejected|only supports Discrete"):
         export_policy(
-            out_dir=tmp_path / "bad.rlx",
+            out_dir=tmp_path / "bad.arena",
             name="bad",
             roles=["agent"],
             observation=_box(),
@@ -134,7 +134,7 @@ def test_encode_obs_fails_loud_on_length_mismatch(tmp_path: Path) -> None:
     arch = _mlp(obs_dim=4)
     torch.manual_seed(2)
     bundle = export_policy(
-        out_dir=tmp_path / "p.rlx",
+        out_dir=tmp_path / "p.arena",
         name="p",
         roles=["agent"],
         observation=_box(4),
@@ -155,7 +155,7 @@ def test_discrete_obs_rejects_length1_vector(tmp_path: Path) -> None:
     arch = _mlp(obs_dim=4)
     torch.manual_seed(3)
     bundle = export_policy(
-        out_dir=tmp_path / "d.rlx",
+        out_dir=tmp_path / "d.arena",
         name="d",
         roles=["agent"],
         observation={"type": "Discrete", "n": 4, "dtype": "int64"},
@@ -181,7 +181,7 @@ def test_export_rejects_obs_dim_shape_desync(tmp_path: Path) -> None:
     torch.manual_seed(4)
     with pytest.raises(SchemaError, match="observation_dim"):
         export_policy(
-            out_dir=tmp_path / "bad.rlx",
+            out_dir=tmp_path / "bad.arena",
             name="bad",
             roles=["agent"],
             observation=_box(4),
@@ -198,7 +198,7 @@ def test_export_rejects_3d_box_without_layout(tmp_path: Path) -> None:
     torch.manual_seed(5)
     with pytest.raises(SchemaError, match="layout"):
         export_policy(
-            out_dir=tmp_path / "img.rlx",
+            out_dir=tmp_path / "img.arena",
             name="img",
             roles=["agent"],
             observation={
@@ -225,7 +225,7 @@ def test_verify_rejects_oob_expected_action(tmp_path: Path) -> None:
     arch = _mlp()
     torch.manual_seed(6)
     bundle = export_policy(
-        out_dir=tmp_path / "p.rlx",
+        out_dir=tmp_path / "p.arena",
         name="p",
         roles=["agent"],
         observation=_box(),
@@ -262,7 +262,7 @@ def test_embed_rejects_oob_expected_action(tmp_path: Path) -> None:
     arch = _mlp()
     torch.manual_seed(6)
     bundle = export_policy(
-        out_dir=tmp_path / "p.rlx",
+        out_dir=tmp_path / "p.arena",
         name="p",
         roles=["agent"],
         observation=_box(),
@@ -317,7 +317,7 @@ def test_ema_state_dict_warns_when_ignored(tmp_path: Path) -> None:
         warnings.simplefilter("always")
         export_from_checkpoint(
             source=ckpt,
-            out=tmp_path / "plain.rlx",
+            out=tmp_path / "plain.arena",
             role="agent",
             architecture=arch,
             observation=_box(),
@@ -340,7 +340,7 @@ def test_prefer_ema_loads_ema_weights(tmp_path: Path) -> None:
     torch.save({"state_dict": plain, "ema_state_dict": ema}, ckpt)
     bundle = export_from_checkpoint(
         source=ckpt,
-        out=tmp_path / "ema.rlx",
+        out=tmp_path / "ema.arena",
         role="agent",
         architecture=arch,
         observation=_box(),
@@ -365,11 +365,11 @@ def test_ema_is_selected_by_default_and_base_opt_out_is_recorded(tmp_path: Path)
     ckpt = tmp_path / "both.pt"
     torch.save({"state_dict": plain, "ema_state_dict": ema}, ckpt)
     ema_bundle = export_from_checkpoint(
-        source=ckpt, out=tmp_path / "ema.rlx", role="agent", architecture=arch,
+        source=ckpt, out=tmp_path / "ema.arena", role="agent", architecture=arch,
         observation=_box(), action=_disc(), make_reference_cases=False,
     )
     base_bundle = export_from_checkpoint(
-        source=ckpt, out=tmp_path / "base.rlx", role="agent", architecture=arch,
+        source=ckpt, out=tmp_path / "base.arena", role="agent", architecture=arch,
         observation=_box(), action=_disc(), make_reference_cases=False, prefer_ema=False,
     )
     assert torch.allclose(
@@ -390,7 +390,7 @@ def test_ema_is_selected_by_default_and_base_opt_out_is_recorded(tmp_path: Path)
 @pytest.mark.requires_pettingzoo
 def test_mpe_simple_tag_resolves_via_mpe2() -> None:
     pytest.importorskip("mpe2")
-    from rlx.adapters.task_pettingzoo.adapter import make_env
+    from arena.adapters.task_pettingzoo.adapter import make_env
 
     env = make_env(
         {
@@ -417,7 +417,7 @@ def test_reset_on_empty_list_preserved(tmp_path: Path) -> None:
     arch = _gru()
     torch.manual_seed(11)
     bundle = export_policy(
-        out_dir=tmp_path / "gru.rlx",
+        out_dir=tmp_path / "gru.arena",
         name="gru",
         roles=["agent"],
         observation=_box(),
@@ -440,7 +440,7 @@ def test_reset_on_empty_list_preserved(tmp_path: Path) -> None:
 
     # Explicit agent_termination still works when declared
     bundle2 = export_policy(
-        out_dir=tmp_path / "gru2.rlx",
+        out_dir=tmp_path / "gru2.arena",
         name="gru2",
         roles=["agent"],
         observation=_box(),
@@ -471,7 +471,7 @@ def test_generate_reference_cases_exercises_masks(tmp_path: Path, masks: str) ->
     arch = _mlp()
     torch.manual_seed(12)
     bundle = export_policy(
-        out_dir=tmp_path / f"{masks}.rlx",
+        out_dir=tmp_path / f"{masks}.arena",
         name=masks,
         roles=["agent"],
         observation=_box(),
@@ -494,7 +494,7 @@ def test_verify_refuses_optional_masks_without_masked_case(tmp_path: Path) -> No
     arch = _mlp()
     torch.manual_seed(13)
     bundle = export_policy(
-        out_dir=tmp_path / "opt.rlx",
+        out_dir=tmp_path / "opt.arena",
         name="opt",
         roles=["agent"],
         observation=_box(),

@@ -10,13 +10,13 @@ import pytest
 pytest.importorskip("torch")
 pytest.importorskip("pettingzoo")
 
-from rlx.adapters.policy_custom_torch import (
+from arena.adapters.policy_custom_torch import (
     _embed_reference_cases,
     generate_reference_cases,
     load_runtime,
 )
-from rlx.conformance.fixtures import build_rps_policy
-from rlx.conformance.qualification import qualify_adapter_fixture
+from arena.conformance.fixtures import build_rps_policy
+from arena.conformance.qualification import qualify_adapter_fixture
 
 
 @pytest.mark.acceptance
@@ -25,7 +25,7 @@ from rlx.conformance.qualification import qualify_adapter_fixture
 def test_qualifies_custom_torch_pettingzoo_fixture(tmp_path: Path) -> None:
     bundles = {}
     for index, role in enumerate(("player_0", "player_1")):
-        bundle = build_rps_policy(tmp_path / f"{role}.rlx", role=role, seed=index + 1)
+        bundle = build_rps_policy(tmp_path / f"{role}.arena", role=role, seed=index + 1)
         runtime = load_runtime(bundle)
         _embed_reference_cases(
             bundle,
@@ -39,11 +39,11 @@ def test_qualifies_custom_torch_pettingzoo_fixture(tmp_path: Path) -> None:
         bundles[role] = bundle
     fixture = tmp_path / "match.yaml"
     fixture.write_text(
-        """schema: rlx.match/v0alpha1
-task: {adapter: pettingzoo-parallel, env: rlx/competitive_rps_v0}
+        """schema: arena.match/v0alpha1
+task: {adapter: pettingzoo-parallel, env: arena/competitive_rps_v0}
 assignments:
-  player_0: ./player_0.rlx
-  player_1: ./player_1.rlx
+  player_0: ./player_0.arena
+  player_1: ./player_1.arena
 seeds: {start: 0, count: 2}
 action_mode: deterministic
 record: {trajectories: all}
@@ -55,4 +55,4 @@ record: {trajectories: all}
     assert report["ok"]
     assert report["checks"]["tamper_detection"]["ok"]
     persisted = json.loads(out.read_text(encoding="utf-8"))
-    assert persisted["schema"] == "rlx.adapter-qualification/v1"
+    assert persisted["schema"] == "arena.adapter-qualification/v1"

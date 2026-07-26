@@ -3,11 +3,11 @@
 This strengthens the in-process ``test_u01_clean_room`` gate by reproducing the
 conditions of the *human* U-01 step as closely as an automated test can:
 
-* **Never-trained machine** — RLX is built into a real distributable wheel and
+* **Never-trained machine** — Arena is built into a real distributable wheel and
   installed into a throwaway ``python3.12 -m venv`` (or a minimal Docker image)
   with a scrubbed ``HOME``/``XDG``/``PYTHONPATH`` and no repository on the import
   path. The way a stranger installs it, *not* ``pip install -e .``.
-* **Received bundles alone** — only the ``.rlx`` bundles, ``match.yaml``, and the
+* **Received bundles alone** — only the ``.arena`` bundles, ``match.yaml``, and the
   clean-room doc are copied into the sandbox. The trainer package, checkpoints,
   export spec, and source repo are asserted absent/unimportable, with a negative
   control that fails iff a trainer import were required.
@@ -42,19 +42,19 @@ from packaging.markers import default_environment
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
-from rlx.conformance.usability import run_blind_reader
+from arena.conformance.usability import run_blind_reader
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLEAN_ROOM_DOC = REPO_ROOT / "docs" / "clean-room.md"
 
 _MATCH_YAML = """\
-schema: rlx.match/v0alpha1
+schema: arena.match/v0alpha1
 task:
   adapter: pettingzoo-parallel
-  env: rlx/competitive_rps_v0
+  env: arena/competitive_rps_v0
 assignments:
-  player_0: ./player_0.rlx
-  player_1: ./player_1.rlx
+  player_0: ./player_0.arena
+  player_1: ./player_1.arena
 seeds: {start: 0, count: 5}
 action_mode: deterministic
 record:
@@ -66,11 +66,11 @@ failure_policy:
 """
 
 # Written into the venv so any hidden outbound connection during the run fails,
-# while loopback stays usable. Gated on RLX_CLEANROOM_NO_NET so install is unaffected.
+# while loopback stays usable. Gated on ARENA_CLEANROOM_NO_NET so install is unaffected.
 _NET_GUARD_SITECUSTOMIZE = '''\
 import os
 
-if os.environ.get("RLX_CLEANROOM_NO_NET") == "1":
+if os.environ.get("ARENA_CLEANROOM_NO_NET") == "1":
     import socket
 
     _ALLOWED = {"127.0.0.1", "::1", "localhost", ""}
@@ -86,7 +86,7 @@ if os.environ.get("RLX_CLEANROOM_NO_NET") == "1":
         h = _host(address)
         if h in _ALLOWED or h is None:
             return _orig_connect(self, address, *a, **k)
-        raise OSError(f"RLX clean-room: network access blocked (attempted {h!r})")
+        raise OSError(f"Arena clean-room: network access blocked (attempted {h!r})")
 
     def _connect_ex(self, address, *a, **k):
         h = _host(address)
@@ -127,8 +127,8 @@ def hermetic_wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
         check=False,
     )
     assert proc.returncode == 0, f"wheel build failed:\n{proc.stdout}\n{proc.stderr}"
-    wheels = list(dist.glob("rlx-*.whl"))
-    sdists = list(dist.glob("rlx-*.tar.gz"))
+    wheels = list(dist.glob("arena-*.whl"))
+    sdists = list(dist.glob("arena-*.tar.gz"))
     assert wheels, f"no wheel produced in {dist}"
     assert sdists, f"no sdist produced in {dist}"
     return wheels[0]
@@ -137,7 +137,7 @@ def hermetic_wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
 def _pack_installed_distribution(distribution: importlib.metadata.Distribution, wheelhouse: Path) -> None:
     """Turn an installed dependency into a local wheel for the nested fresh venv.
 
-    The outer test environment has already resolved RLX's declared test extras.
+    The outer test environment has already resolved Arena's declared test extras.
     Repacking those installed distributions makes dependency resolution for the
     nested venv reproducible without contacting an index, while retaining the
     normal pip wheel-install path.
@@ -206,7 +206,7 @@ def _pack_installed_distribution(distribution: importlib.metadata.Distribution, 
             archive.writestr(
                 f"{metadata_dir}/WHEEL",
                 "Wheel-Version: 1.0\n"
-                "Generator: rlx hermetic wheelhouse\n"
+                "Generator: arena hermetic wheelhouse\n"
                 "Root-Is-Purelib: true\n"
                 "Tag: py3-none-any\n",
             )
@@ -279,7 +279,7 @@ def handoff(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
     that must NEVER leak into the clean room."""
     torch = pytest.importorskip("torch")
     pytest.importorskip("pettingzoo")
-    from rlx.conformance.fixtures import build_rps_policy
+    from arena.conformance.fixtures import build_rps_policy
 
     root = tmp_path_factory.mktemp("author")
 
@@ -297,8 +297,8 @@ def handoff(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
     # --- Recipient side: the portable bundles + match manifest.
     bundles = root / "bundles"
     bundles.mkdir()
-    build_rps_policy(bundles / "player_0.rlx", role="player_0", seed=1)
-    build_rps_policy(bundles / "player_1.rlx", role="player_1", seed=2)
+    build_rps_policy(bundles / "player_0.arena", role="player_0", seed=1)
+    build_rps_policy(bundles / "player_1.arena", role="player_1", seed=2)
     (bundles / "match.yaml").write_text(_MATCH_YAML, encoding="utf-8")
 
     return {"root": root, "bundles": bundles, "trainer_name": "trainer_repo"}
@@ -307,7 +307,7 @@ def handoff(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
 def _stage_sandbox(dest: Path, handoff: dict[str, Path]) -> None:
     """Copy ONLY what a recipient receives into the sandbox."""
     dest.mkdir(parents=True, exist_ok=True)
-    for name in ("player_0.rlx", "player_1.rlx"):
+    for name in ("player_0.arena", "player_1.arena"):
         shutil.copytree(handoff["bundles"] / name, dest / name)
     shutil.copy2(handoff["bundles"] / "match.yaml", dest / "match.yaml")
     # The received copy of the guide — parsed in-place, as a reader would use it.
@@ -320,7 +320,7 @@ def _assert_recipient_only(sandbox: Path, trainer_name: str) -> None:
     assert not list(sandbox.glob("**/ckpt_*.pt")), "trainer checkpoints leaked into sandbox"
     assert not list(sandbox.glob("**/export_spec.yaml")), "export spec leaked into sandbox"
     # Legitimate: portable policy weights live inside the bundles.
-    assert list(sandbox.glob("player_0.rlx/payloads/weights.pt")), "bundle weights missing"
+    assert list(sandbox.glob("player_0.arena/payloads/weights.pt")), "bundle weights missing"
 
 
 # --------------------------------------------------------------------------- #
@@ -366,7 +366,7 @@ def test_u01_hermetic_venv(
     )
     assert r.returncode == 0, f"wheel install failed:\n{r.stdout}\n{r.stderr}"
 
-    # Install the network guard into the venv (active only when RLX_CLEANROOM_NO_NET=1).
+    # Install the network guard into the venv (active only when ARENA_CLEANROOM_NO_NET=1).
     site = subprocess.run(
         [str(vpython), "-c", "import site; print(site.getsitepackages()[0])"],
         capture_output=True, text=True, check=True,
@@ -390,19 +390,19 @@ def test_u01_hermetic_venv(
         # deliberately NO PYTHONPATH — the repo must not be importable.
     }
     (tmp_path / "tmp").mkdir(exist_ok=True)
-    run_env = {**base_env, "RLX_CLEANROOM_NO_NET": "1", "PIP_NO_INDEX": "1"}
+    run_env = {**base_env, "ARENA_CLEANROOM_NO_NET": "1", "PIP_NO_INDEX": "1"}
 
-    # 4. Isolation: rlx comes from the wheel; trainer/repo are unimportable.
+    # 4. Isolation: arena comes from the wheel; trainer/repo are unimportable.
     got = subprocess.run(
-        [str(vpython), "-c", "import rlx; print(rlx.__file__)"],
+        [str(vpython), "-c", "import arena; print(arena.__file__)"],
         cwd=sandbox, env=base_env, capture_output=True, text=True, check=False,
     )
     assert got.returncode == 0, got.stderr
-    rlx_file = got.stdout.strip()
-    assert "site-packages" in rlx_file and str(venv_dir) in rlx_file, (
-        f"rlx imported from outside the wheel install: {rlx_file}"
+    arena_file = got.stdout.strip()
+    assert "site-packages" in arena_file and str(venv_dir) in arena_file, (
+        f"arena imported from outside the wheel install: {arena_file}"
     )
-    assert str(REPO_ROOT) not in rlx_file, f"rlx imported from the source repo: {rlx_file}"
+    assert str(REPO_ROOT) not in arena_file, f"arena imported from the source repo: {arena_file}"
 
     # Negative control: this MUST fail — it proves the trainer is truly absent.
     # If it ever passed, the clean room would not be a clean room.
@@ -431,9 +431,9 @@ def test_u01_hermetic_venv(
 
     # 6. Success criteria from the guide.
     for cmd, proc in outputs.items():
-        if cmd.startswith("rlx check"):
+        if cmd.startswith("arena check"):
             assert "COMPATIBLE" in proc["stdout"], proc["stdout"]
-        if cmd.startswith("rlx match run"):
+        if cmd.startswith("arena match run"):
             assert "failures=0" in proc["stdout"], proc["stdout"]
 
     out = sandbox / "runs" / "baseline-match"
@@ -475,7 +475,7 @@ def test_u01_hermetic_docker(
     ctx.mkdir()
     shutil.copy2(hermetic_wheel, ctx / hermetic_wheel.name)
 
-    image = f"rlx-cleanroom:{os.getpid()}"
+    image = f"arena-cleanroom:{os.getpid()}"
     build = subprocess.run(
         ["docker", "build", "-f", str(dockerfile), "-t", image, str(ctx)],
         capture_output=True, text=True, check=False,
@@ -495,14 +495,14 @@ def test_u01_hermetic_docker(
 
         mount = f"{sandbox}:/work"
 
-        # Isolation: rlx from the wheel, trainer unimportable — with --network none.
-        rlx_where = subprocess.run(
+        # Isolation: arena from the wheel, trainer unimportable — with --network none.
+        arena_where = subprocess.run(
             ["docker", "run", "--rm", "--network", "none", image,
-             "python", "-c", "import rlx; print(rlx.__file__)"],
+             "python", "-c", "import arena; print(arena.__file__)"],
             capture_output=True, text=True, check=False,
         )
-        assert rlx_where.returncode == 0, rlx_where.stderr
-        assert "site-packages" in rlx_where.stdout, rlx_where.stdout
+        assert arena_where.returncode == 0, arena_where.stderr
+        assert "site-packages" in arena_where.stdout, arena_where.stdout
 
         control = subprocess.run(
             ["docker", "run", "--rm", "--network", "none", image,

@@ -9,9 +9,9 @@ import pytest
 pytest.importorskip("torch")
 pytest.importorskip("pettingzoo")
 
-from rlx.cli.main import main
-from rlx.core.sdk import Policy
-from rlx.core.store import LocalStore
+from arena.cli.main import main
+from arena.core.sdk import Policy
+from arena.core.store import LocalStore
 
 DEMO = Path(__file__).resolve().parents[2] / "examples" / "eval" / "demo"
 
@@ -21,7 +21,7 @@ DEMO = Path(__file__).resolve().parents[2] / "examples" / "eval" / "demo"
 @pytest.mark.requires_pettingzoo
 def test_checked_in_eval_demo_cli(tmp_path: Path, monkeypatch, capsys) -> None:
     assert (DEMO / "evaluation.yaml").exists(), "run python examples/eval/generate_demo.py"
-    # Copy demo into tmp so we don't dirty the tree with .rlx/eval-run
+    # Copy demo into tmp so we don't dirty the tree with .arena/eval-run
     import shutil
 
     work = tmp_path / "demo"
@@ -30,12 +30,12 @@ def test_checked_in_eval_demo_cli(tmp_path: Path, monkeypatch, capsys) -> None:
     LocalStore(work).init()
 
     assert main(["population", "create", "population.yaml", "--ref", "populations/opp"]) == 0
-    digests = {n: Policy.load(f"{n}.rlx").digest for n in ("rock", "paper", "scissors")}
+    digests = {n: Policy.load(f"{n}.arena").digest for n in ("rock", "paper", "scissors")}
     argv = [
         "eval",
         "run",
         "evaluation.yaml",
-        *[x for n, d in digests.items() for x in ("--policy", f"{d}=./{n}.rlx")],
+        *[x for n, d in digests.items() for x in ("--policy", f"{d}=./{n}.arena")],
         "--population",
         "population.yaml",
         "--out",

@@ -14,11 +14,11 @@ import numpy as np
 from gymnasium.spaces import Box, Discrete
 from pettingzoo import ParallelEnv
 
-from rlx.adapters.policy_custom_torch import build_module, export_policy
+from arena.adapters.policy_custom_torch import build_module, export_policy
 
 
 class _BaseParallel(ParallelEnv):
-    metadata = {"name": "rlx_adversarial_v0", "render_modes": []}
+    metadata = {"name": "arena_adversarial_v0", "render_modes": []}
     _agents: tuple[str, ...] = ("player_0",)
     _obs_n = 4
     _act_n = 3
@@ -127,7 +127,7 @@ class BoxObsParallel(ParallelEnv):
     policy's declared observation contract exactly.
     """
 
-    metadata = {"name": "rlx_boxobs_v0", "render_modes": []}
+    metadata = {"name": "arena_boxobs_v0", "render_modes": []}
 
     def __init__(self, max_cycles: int = 5, render_mode: str | None = None) -> None:
         self.max_cycles = int(max_cycles)

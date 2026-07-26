@@ -1,9 +1,9 @@
-schema: rlx.task/v0alpha1
+schema: arena.task/v0alpha1
 name: task:dynamic-lineup@0.4
 adapter: pettingzoo-parallel
-env: rlx/dynamic_lineup_aec_v0
+env: arena/dynamic_lineup_aec_v0
 interaction: dynamic_aec
 version: pilot+pettingzoo-1.25.0
 packaging:
   kind: pettingzoo_wrappers
-digest: sha256:157d2cb856466eb43ad77b5d2aeb0855207b87029fc882916f13aa9b0b002e1c
+digest: sha256:e45dac9dcb4477ef72e955f70e8c02918134e18d35b3d370e6697e36ececd956

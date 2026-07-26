@@ -3,7 +3,7 @@
 Companion to [usability-signoff.md](usability-signoff.md) for **population + evaluation**
 handoff. Give the reader only:
 
-- built RLX wheel (or `pip install 'rlx[torch,pettingzoo]'`)
+- built Arena wheel (or `pip install 'arena[torch,pettingzoo]'`)
 - `examples/eval/demo/` (checked-in bundles + YAMLs) **or** an equivalent received pack
 - [eval-clean-room.md](eval-clean-room.md)
 

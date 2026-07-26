@@ -12,10 +12,10 @@ import numpy as np
 import pytest
 import yaml
 
-from rlx.adapters.policy_custom_torch import load_runtime, verify_bundle_self
-from rlx.adapters.task_pettingzoo.wrappers import apply_wrappers, normalize_wrappers
-from rlx.core.errors import SchemaError
-from rlx.core.sdk import Policy, Task, check
+from arena.adapters.policy_custom_torch import load_runtime, verify_bundle_self
+from arena.adapters.task_pettingzoo.wrappers import apply_wrappers, normalize_wrappers
+from arena.core.errors import SchemaError
+from arena.core.sdk import Policy, Task, check
 
 torch = pytest.importorskip("torch")
 nn = torch.nn
@@ -105,7 +105,7 @@ PISTONBALL_LIKE_WRAPPERS = [
 
 def _write_factory_module(directory: Path) -> Path:
     """Write an importable factory module for subprocess CLI export."""
-    path = directory / "rlx_test_byo_actor.py"
+    path = directory / "arena_test_byo_actor.py"
     path.write_text(
         '''"""Test-only BYO actor factory (exporter-side)."""
 import torch
@@ -209,7 +209,7 @@ def test_byo_torchscript_cli_export_verify_clean_room(tmp_path: Path) -> None:
         "preprocessing": {
             "id": "pistonball_like_layout",
             "pipeline": {
-                "version": "rlx.preprocess/v1",
+                "version": "arena.preprocess/v1",
                 "steps": [{"op": "layout", "from": "HWC", "to": "CHW"}],
             },
         },
@@ -217,19 +217,19 @@ def test_byo_torchscript_cli_export_verify_clean_room(tmp_path: Path) -> None:
     spec_path = tmp_path / "spec.yaml"
     spec_path.write_text(yaml.safe_dump(spec), encoding="utf-8")
 
-    out = tmp_path / "actor.rlx"
+    out = tmp_path / "actor.arena"
     env = os.environ.copy()
     env["PYTHONPATH"] = str(factory_dir) + os.pathsep + env.get("PYTHONPATH", "")
     cmd = [
         sys.executable,
         "-m",
-        "rlx",
+        "arena",
         "policy",
         "export",
         "--adapter",
         "custom-pytorch",
         "--module",
-        "rlx_test_byo_actor:build_tiny_cnn_actor",
+        "arena_test_byo_actor:build_tiny_cnn_actor",
         "--source",
         str(ckpt),
         "--role",
@@ -264,7 +264,7 @@ def test_byo_torchscript_cli_export_verify_clean_room(tmp_path: Path) -> None:
 
     # Clean-room child: no factory dir on PYTHONPATH.
     child = (
-        "from rlx.adapters.policy_custom_torch import load_runtime; "
+        "from arena.adapters.policy_custom_torch import load_runtime; "
         "import numpy as np; "
         f"rt=load_runtime({str(out)!r}); "
         f"print(rt.act(np.asarray({cases[0]['observation']!r}, dtype=np.uint8)))"
@@ -280,7 +280,7 @@ def test_byo_torchscript_cli_export_verify_clean_room(tmp_path: Path) -> None:
     assert result.stdout.strip().isdigit()
 
     policy = Policy.load(out)
-    from rlx.core.compatibility import compose_check
+    from arena.core.compatibility import compose_check
 
     report = compose_check(
         policy=policy.manifest,
@@ -306,7 +306,7 @@ def test_wrapped_task_check_matches_policy_space(tmp_path: Path, monkeypatch) ->
     pytest.importorskip("supersuit")
 
     # Patch make_env to return our tiny env so we don't need Pistonball deps.
-    import rlx.adapters.task_pettingzoo.adapter as adapter
+    import arena.adapters.task_pettingzoo.adapter as adapter
 
     def _fake_make(spec):
         normalize_wrappers(spec.get("wrappers"))
@@ -335,7 +335,7 @@ def test_wrapped_task_check_matches_policy_space(tmp_path: Path, monkeypatch) ->
     _write_factory_module(factory_dir)
     sys.path.insert(0, str(factory_dir))
 
-    from rlx.adapters.policy_custom_torch import export_module_from_checkpoint
+    from arena.adapters.policy_custom_torch import export_module_from_checkpoint
 
     actor = build_tiny_cnn_actor()
     ckpt = tmp_path / "w.pt"
@@ -347,15 +347,15 @@ def test_wrapped_task_check_matches_policy_space(tmp_path: Path, monkeypatch) ->
         }
     ]
     bundle = export_module_from_checkpoint(
-        module_ref="rlx_test_byo_actor:build_tiny_cnn_actor",
-        out_dir=tmp_path / "p.rlx",
+        module_ref="arena_test_byo_actor:build_tiny_cnn_actor",
+        out_dir=tmp_path / "p.arena",
         role="agent_0",
         observation=obs_space,
         action={"type": "Discrete", "n": 3, "masks": "none"},
         source=ckpt,
         preprocessing={
             "pipeline": {
-                "version": "rlx.preprocess/v1",
+                "version": "arena.preprocess/v1",
                 "steps": [{"op": "layout", "from": "HWC", "to": "CHW"}],
             }
         },

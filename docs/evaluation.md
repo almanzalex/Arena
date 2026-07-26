@@ -2,9 +2,9 @@
 
 Versioned suites expand to match jobs (`run_match` or AEC), record a sampling ledger, and produce reports that keep payoff matrices primary.
 
-The `rlx.evaluation/v0alpha1` suite schema is legacy-frozen so earlier digests
-remain valid. RLX 1.0 additionally projects it into
-`rlx.evaluation-intent/v1` and records `rlx.evaluation-binding/v1`. Endpoint,
+The `arena.evaluation/v0alpha1` suite schema is legacy-frozen so earlier digests
+remain valid. Arena 1.0 additionally projects it into
+`arena.evaluation-intent/v1` and records `arena.evaluation-binding/v1`. Endpoint,
 interpreter, worker count, and timeout implementation change the binding digest,
 not semantic intent. Seeds, assignments, metrics, provider semantics, and
 missingness policy change intent.
@@ -12,15 +12,15 @@ missingness policy change intent.
 ## Workflow
 
 ```bash
-rlx eval validate ./evaluation.yaml --population sha256:…=./population.yaml
-rlx eval run ./evaluation.yaml \
-  --policy candidate=./player_0.rlx \
-  --policy <digest>=./rock.rlx \
+arena eval validate ./evaluation.yaml --population sha256:…=./population.yaml
+arena eval run ./evaluation.yaml \
+  --policy candidate=./player_0.arena \
+  --policy <digest>=./rock.arena \
   --population <pop-digest>=./population.yaml \
   --out ./eval-runs/crossplay
-rlx eval report ./eval-runs/crossplay --json
-rlx eval bundle ./eval-runs/crossplay --out ./bundles/crossplay
-# or: rlx release build --eval ./eval-runs/crossplay --out ./bundles/crossplay
+arena eval report ./eval-runs/crossplay --json
+arena eval bundle ./eval-runs/crossplay --out ./bundles/crossplay
+# or: arena release build --eval ./eval-runs/crossplay --out ./bundles/crossplay
 ```
 
 ## Semantics
@@ -40,7 +40,7 @@ rlx eval bundle ./eval-runs/crossplay --out ./bundles/crossplay
   used only for trusted calls that cannot cross JSON.
 - **Interaction:** `parallel`, `aec`, or the qualified `dynamic_aec` lifecycle.
 
-After `rlx task verify-equivalence`, copy the returned
+After `arena task verify-equivalence`, copy the returned
 `shared_task_intent_digest` into both evaluation suites as
 `task_intent_digest`. Verified native and external tasks can then share one
 evaluation-intent digest while retaining different execution bindings.
@@ -50,7 +50,7 @@ See [RFC 004](../rfcs/004-evaluation.md) and [populations.md](populations.md).
 ## Trajectory slices
 
 ```bash
-rlx data select ./eval-runs/crossplay --out ./datasets/losses \
+arena data select ./eval-runs/crossplay --out ./datasets/losses \
   --policy sha256:… --role player_0 --outcome loss
 ```
 
@@ -61,9 +61,9 @@ Datasets point at source digests; sources are not rewritten (SL-01…03).
 Sibling to [clean-room.md](clean-room.md): from a locked eval bundle, recompute metrics offline without trainer repos.
 
 ```bash
-# On a fresh machine with RLX + extras installed (offline wheelhouse OK):
-rlx inspect ./bundles/crossplay/bundle.yaml --json
-# Re-aggregate: rlx eval report against a run dir restored from the bundle trajectories
+# On a fresh machine with Arena + extras installed (offline wheelhouse OK):
+arena inspect ./bundles/crossplay/bundle.yaml --json
+# Re-aggregate: arena eval report against a run dir restored from the bundle trajectories
 ```
 
 Checklist:

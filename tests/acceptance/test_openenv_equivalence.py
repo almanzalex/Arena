@@ -12,11 +12,11 @@ import pytest
 pytest.importorskip("openenv")
 pytest.importorskip("pettingzoo")
 
-from rlx.cli.main import main
-from rlx.conformance.qualification import qualify_task_fixture
-from rlx.core.manifests import load_manifest
-from rlx.core.tasks import verify_task_equivalence
-from rlx.runtime.evaluation import run_evaluation
+from arena.cli.main import main
+from arena.conformance.qualification import qualify_task_fixture
+from arena.core.manifests import load_manifest
+from arena.core.tasks import verify_task_equivalence
+from arena.runtime.evaluation import run_evaluation
 
 
 def _free_port() -> int:
@@ -33,7 +33,7 @@ def test_t01_t02_real_openenv_transport_equivalence(tmp_path: Path) -> None:
         [
             sys.executable,
             "-m",
-            "rlx.adapters.task_openenv.server",
+            "arena.adapters.task_openenv.server",
             "--port",
             str(port),
         ],
@@ -61,7 +61,7 @@ def test_t01_t02_real_openenv_transport_equivalence(tmp_path: Path) -> None:
             [
                 "task",
                 "import",
-                f"openenv://127.0.0.1:{port}/rlx/competitive_rps_v0",
+                f"openenv://127.0.0.1:{port}/arena/competitive_rps_v0",
                 "--name",
                 "task:rps-openenv@0.3",
                 "--out",
@@ -97,8 +97,8 @@ def test_t01_t02_real_openenv_transport_equivalence(tmp_path: Path) -> None:
         assert qualification["adapter"] == "openenv"
 
         policies = {
-            "player_0": str(Path("examples/eval/demo/rock.rlx").resolve()),
-            "player_1": str(Path("examples/eval/demo/paper.rlx").resolve()),
+            "player_0": str(Path("examples/eval/demo/rock.arena").resolve()),
+            "player_1": str(Path("examples/eval/demo/paper.arena").resolve()),
         }
 
         shared_task_intent = result["shared_task_intent_digest"]
@@ -106,7 +106,7 @@ def test_t01_t02_real_openenv_transport_equivalence(tmp_path: Path) -> None:
         def evaluate(task, out):
             return run_evaluation(
                 {
-                    "schema": "rlx.evaluation/v0alpha1",
+                    "schema": "arena.evaluation/v0alpha1",
                     "name": "same-policy-native-openenv",
                     "provider": "native",
                     "interaction": "parallel",
@@ -153,7 +153,7 @@ def test_openenv_generic_box_contract_second_task(tmp_path: Path) -> None:
         [
             sys.executable,
             "-m",
-            "rlx.adapters.task_openenv.server",
+            "arena.adapters.task_openenv.server",
             "--port",
             str(port),
             "--env",
@@ -186,7 +186,7 @@ def test_openenv_generic_box_contract_second_task(tmp_path: Path) -> None:
             [
                 "task",
                 "import",
-                f"openenv://127.0.0.1:{port}/rlx/vector_coordination_v0",
+                f"openenv://127.0.0.1:{port}/arena/vector_coordination_v0",
                 "--name",
                 "task:vector-openenv@0.5",
                 "--contract",
@@ -199,7 +199,7 @@ def test_openenv_generic_box_contract_second_task(tmp_path: Path) -> None:
         ) == 0
         imported = load_manifest(imported_path)
         protocol = imported["packaging"]["protocol"]
-        assert protocol["schema"] == "rlx.openenv-capabilities/v1"
+        assert protocol["schema"] == "arena.openenv-capabilities/v1"
         assert protocol["contract_digest"].startswith("sha256:")
         native = load_manifest("examples/tasks/native-vector.yaml")
         suite = load_manifest("examples/tasks/vector-equivalence.yaml")

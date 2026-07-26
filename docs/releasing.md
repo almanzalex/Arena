@@ -1,4 +1,4 @@
-# RLX 1.0 release evidence
+# Arena 1.0 release evidence
 
 The release is not “green because CI said so.” Each mandatory gate produces a
 durable file, and the exact wheel/sdist plus those files are content-bound into
@@ -8,11 +8,11 @@ The release-candidate workflow builds the distributions once, installs the
 exact wheel, emits SHA-256 checksums, a reproducible CycloneDX SBOM, dependency,
 Bandit, and secret-scan reports, and GitHub/Sigstore provenance plus SBOM
 attestations over the wheel and sdist. Those repository-bound attestations
-complement the RLX release-manager signature below; neither substitutes for the
+complement the Arena release-manager signature below; neither substitutes for the
 other's trust channel.
 
 ```bash
-rlx release assemble \
+arena release assemble \
   --release 1.0.0 --tag v1.0.0 --commit "$(git rev-parse HEAD)" \
   --gate R-01=evidence/R-01-platform-ci.json \
   --gate R-02=evidence/R-02-hermetic.json \
@@ -28,14 +28,14 @@ rlx release assemble \
   --gate R-12=evidence/R-12-recovery.json \
   --gate R-13=evidence/R-13-docs.json \
   --gate R-14=evidence/R-14-integrity.json \
-  --artifact dist/rlx-1.0.0-py3-none-any.whl \
-  --artifact dist/rlx-1.0.0.tar.gz \
+  --artifact dist/arena-1.0.0-py3-none-any.whl \
+  --artifact dist/arena-1.0.0.tar.gz \
   --out evidence/release-index.json
 
-rlx attest keygen --private release-private.pem --public release-public.pem
-rlx release sign evidence/release-index.json \
+arena attest keygen --private release-private.pem --public release-public.pem
+arena release sign evidence/release-index.json \
   --key release-private.pem --out evidence/release-index.sig.json
-rlx release verify evidence/release-index.json \
+arena release verify evidence/release-index.json \
   --signature evidence/release-index.sig.json \
   --key release-public.pem --at-release
 ```
@@ -51,9 +51,9 @@ Current qualification is a separate signed ledger so an outage or expired
 provider record can change today’s verdict without rewriting release history:
 
 ```bash
-rlx release sign evidence/current-ledger.json \
+arena release sign evidence/current-ledger.json \
   --key operations-private.pem --out evidence/current-ledger.sig.json
-rlx release verify evidence/release-index.json \
+arena release verify evidence/release-index.json \
   --signature evidence/release-index.sig.json --key release-public.pem \
   --current-ledger evidence/current-ledger.json \
   --ledger-signature evidence/current-ledger.sig.json \

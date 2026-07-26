@@ -15,22 +15,22 @@ from pathlib import Path
 
 import pytest
 
-from rlx.core.errors import StoreError
-from rlx.core.identity import parse_digest, sha256_bytes
-from rlx.core.manifests import policy_content_digest
-from rlx.core.store import LocalStore
+from arena.core.errors import StoreError
+from arena.core.identity import parse_digest, sha256_bytes
+from arena.core.manifests import policy_content_digest
+from arena.core.store import LocalStore
 
 torch = pytest.importorskip("torch")
 pytest.importorskip("pettingzoo")
 
 from _adv_envs import make_discrete_policy  # noqa: E402
 
-from rlx.adapters.policy_custom_torch import (  # noqa: E402
+from arena.adapters.policy_custom_torch import (  # noqa: E402
     load_runtime,
     verify_bundle_integrity,
 )
-from rlx.core.errors import ConformanceError  # noqa: E402
-from rlx.core.manifests import load_manifest  # noqa: E402
+from arena.core.errors import ConformanceError  # noqa: E402
+from arena.core.manifests import load_manifest  # noqa: E402
 
 
 @pytest.mark.requires_torch
@@ -99,7 +99,7 @@ def test_bundle_weights_tamper_detected_on_load(tmp_path: Path) -> None:
 
     # Swap the weights for a different network's weights.
     torch.manual_seed(9999)
-    from rlx.adapters.policy_custom_torch import build_module
+    from arena.adapters.policy_custom_torch import build_module
 
     other = build_module(
         {"type": "mlp_categorical", "observation_dim": 4, "hidden_dims": [16], "action_n": 3}

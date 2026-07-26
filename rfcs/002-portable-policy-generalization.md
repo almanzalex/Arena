@@ -5,8 +5,8 @@
 **Depends on:** RFC 000, RFC 001  
 **Scope:** Post-0.1 design for bring-your-own PyTorch policies, serializable preprocessing, custom task handoff, and safe checkpoint ingestion.
 
-> **Implemented-boundary update (2026-07-21):** RLX dispatches portable behavior
-> through an **axes + case registry** (`rlx.core.registry` / `rlx.plugins`).
+> **Implemented-boundary update (2026-07-21):** Arena dispatches portable behavior
+> through an **axes + case registry** (`arena.core.registry` / `arena.plugins`).
 > Registered + qualified cases include Discrete templates, TorchScript BYO,
 > complete MultiDiscrete / Dict / diagonal-Gaussian Box, preprocess ops, and
 > SuperSuit wrappers. Opt-in (not default, not sandboxed) cases:
@@ -14,7 +14,7 @@
 > fail loud with an extension recipe; mixtures and unscriptable arbitrary Python
 > remain non-goals until registered, tested, and qualified.
 >
-> **Implemented-boundary update (2026-07-20):** RLX implements the T1
+> **Implemented-boundary update (2026-07-20):** Arena implements the T1
 > TorchScript path as the preferred BYO payload. It does not claim T2
 > (`torch.export`) as a shipping runtime tier. The table below remains design
 > analysis except where the registry capability matrix in README supersedes it.
@@ -23,25 +23,25 @@
 > clean-room regression tests were used to test each boundary. Incomplete
 > MultiDiscrete/Dict/Gaussian claims, unscriptable Python without trust opt-in,
 > and arbitrary environment source handoff without digests remain explicit
-> fail-loud non-goals. `rlx adapter qualify` records the qualification evidence
+> fail-loud non-goals. `arena adapter qualify` records the qualification evidence
 > required before an adapter/case can be declared supported.
 
 ## Problem (what 0.1 actually is)
 
-RLX 0.1’s `custom-pytorch` adapter is a **two-template declarative categorical contract**:
+Arena 0.1’s `custom-pytorch` adapter is a **two-template declarative categorical contract**:
 
-- Architectures: `mlp_categorical`, `gru_categorical` only (`rlx/adapters/policy_custom_torch`).
+- Architectures: `mlp_categorical`, `gru_categorical` only (`arena/adapters/policy_custom_torch`).
 - Preprocessing: elementwise mean/std (+ optional clip) only.
 - Weights load with `torch.load(..., weights_only=True)` into a **reconstructed template graph**.
 - Match runner tasks: bundled pilot env or `pettingzoo.*` modules.
 
 That satisfies the pilot pair and clean-room gates for policies that already fit those templates. It does **not** deliver the product slogan “bring your own PyTorch policy” for a lab’s real `nn.Module` (custom recurrence, in-graph masks, frame-stacking wrappers, non-PettingZoo envs).
 
-**Status-quo lab friction today:** a second researcher gets a checkpoint + Slack instructions, then writes a load script that imports the trainer repo, guesses wrapper order, hard-codes role maps, and silently diverges when frame-stack / running-norm / mask conventions drift. RLX 0.1 removes some of that for the two templates, but for bespoke modules it pushes users back to the same hand-written handoff — or worse, into a false sense of portability when elementwise preprocess is declared while frame-stack was required.
+**Status-quo lab friction today:** a second researcher gets a checkpoint + Slack instructions, then writes a load script that imports the trainer repo, guesses wrapper order, hard-codes role maps, and silently diverges when frame-stack / running-norm / mask conventions drift. Arena 0.1 removes some of that for the two templates, but for bespoke modules it pushes users back to the same hand-written handoff — or worse, into a false sense of portability when elementwise preprocess is declared while frame-stack was required.
 
 ### Prototype evidence of the silent-failure class
 
-On a 20-step synthetic stream with a bespoke masked-GRU and a real `running_norm → frame_stack(k=4)` pipeline, an RLX-0.1-style elementwise pad+normalize path produced **10% wrong actions** while still running without error. The messy-trainer adversarial case elsewhere reported ~63% wrong under the same bug class; both show the failure mode is **silent behavioral drift**, not a hard crash.
+On a 20-step synthetic stream with a bespoke masked-GRU and a real `running_norm → frame_stack(k=4)` pipeline, an Arena-0.1-style elementwise pad+normalize path produced **10% wrong actions** while still running without error. The messy-trainer adversarial case elsewhere reported ~63% wrong under the same bug class; both show the failure mode is **silent behavioral drift**, not a hard crash.
 
 ---
 
@@ -91,8 +91,8 @@ nn.Module + wrappers
     ├─ capture preprocess IR ─────────► payloads/preprocess.json
     ├─ serialize actor (T1/T2/T4) ────► payloads/model.(pt|pt2) [/ inference/*.py]
     ├─ record reference cases ────────► payloads/reference_cases.json
-    └─ rlx policy verify (source)       rlx policy verify (self)
-                                        rlx match run (no trainer repo)
+    └─ arena policy verify (source)       arena policy verify (self)
+                                        arena match run (no trainer repo)
 ```
 
 ---
@@ -181,9 +181,9 @@ Environment: PyTorch **2.9.1**, clean-room `PYTHONPATH` = artifact dir only, tra
 
 | Today (typical lab) | With T1/T2 + preprocess IR |
 |---------------------|----------------------------|
-| Share checkpoint path + branch SHA | Share one `.rlx` bundle digest |
-| Clone trainer + create venv + CUDA dance | Install `rlx[torch]` (+ pinned torch) |
-| Write `load_opponent.py` importing `my_proj.models` | `rlx policy verify` / `rlx match run` |
+| Share checkpoint path + branch SHA | Share one `.arena` bundle digest |
+| Clone trainer + create venv + CUDA dance | Install `arena[torch]` (+ pinned torch) |
+| Write `load_opponent.py` importing `my_proj.models` | `arena policy verify` / `arena match run` |
 | Manually copy RunningMeanStd / FrameStack order | Pipeline IR embedded; verify fails if omitted |
 | Silent wrong actions if wrapper missed | Conformance cases + shape checks fail loud |
 | “Works on my machine” recurrence resets | Declared `reset_on` + reference trajectories |
@@ -196,16 +196,16 @@ Environment: PyTorch **2.9.1**, clean-room `PYTHONPATH` = artifact dir only, tra
 
 ### 2.1 Why elementwise-only is insufficient
 
-RLX 0.1 `Preprocessing` is `(x - mean) / std` with optional clip, applied after pad/truncate to `observation_dim`. Frame-stacking, concat of heterogeneous fields, and running-stat vectors **cannot** be represented. Export that “succeeds” with the wrong preprocess id produces **silent policy drift** (prototype: 10% wrong actions; adversarial messy case higher).
+Arena 0.1 `Preprocessing` is `(x - mean) / std` with optional clip, applied after pad/truncate to `observation_dim`. Frame-stacking, concat of heterogeneous fields, and running-stat vectors **cannot** be represented. Export that “succeeds” with the wrong preprocess id produces **silent policy drift** (prototype: 10% wrong actions; adversarial messy case higher).
 
-### 2.2 Proposed IR: `rlx.preprocess/v1`
+### 2.2 Proposed IR: `arena.preprocess/v1`
 
 ```yaml
 preprocessing:
   included: true
   id: "norm_framestack_v1"          # content hash of steps+params preferred
   pipeline:
-    version: rlx.preprocess/v1
+    version: arena.preprocess/v1
     steps:
       - op: running_norm
         mean: [...]                  # broadcastable to current tensor
@@ -224,7 +224,7 @@ preprocessing:
 - Stateful ops (`frame_stack`, running stats if online) expose `reset()` aligned with policy `reset_on`.
 - Unknown `op` → **export/load error** (fail loud).
 - Shape mismatch → **error** (prototype: feeding 8-d into `feat_dim: 2` raised `ValueError` / broadcast error).
-- Registry lives in RLX; adapters may register extra ops behind plugin namespacing (`lab.foo.bar`) with allowlisted code (same trust tier as T4).
+- Registry lives in Arena; adapters may register extra ops behind plugin namespacing (`lab.foo.bar`) with allowlisted code (same trust tier as T4).
 
 ### 2.3 Capture from trainer wrappers (minimal user effort)
 
@@ -232,12 +232,12 @@ Provide a **capture helper** used on the trainer machine (imports trainer — th
 
 ```python
 # trainer-side, once
-pipe = rlx.preprocess.capture([
+pipe = arena.preprocess.capture([
     env.get_wrapper_by_id("NormalizeObservation"),  # or duck-typed
     env.get_wrapper_by_id("FrameStack"),
 ])
 # or explicit:
-pipe = rlx.preprocess.from_steps([...])
+pipe = arena.preprocess.from_steps([...])
 ```
 
 Heuristics (best-effort, never silent):
@@ -265,10 +265,10 @@ Heuristics (best-effort, never silent):
 
 `make_env` today: pilot aliases, a few classic ids, or `importlib` of `pettingzoo.*`. Lab Parallel envs outside that namespace are not portable.
 
-### 3.2 Contract sketch (`rlx.task/v1`)
+### 3.2 Contract sketch (`arena.task/v1`)
 
 ```yaml
-schema: rlx.task/v1
+schema: arena.task/v1
 adapter: python-entrypoint          # or pettingzoo-parallel | openenv (later)
 name: lab/pursuit_custom
 interaction: parallel
@@ -294,14 +294,14 @@ roles:  # optional cache; still discovered via describe_task
 2. **Pinned pip package** name/version on allowlist (no source tree) — cleaner when the env is already published.
 3. **OpenEnv / container** (roadmap 0.3) — best isolation; higher overhead; equivalence suite required.
 
-**Safety:** default deny. `rlx match run` refuses `python-entrypoint` unless workspace trust includes the task digest (or `--trust-task-code`). No network during load by default.
+**Safety:** default deny. `arena match run` refuses `python-entrypoint` unless workspace trust includes the task digest (or `--trust-task-code`). No network during load by default.
 
 **API surface:** factory must expose PettingZoo Parallel semantics used by the match runner (`reset`, `step`, `agents`, spaces, optional `action_mask` in obs dict). AEC deferred to existing 0.2 roadmap.
 
 ### 3.3 Friction reduction
 
 Today: “install my private env package from this git URL + this commit + these wrappers.”  
-Target: one task artifact + trust prompt + `rlx check` space discovery — still not magic for proprietary simulators with native binaries, but removes path/import archaeology when the env is pure Python.
+Target: one task artifact + trust prompt + `arena check` space discovery — still not magic for proprietary simulators with native binaries, but removes path/import archaeology when the env is pure Python.
 
 ---
 
@@ -332,7 +332,7 @@ This complements (does not replace) tactical hardening of 0.1 loaders.
 
 ## 5. Manifest / adapter changes (additive)
 
-Extend `rlx.policy/v0alpha1` → `v0alpha2` (or additive fields with forward-compatible readers):
+Extend `arena.policy/v0alpha1` → `v0alpha2` (or additive fields with forward-compatible readers):
 
 ```yaml
 runtime:
@@ -364,12 +364,12 @@ payloads:
 CLI sketch:
 
 ```bash
-rlx policy export --adapter custom-pytorch \
+arena policy export --adapter custom-pytorch \
   --source ./ckpt.pt \
   --module my_proj.policy:Actor \
   --capture-preprocess env:make_env \
   --role evader \
-  --out ./artifacts/evader.rlx
+  --out ./artifacts/evader.arena
 
 # refuses template remapping if module is not a template
 # writes tier chosen by probe + embedded reference cases from raw obs
@@ -412,10 +412,10 @@ rlx policy export --adapter custom-pytorch \
 
 - **Expressibility ceiling:** dynamic Python, custom CUDA ops, and trainer-side masking outside the module may force T4 or code changes.
 - **Trace fragility:** control-flow and optional mask paths can look green on the traced example and diverge later — mitigate with diverse reference cases at export.
-- **Trust ≠ sandbox:** TorchScript/export/bundled source all execute native/Python code; RLX provides **integrity + consent**, not a malware VM.
+- **Trust ≠ sandbox:** TorchScript/export/bundled source all execute native/Python code; Arena provides **integrity + consent**, not a malware VM.
 - **ONNX:** attractive for portability marketing; **unproven here**; deps and op coverage are real costs.
 - **Env handoff:** pure-Python Parallel factories package cleanly; complex simulators still need OpenEnv/containers.
-- **Adoption/performance at scale:** not measured; do not claim RLX becomes “the standard.”
+- **Adoption/performance at scale:** not measured; do not claim Arena becomes “the standard.”
 
 ---
 
@@ -434,7 +434,7 @@ rlx policy export --adapter custom-pytorch \
 
 ## 9. Appendix — prototype session notes
 
-Throwaway prototypes lived under `/tmp/rlx_byo_proto/` (trainer_repo export + clean_room verify subprocess) and were **deleted after RFC authorship**. No changes were made to `rlx/` or `tests/` for this design work.
+Throwaway prototypes lived under `/tmp/arena_byo_proto/` (trainer_repo export + clean_room verify subprocess) and were **deleted after RFC authorship**. No changes were made to `arena/` or `tests/` for this design work.
 
 Key clean-room JSON fields observed:
 

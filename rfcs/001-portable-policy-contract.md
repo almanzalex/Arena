@@ -1,4 +1,4 @@
-# RFC 001 — Portable Policy Contract (RLX 0.1)
+# RFC 001 — Portable Policy Contract (Arena 0.1)
 
 **Status:** Accepted for MVP 0.1  
 **Date:** 2026-07-16  
@@ -6,15 +6,15 @@
 
 ## Goals
 
-Define the minimum executable contract so a custom-PyTorch policy can leave its training repository, pass `rlx check` against a PettingZoo Parallel task role, and produce source-equivalent actions under conformance fixtures F1–F4.
+Define the minimum executable contract so a custom-PyTorch policy can leave its training repository, pass `arena check` against a PettingZoo Parallel task role, and produce source-equivalent actions under conformance fixtures F1–F4.
 
-## Manifest schema (`rlx.policy/v0alpha1`)
+## Manifest schema (`arena.policy/v0alpha1`)
 
 Required fields:
 
 | Field | Semantics |
 |-------|-----------|
-| `schema` | Must be `rlx.policy/v0alpha1` |
+| `schema` | Must be `arena.policy/v0alpha1` |
 | `name` | Human-readable identity (not content identity) |
 | `roles.allowed` | Roles this policy may control |
 | `runtime.adapter` | `custom-pytorch` for MVP |
@@ -43,7 +43,7 @@ Large payloads are referenced by digest; they are never embedded in the manifest
 - Must be **included** in the policy bundle for 0.1 (no external trainer hooks).
 - Supported transforms: identity, mean/std normalization (broadcastable vectors), optional clip.
 - Transform order is fixed: `normalize` then `clip` when both are set.
-- Preprocessing identifiers appear on the manifest; `rlx check` requires matching identifiers when the task declares expectations.
+- Preprocessing identifiers appear on the manifest; `arena check` requires matching identifiers when the task declares expectations.
 
 ## Roles
 
@@ -74,7 +74,7 @@ Large payloads are referenced by digest; they are never embedded in the manifest
 ## Weight / runtime payloads
 
 - Weights: PyTorch `state_dict` serialized with `torch.save` under a content-addressed object.
-- Architecture templates live in `rlx.adapters.policy_custom_torch` (`mlp_categorical`, `gru_categorical`).
+- Architecture templates live in `arena.adapters.policy_custom_torch` (`mlp_categorical`, `gru_categorical`).
 - Loading reconstitutes the module from architecture + weights only — **no** `sys.path` mutation toward a training repo.
 
 ## Provenance
@@ -93,7 +93,7 @@ Large payloads are referenced by digest; they are never embedded in the manifest
 | Recurrent hidden states | `atol=1e-5`, `rtol=1e-5` |
 | Continuous actions (if present) | Declared per-manifest; not required for pilot |
 
-## Match schema (`rlx.match/v0alpha1`)
+## Match schema (`arena.match/v0alpha1`)
 
 | Field | Semantics |
 |-------|-----------|
@@ -104,7 +104,7 @@ Large payloads are referenced by digest; they are never embedded in the manifest
 | `record` | Trajectory / input recording flags |
 | `failure_policy` | `timeout_seconds`, `retain_incomplete`, `retry` |
 
-## Trajectory schema (`rlx.trajectory/v0alpha1`)
+## Trajectory schema (`arena.trajectory/v0alpha1`)
 
 Per episode:
 
@@ -115,4 +115,4 @@ D-01 requires every transition to include task, agent, role, policy, seed, obser
 
 ## Negative compatibility dimensions
 
-`rlx check` must fail clearly for mismatches in: observation dtype/shape/bounds, action space, role eligibility, preprocessing id, mask requirement, recurrent requirement, and inference mode availability.
+`arena check` must fail clearly for mismatches in: observation dtype/shape/bounds, action space, role eligibility, preprocessing id, mask requirement, recurrent requirement, and inference mode availability.

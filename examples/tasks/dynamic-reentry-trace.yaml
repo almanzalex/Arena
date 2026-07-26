@@ -1,4 +1,4 @@
-schema: rlx.trace-suite/v1
+schema: arena.trace-suite/v1
 name: dynamic-reentry-reference
 interaction: dynamic_aec
 episodes:

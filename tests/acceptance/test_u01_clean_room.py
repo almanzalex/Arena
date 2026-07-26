@@ -13,7 +13,7 @@ import pytest
 torch = pytest.importorskip("torch")
 pytest.importorskip("pettingzoo")
 
-from rlx.adapters.policy_custom_torch import build_module  # noqa: E402
+from arena.adapters.policy_custom_torch import build_module  # noqa: E402
 
 _EXPORT_SPEC = """\
 architecture:
@@ -37,13 +37,13 @@ preprocessing:
 """
 
 _MATCH_YAML = """\
-schema: rlx.match/v0alpha1
+schema: arena.match/v0alpha1
 task:
   adapter: pettingzoo-parallel
-  env: rlx/competitive_rps_v0
+  env: arena/competitive_rps_v0
 assignments:
-  player_0: ./player_0.rlx
-  player_1: ./player_1.rlx
+  player_0: ./player_0.arena
+  player_1: ./player_1.arena
 seeds: {start: 0, count: 5}
 action_mode: deterministic
 record:
@@ -68,10 +68,10 @@ def _make_checkpoint(path: Path, *, seed: int) -> None:
 def test_u01_scripted_clean_room(tmp_path: Path) -> None:
     """End-to-end U-01 via the documented CLI only.
 
-    Researcher A: ``rlx policy export`` two policies from checkpoints, then
-    ``rlx policy verify`` each. Researcher B: receive *only* the ``.rlx`` bundles in a
+    Researcher A: ``arena policy export`` two policies from checkpoints, then
+    ``arena policy verify`` each. Researcher B: receive *only* the ``.arena`` bundles in a
     fresh directory (trainer repo + checkpoints deleted, trainer off ``PYTHONPATH``) and
-    run ``rlx init`` → ``inspect`` → ``check`` → ``match run --record`` → ``data inspect``.
+    run ``arena init`` → ``inspect`` → ``check`` → ``match run --record`` → ``data inspect``.
 
     The only remaining residual is the genuine human step documented in docs/clean-room.md:
     a second person repeating this on a machine that never had the trainer checkout.
@@ -85,7 +85,7 @@ def test_u01_scripted_clean_room(tmp_path: Path) -> None:
 
     def cli(*args: str, cwd: Path, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
         return subprocess.run(
-            [sys.executable, "-m", "rlx.cli.main", *args],
+            [sys.executable, "-m", "arena.cli.main", *args],
             cwd=cwd,
             capture_output=True,
             text=True,
@@ -103,11 +103,11 @@ def test_u01_scripted_clean_room(tmp_path: Path) -> None:
             "--source", f"./{ckpt}",
             "--role", role,
             "--spec", "./export_spec.yaml",
-            "--out", f"./{role}.rlx",
+            "--out", f"./{role}.arena",
             cwd=author,
         )
         assert r.returncode == 0, r.stderr
-        r = cli("policy", "verify", f"./{role}.rlx", cwd=author)
+        r = cli("policy", "verify", f"./{role}.arena", cwd=author)
         assert r.returncode == 0, r.stderr + r.stdout
         assert '"ok": true' in r.stdout, r.stdout
 
@@ -115,9 +115,9 @@ def test_u01_scripted_clean_room(tmp_path: Path) -> None:
     clean = tmp_path / "clean_room"
     clean.mkdir()
     for role in ("player_0", "player_1"):
-        shutil.copytree(author / f"{role}.rlx", clean / f"{role}.rlx")
+        shutil.copytree(author / f"{role}.arena", clean / f"{role}.arena")
     (clean / "match.yaml").write_text(_MATCH_YAML, encoding="utf-8")
-    shutil.rmtree(author)  # trainer, checkpoints, spec, and .rlx workspace all gone
+    shutil.rmtree(author)  # trainer, checkpoints, spec, and .arena workspace all gone
 
     # Clean environment: nothing trainer-side on PYTHONPATH.
     clean_env = {**os.environ, "PYTHONPATH": ""}
@@ -130,9 +130,9 @@ def test_u01_scripted_clean_room(tmp_path: Path) -> None:
     assert r.returncode == 0, r.stderr
 
     for role in ("player_0", "player_1"):
-        r = clean_cli("inspect", f"./{role}.rlx")
+        r = clean_cli("inspect", f"./{role}.arena")
         assert r.returncode == 0, r.stderr
-        r = clean_cli("check", "rlx/competitive_rps_v0", f"./{role}.rlx", "--role", role)
+        r = clean_cli("check", "arena/competitive_rps_v0", f"./{role}.arena", "--role", role)
         assert r.returncode == 0, r.stderr + r.stdout
         assert "COMPATIBLE" in r.stdout, r.stdout
 

@@ -20,7 +20,7 @@ pytest.importorskip("pettingzoo")
 
 from _adv_envs import make_discrete_policy  # noqa: E402
 
-from rlx.adapters.policy_custom_torch import (  # noqa: E402
+from arena.adapters.policy_custom_torch import (  # noqa: E402
     build_module,
     export_policy,
     load_runtime,
@@ -69,7 +69,7 @@ def test_preprocessing_is_numeric_only_no_code(tmp_path: Path) -> None:
     looks like code is simply ignored, never eval'd — so nothing executable is
     embedded that could close over the trainer."""
     bundle = make_discrete_policy(tmp_path / "p", role="player_0")
-    from rlx.core.manifests import load_manifest
+    from arena.core.manifests import load_manifest
 
     manifest = load_manifest(bundle / "policy.yaml")
     prep = manifest["preprocessing"]
@@ -77,7 +77,7 @@ def test_preprocessing_is_numeric_only_no_code(tmp_path: Path) -> None:
     for key in ("mean", "std", "clip"):
         assert not callable(prep.get(key))
     # Runtime uses only numeric fields; no callables anywhere in the manifest.
-    from rlx.adapters.policy_custom_torch import Preprocess
+    from arena.adapters.policy_custom_torch import Preprocess
 
     pp = Preprocess({"mean": 0.0, "std": 1.0})
     import numpy as np
@@ -93,7 +93,7 @@ def test_clean_bundle_loads_without_repo_on_pythonpath(tmp_path: Path) -> None:
     bundle = make_discrete_policy(tmp_path / "clean", role="player_0", seed=3)
     script = (
         "import sys;"
-        "from rlx.adapters.policy_custom_torch import load_runtime;"
+        "from arena.adapters.policy_custom_torch import load_runtime;"
         "rt=load_runtime(sys.argv[1]); rt.reset();"
         "a=rt.act(0, mode='deterministic'); assert a in (0,1,2), a; print('OK', a)"
     )

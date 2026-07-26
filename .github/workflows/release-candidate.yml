@@ -28,40 +28,40 @@ jobs:
           python -m build
       - name: Install exact wheel and run offline demo
         run: |
-          python -m venv /tmp/rlx-release-venv
+          python -m venv /tmp/arena-release-venv
           WHEEL="$(ls dist/*.whl)"
-          /tmp/rlx-release-venv/bin/python -m pip install --upgrade pip
-          /tmp/rlx-release-venv/bin/python -m pip install "${WHEEL}[quickstart,openenv]"
+          /tmp/arena-release-venv/bin/python -m pip install --upgrade pip
+          /tmp/arena-release-venv/bin/python -m pip install "${WHEEL}[quickstart,openenv]"
           cd /tmp
-          /tmp/rlx-release-venv/bin/rlx --version
-          /tmp/rlx-release-venv/bin/rlx doctor --capability core --json
-          /tmp/rlx-release-venv/bin/rlx schema list --json
-          env PIP_NO_INDEX=1 /tmp/rlx-release-venv/bin/rlx demo handoff --out /tmp/rlx-demo --json
-          env PIP_NO_INDEX=1 /tmp/rlx-release-venv/bin/rlx inspect /tmp/rlx-demo/restored-policy.rlx --json
+          /tmp/arena-release-venv/bin/arena --version
+          /tmp/arena-release-venv/bin/arena doctor --capability core --json
+          /tmp/arena-release-venv/bin/arena schema list --json
+          env PIP_NO_INDEX=1 /tmp/arena-release-venv/bin/arena demo handoff --out /tmp/arena-demo --json
+          env PIP_NO_INDEX=1 /tmp/arena-release-venv/bin/arena inspect /tmp/arena-demo/restored-policy.arena --json
       - name: Prove resolver-isolated Gimitest boundary
         run: |
-          python -m venv /tmp/rlx-gimitest-venv
+          python -m venv /tmp/arena-gimitest-venv
           WHEEL="$(ls dist/*.whl)"
-          /tmp/rlx-gimitest-venv/bin/python -m pip install --upgrade pip
-          /tmp/rlx-gimitest-venv/bin/python -m pip install \
-            "${WHEEL}[torch,pettingzoo]"
-          /tmp/rlx-gimitest-venv/bin/python -m pip install \
+          /tmp/arena-gimitest-venv/bin/python -m pip install --upgrade pip
+          /tmp/arena-gimitest-venv/bin/python -m pip install \
+            "${WHEEL}[torch,pettingzoo,gimitest]"
+          /tmp/arena-gimitest-venv/bin/python -m pip install \
             --no-deps gimitest==1.0
-          export RLX_GIMITEST_PYTHON=/tmp/rlx-gimitest-venv/bin/python
-          /tmp/rlx-release-venv/bin/rlx doctor --capability gimitest --json
-          /tmp/rlx-release-venv/bin/python examples/1.0/run_local_boundaries.py \
-            --out /tmp/rlx-boundary-proof
-          cp /tmp/rlx-boundary-proof/result.json \
+          export ARENA_GIMITEST_PYTHON=/tmp/arena-gimitest-venv/bin/python
+          /tmp/arena-release-venv/bin/arena doctor --capability gimitest --json
+          /tmp/arena-release-venv/bin/python examples/1.0/run_local_boundaries.py \
+            --out /tmp/arena-boundary-proof
+          cp /tmp/arena-boundary-proof/result.json \
             dist/gimitest-boundary-proof.json
       - name: Generate SBOM and audit the exact quickstart environment
         run: |
           cyclonedx-py environment --output-reproducible --output-format JSON \
-            --output-file dist/sbom.cdx.json /tmp/rlx-release-venv/bin/python
+            --output-file dist/sbom.cdx.json /tmp/arena-release-venv/bin/python
           pip-audit --progress-spinner off \
-            --path /tmp/rlx-release-venv/lib/python3.12/site-packages \
+            --path /tmp/arena-release-venv/lib/python3.12/site-packages \
             --format json --output dist/pip-audit.json
-          python scripts/check_pip_audit.py dist/pip-audit.json --allow-unpublished rlx
-          bandit -q -r rlx -ll -f json -o dist/bandit.json
+          python scripts/check_pip_audit.py dist/pip-audit.json --allow-unpublished arena
+          bandit -q -r arena -ll -f json -o dist/bandit.json
           detect-secrets scan --all-files \
             --exclude-files '(^|/)(\.venv|dist|\.git|\.pytest_cache|\.ruff_cache|tests|docs|examples)/' \
             --exclude-files '\.(pt|whl|gz)$' > dist/secrets-scan.json
@@ -85,6 +85,6 @@ jobs:
           sbom-path: dist/sbom.cdx.json
       - uses: actions/upload-artifact@v4
         with:
-          name: rlx-release-${{ github.sha }}
+          name: arena-release-${{ github.sha }}
           path: dist/
           if-no-files-found: error

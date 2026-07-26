@@ -1,4 +1,4 @@
-schema: rlx.task/v0alpha1
+schema: arena.task/v0alpha1
 name: task:openspiel-kuhn-poker@0.5
 adapter: openspiel
 env: openspiel://kuhn_poker
@@ -6,4 +6,4 @@ interaction: aec
 version: open_spiel-2.0.1:kuhn_poker
 packaging:
   kind: openspiel
-digest: sha256:c283caeb446143337077c726927e8fed84a32c1be533bdfde2f66a891c36dd48
+digest: sha256:b21fc650317525b5dce5b67bbc4d176d1b6b64793fe632afcfdb37725f95224a

@@ -2,24 +2,24 @@
 
 from pathlib import Path
 
-from rlx.core.identity import digest_uri, sha256_bytes
-from rlx.core.manifests import (
+from arena.core.identity import digest_uri, sha256_bytes
+from arena.core.manifests import (
     POLICY_SCHEMA,
     dump_yaml,
     load_manifest,
     policy_content_digest,
     validate_policy_manifest,
 )
-from rlx.core.store import LocalStore
+from arena.core.store import LocalStore
 
 
 def test_init_and_put_get(tmp_path: Path) -> None:
     store = LocalStore(tmp_path)
     store.init()
-    assert (tmp_path / ".rlx" / "workspace.toml").exists()
-    digest = store.put_bytes(b"hello-rlx")
+    assert (tmp_path / ".arena" / "workspace.toml").exists()
+    digest = store.put_bytes(b"hello-arena")
     assert digest.startswith("sha256:")
-    assert store.get_bytes(digest) == b"hello-rlx"
+    assert store.get_bytes(digest) == b"hello-arena"
     store.set_ref("policy/demo", digest)
     assert store.get_ref("policy/demo") == digest
 

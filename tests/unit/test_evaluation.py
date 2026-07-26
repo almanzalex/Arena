@@ -12,12 +12,12 @@ import pytest
 pytest.importorskip("torch")
 pytest.importorskip("pettingzoo")
 
-from rlx.conformance.fixtures import build_fixed_action_rps_policy, build_rps_policy
-from rlx.core.errors import SchemaError
-from rlx.core.population import create_population
-from rlx.core.sdk import Policy
-from rlx.core.store import LocalStore
-from rlx.runtime.evaluation import (
+from arena.conformance.fixtures import build_fixed_action_rps_policy, build_rps_policy
+from arena.core.errors import SchemaError
+from arena.core.population import create_population
+from arena.core.sdk import Policy
+from arena.core.store import LocalStore
+from arena.runtime.evaluation import (
     expand_evaluation_cells,
     run_evaluation,
     validate_evaluation,
@@ -32,13 +32,13 @@ def _suite(
     role_swaps: list | None = None,
 ) -> dict:
     suite = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "rps-crossplay",
         "interaction": "parallel",
         "task": {
             "adapter": "pettingzoo-parallel",
-            "env": "rlx/competitive_rps_v0",
-            "version": "rlx-pilot",
+            "env": "arena/competitive_rps_v0",
+            "version": "arena-pilot",
             "config": {"max_cycles": 1},
         },
         "assignments": {
@@ -94,7 +94,7 @@ def test_eval_crossplay_matrix_and_ledger_stable(tmp_path: Path, monkeypatch) ->
         out_dir=tmp_path / "eval1",
         workers=1,
     )
-    from rlx.plugins import interactions
+    from arena.plugins import interactions
 
     real_run = interactions.get_interaction("parallel").run_match
     rendezvous = threading.Barrier(2, timeout=5)
@@ -192,10 +192,10 @@ def test_expand_cartesian_two_populations(tmp_path: Path, monkeypatch) -> None:
         store=store,
     )
     suite = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "cart",
         "interaction": "parallel",
-        "task": {"adapter": "pettingzoo-parallel", "env": "rlx/competitive_rps_v0"},
+        "task": {"adapter": "pettingzoo-parallel", "env": "arena/competitive_rps_v0"},
         "assignments": {
             "player_0": {"kind": "crossplay", "population": pop["digest"]},
             "player_1": {"kind": "crossplay", "population": pop["digest"]},

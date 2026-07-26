@@ -13,10 +13,10 @@ import time
 from pathlib import Path
 from urllib.request import urlopen
 
-from rlx.core.io import publish_directory
-from rlx.core.manifests import dump_json, load_manifest
-from rlx.core.tasks import import_openenv_task, verify_task_equivalence
-from rlx.runtime.evaluation import run_evaluation
+from arena.core.io import publish_directory
+from arena.core.manifests import dump_json, load_manifest
+from arena.core.tasks import import_openenv_task, verify_task_equivalence
+from arena.runtime.evaluation import run_evaluation
 
 
 def _free_port() -> int:
@@ -27,7 +27,7 @@ def _free_port() -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out", default="./rlx-1.0-boundaries")
+    parser.add_argument("--out", default="./arena-1.0-boundaries")
     args = parser.parse_args(argv)
     root = Path(__file__).resolve().parents[2]
     destination = Path(args.out).resolve()
@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
                 [
                     sys.executable,
                     "-m",
-                    "rlx.adapters.task_openenv.server",
+                    "arena.adapters.task_openenv.server",
                     "--port",
                     str(port),
                 ],
@@ -73,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
 
             openenv_task_path = stage / "openenv-rps.yaml"
             openenv_task = import_openenv_task(
-                f"openenv://127.0.0.1:{port}/rlx/competitive_rps_v0",
+                f"openenv://127.0.0.1:{port}/arena/competitive_rps_v0",
                 name="task:rps-openenv@1.0",
                 out=openenv_task_path,
                 source_revision="openenv-0.4.1",
@@ -88,17 +88,17 @@ def main(argv: list[str] | None = None) -> int:
             shared_task_intent = equivalence["shared_task_intent_digest"]
             policies = {
                 "player_0": str(
-                    (root / "examples/eval/demo/rock.rlx").resolve()
+                    (root / "examples/eval/demo/rock.arena").resolve()
                 ),
                 "player_1": str(
-                    (root / "examples/eval/demo/paper.rlx").resolve()
+                    (root / "examples/eval/demo/paper.arena").resolve()
                 ),
             }
 
             def suite(task: dict, *, provider: str = "native", config: dict | None = None):
                 return {
-                    "schema": "rlx.evaluation/v0alpha1",
-                    "name": "rlx-1.0-boundary-proof",
+                    "schema": "arena.evaluation/v0alpha1",
+                    "name": "arena-1.0-boundary-proof",
                     "provider": provider,
                     "provider_config": config or {},
                     "interaction": "parallel",
@@ -114,11 +114,11 @@ def main(argv: list[str] | None = None) -> int:
                     },
                 }
 
-            isolated_python = os.environ.get("RLX_GIMITEST_PYTHON")
+            isolated_python = os.environ.get("ARENA_GIMITEST_PYTHON")
             isolation = (
                 {
                     "mode": "subprocess",
-                    "python": str(Path(isolated_python).resolve()),
+                    "python": str(Path(isolated_python)),
                     "timeout_seconds": 60,
                 }
                 if isolated_python
@@ -155,13 +155,13 @@ def main(argv: list[str] | None = None) -> int:
                     config={
                         "semantic": {
                             "test_class": (
-                                "rlx.adapters.eval_gimitest.scenarios:"
+                                "arena.adapters.eval_gimitest.scenarios:"
                                 "RewardTransformScenario"
                             ),
                             "parameters": {"reward_scale": -1.0},
                         },
                         "test_class": (
-                            "rlx.adapters.eval_gimitest.scenarios:"
+                            "arena.adapters.eval_gimitest.scenarios:"
                             "RewardTransformScenario"
                         ),
                         "parameters": {"reward_scale": -1.0},
@@ -193,7 +193,7 @@ def main(argv: list[str] | None = None) -> int:
             assert transformed["evaluation_intent_digest"] != native["evaluation_intent_digest"]
             result.update(
                 {
-                    "schema": "rlx.local-boundary-proof/v1",
+                    "schema": "arena.local-boundary-proof/v1",
                     "ok": True,
                     "shared_task_intent_digest": shared_task_intent,
                     "evaluation_intent_digest": native[

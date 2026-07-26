@@ -1,4 +1,4 @@
-# RFC 006 — OpenEnv Task Adapter (RLX 0.3)
+# RFC 006 — OpenEnv Task Adapter (Arena 0.3)
 
 **Status:** Accepted in 0.3; typed second-task qualification added in 0.5
 **Date:** 2026-07-21
@@ -6,13 +6,13 @@
 
 ## User promise
 
-Use OpenEnv for **isolated / remote** task execution without changing RLX artifact identity. RLX does **not** reimplement OpenEnv’s container or service layer.
+Use OpenEnv for **isolated / remote** task execution without changing Arena artifact identity. Arena does **not** reimplement OpenEnv’s container or service layer.
 
 ## Schema / CLI
 
 ```text
-rlx task import openenv://… --name task:…@…
-rlx task verify-equivalence <native> <openenv> --trace-suite <yaml>
+arena task import openenv://… --name task:…@…
+arena task verify-equivalence <native> <openenv> --trace-suite <yaml>
 ```
 
 Task manifests gain optional fields:
@@ -59,11 +59,11 @@ Qualify fixture: native RPS (or chosen pilot) + OpenEnv twin; `verify-equivalenc
 
 ## Frozen implementation
 
-- Pilot: `openenv://rlx/competitive_rps_v0`, OpenEnv 0.4.x, Parallel joint-action bridge.
-- Second qualification task: `openenv://rlx/vector_coordination_v0`, typed Box
+- Pilot: `openenv://arena/competitive_rps_v0`, OpenEnv 0.4.x, Parallel joint-action bridge.
+- Second qualification task: `openenv://arena/vector_coordination_v0`, typed Box
   observations and Discrete joint actions over the real service transport.
-- Import pins `/schema`, endpoint, source revision, and an explicit RLX role-space contract.
-- Import pins `rlx.openenv-capabilities/v1` features plus the contract digest.
+- Import pins `/schema`, endpoint, source revision, and an explicit Arena role-space contract.
+- Import pins `arena.openenv-capabilities/v1` features plus the contract digest.
 - `examples/tasks/rps-equivalence.yaml` crosses the real WebSocket serialization boundary.
 - Runtime errors preserve `disconnect`, `container_crash`, `timeout`, and `protocol_error`.
-- Evidence: `tests/acceptance/test_openenv_equivalence.py` and `rlx adapter qualify --peer … --trace-suite …`.
+- Evidence: `tests/acceptance/test_openenv_equivalence.py` and `arena adapter qualify --peer … --trace-suite …`.

@@ -7,13 +7,13 @@ import pytest
 
 pytest.importorskip("torch")
 
-from rlx.adapters.policy_custom_torch import load_runtime, verify_bundle_self
-from rlx.cli.main import main
-from rlx.core.dataset import materialize_dataset, select_episodes
-from rlx.core.errors import ConformanceError, SchemaError
-from rlx.core.manifests import dump_yaml, load_manifest
-from rlx.core.sdk import Policy
-from rlx.runtime.training import run_training_recipe
+from arena.adapters.policy_custom_torch import load_runtime, verify_bundle_self
+from arena.cli.main import main
+from arena.core.dataset import materialize_dataset, select_episodes
+from arena.core.errors import ConformanceError, SchemaError
+from arena.core.manifests import dump_yaml, load_manifest
+from arena.core.sdk import Policy
+from arena.runtime.training import run_training_recipe
 
 
 def _source_run(tmp_path: Path) -> Path:
@@ -21,9 +21,9 @@ def _source_run(tmp_path: Path) -> Path:
     trajectories = run / "trajectories"
     trajectories.mkdir(parents=True)
     episode = {
-        "schema": "rlx.trajectory/v0alpha1",
+        "schema": "arena.trajectory/v0alpha1",
         "seed": 7,
-        "task": {"env": "rlx/competitive_rps_v0"},
+        "task": {"env": "arena/competitive_rps_v0"},
         "agents": ["player_0", "player_1"],
         "role_map": {"player_0": "player_0", "player_1": "player_1"},
         "policies": {},
@@ -53,7 +53,7 @@ def _recipe(
 ) -> Path:
     dump_yaml(
         {
-            "schema": "rlx.train/v1",
+            "schema": "arena.train/v1",
             "name": "imitate-paper",
             "algorithm": algorithm,
             "algorithm_config": algorithm_config or {},
@@ -102,11 +102,11 @@ def test_select_materialize_train_verify_and_reuse(tmp_path: Path) -> None:
     (source_run / "trajectories" / "episode_0000.json").unlink()
     recipe = _recipe(tmp_path / "recipe.yaml", portable_dir / "dataset.yaml")
     result = run_training_recipe(recipe, out_dir=tmp_path / "train-run")
-    assert result["schema"] == "rlx.train-run/v1"
+    assert result["schema"] == "arena.train-run/v1"
     assert result["examples"] == 4
     assert result["loss"]["final"] < result["loss"]["initial"]
 
-    bundle = tmp_path / "train-run" / "policy.rlx"
+    bundle = tmp_path / "train-run" / "policy.arena"
     policy = Policy.load(bundle)
     assert result["output_policy"]["digest"] == policy.digest
     assert verify_bundle_self(bundle)["verify_mode"] == "source-conformance"
@@ -156,9 +156,9 @@ def test_return_weighted_trainer_is_distinct_seeded_registry_case(
     trajectories.mkdir(parents=True)
     for index, (action, episode_return) in enumerate(((0, -5.0), (2, 5.0))):
         episode = {
-            "schema": "rlx.trajectory/v0alpha1",
+            "schema": "arena.trajectory/v0alpha1",
             "seed": index,
-            "task": {"env": "rlx/competitive_rps_v0"},
+            "task": {"env": "arena/competitive_rps_v0"},
             "agents": ["player_0", "player_1"],
             "role_map": {"player_0": "player_0", "player_1": "player_1"},
             "policies": {},
@@ -193,7 +193,7 @@ def test_return_weighted_trainer_is_distinct_seeded_registry_case(
     assert first["algorithm"] == "return_weighted_regression"
     assert first["sample_weights"]["max"] > first["sample_weights"]["min"]
     assert first["output_policy"]["digest"] == second["output_policy"]["digest"]
-    assert load_runtime(tmp_path / "weighted-a" / "policy.rlx").act(0) == 2
+    assert load_runtime(tmp_path / "weighted-a" / "policy.arena").act(0) == 2
 
 
 def test_materialized_dataset_splits_are_portable_and_seeded(

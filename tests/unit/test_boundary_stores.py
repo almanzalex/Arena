@@ -5,32 +5,32 @@ from urllib.parse import quote
 
 import pytest
 
-from rlx.cli.main import main
-from rlx.conformance.qualification import qualify_store
-from rlx.core.errors import StoreError
-from rlx.core.mirror import pull_artifact, push_artifact
-from rlx.core.registry import capability_matrix
-from rlx.core.sdk import Policy
+from arena.cli.main import main
+from arena.conformance.qualification import qualify_store
+from arena.core.errors import StoreError
+from arena.core.mirror import pull_artifact, push_artifact
+from arena.core.registry import capability_matrix
+from arena.core.sdk import Policy
 
 
 @pytest.mark.parametrize(
     "base",
     [
-        "hf://models/lab/rlx",
-        "oci://registry.example/lab/rlx",
-        "wandb://lab/project/rlx",
-        "mlflow://rlx-experiment",
+        "hf://models/lab/arena",
+        "oci://registry.example/lab/arena",
+        "wandb://lab/project/arena",
+        "mlflow://arena-experiment",
     ],
 )
 def test_remote_store_simulations_preserve_policy_identity(tmp_path: Path, base: str) -> None:
-    source = Path("examples/eval/demo/rock.rlx").resolve()
+    source = Path("examples/eval/demo/rock.arena").resolve()
     expected = Policy.load(source).digest
     mirror = tmp_path / "mirror"
     destination = f"{base}?simulate={quote(str(mirror), safe='/')}"
     pushed = push_artifact(source, destination, verify=True)
     assert pushed["identity"] == expected
     assert pushed["uri"].startswith(base)
-    restored = tmp_path / "restored.rlx"
+    restored = tmp_path / "restored.arena"
     pulled = pull_artifact(pushed["uri"], restored, verify=True)
     assert pulled["verified"] is True
     assert Policy.load(restored).digest == expected
@@ -40,8 +40,8 @@ def test_store_simulation_path_must_be_absolute(tmp_path: Path) -> None:
     del tmp_path
     with pytest.raises(StoreError, match="simulate.*absolute"):
         push_artifact(
-            "examples/eval/demo/rock.rlx",
-            "oci://registry.example/lab/rlx?simulate=relative/path",
+            "examples/eval/demo/rock.arena",
+            "oci://registry.example/lab/arena?simulate=relative/path",
             verify=True,
         )
 
@@ -55,7 +55,7 @@ def test_boundary_stores_are_registered() -> None:
 def test_store_qualification_labels_simulation_and_cli(
     tmp_path: Path,
 ) -> None:
-    source = Path("examples/eval/demo/rock.rlx").resolve()
+    source = Path("examples/eval/demo/rock.arena").resolve()
     destination = (
         "oci://registry.example/lab/qualified"
         f"?simulate={quote(str((tmp_path / 'mirror').resolve()), safe='/')}"
@@ -66,7 +66,7 @@ def test_store_qualification_labels_simulation_and_cli(
         destination=destination,
         report_path=report_path,
     )
-    assert report["schema"] == "rlx.store-qualification/v1"
+    assert report["schema"] == "arena.store-qualification/v1"
     assert report["mode"] == "simulation"
     assert report["ok"] is True
     assert report["checks"]["identity_preserved"]["ok"] is True

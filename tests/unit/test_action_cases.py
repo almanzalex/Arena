@@ -17,22 +17,22 @@ import pytest
 torch = pytest.importorskip("torch")
 nn = torch.nn
 
-from rlx.adapters.policy_custom_torch import (  # noqa: E402
+from arena.adapters.policy_custom_torch import (  # noqa: E402
     export_module_policy,
     load_runtime,
     verify_bundle_integrity,
     verify_bundle_self,
 )
-from rlx.core.action_cases import (  # noqa: E402
+from arena.core.action_cases import (  # noqa: E402
     decode_action_from_params,
     validate_action_case,
     validate_expected_action,
     validate_runtime_action,
 )
-from rlx.core.errors import ConformanceError, RuntimeFailure, SchemaError  # noqa: E402
-from rlx.core.manifests import load_manifest  # noqa: E402
-from rlx.runtime.match import _validate_action  # noqa: E402
-from rlx.runtime.trajectory import TrajectoryWriter, inspect_trajectory  # noqa: E402
+from arena.core.errors import ConformanceError, RuntimeFailure, SchemaError  # noqa: E402
+from arena.core.manifests import load_manifest  # noqa: E402
+from arena.runtime.match import _validate_action  # noqa: E402
+from arena.runtime.trajectory import TrajectoryWriter, inspect_trajectory  # noqa: E402
 
 
 def _obs() -> dict:
@@ -183,7 +183,7 @@ def _source_dict(case: dict) -> dict:
 def test_incomplete_action_cases_publish_no_bundle(
     tmp_path: Path, action: dict, message: str
 ) -> None:
-    out = tmp_path / "must-not-exist.rlx"
+    out = tmp_path / "must-not-exist.arena"
     with pytest.raises(SchemaError, match=message):
         export_module_policy(
             out_dir=out,
@@ -205,7 +205,7 @@ def test_incomplete_action_cases_publish_no_bundle(
 @pytest.mark.requires_torch
 def test_complete_multidiscrete_export_verify_act(tmp_path: Path) -> None:
     bundle = export_module_policy(
-        out_dir=tmp_path / "md.rlx",
+        out_dir=tmp_path / "md.arena",
         name="md",
         roles=["agent"],
         module=MultiDiscreteActor(),
@@ -230,7 +230,7 @@ def test_complete_multidiscrete_export_verify_act(tmp_path: Path) -> None:
 @pytest.mark.requires_torch
 def test_complete_gaussian_seeded_conformance_and_negatives(tmp_path: Path) -> None:
     bundle = export_module_policy(
-        out_dir=tmp_path / "g.rlx",
+        out_dir=tmp_path / "g.arena",
         name="gauss",
         roles=["agent"],
         module=GaussianActor(),
@@ -286,8 +286,8 @@ def test_complete_gaussian_seeded_conformance_and_negatives(tmp_path: Path) -> N
     )
     # Digest will fail integrity first — rewrite digest via verify path after
     # integrity bypass: load_runtime checks digests. Patch digest for this negative.
-    from rlx.core.identity import digest_uri, sha256_file
-    from rlx.core.manifests import dump_yaml
+    from arena.core.identity import digest_uri, sha256_file
+    from arena.core.manifests import dump_yaml
 
     manifest = load_manifest(bundle / "policy.yaml")
     manifest["payloads"]["reference_cases"]["digest"] = digest_uri(sha256_file(path))
@@ -302,7 +302,7 @@ def test_wrong_transform_order_rejected_at_export(tmp_path: Path) -> None:
     bad["transform"] = {"order": ["sample", "affine", "tanh"]}
     with pytest.raises(SchemaError, match="transform.order"):
         export_module_policy(
-            out_dir=tmp_path / "bad-order.rlx",
+            out_dir=tmp_path / "bad-order.arena",
             name="bad",
             roles=["agent"],
             module=GaussianActor(),
@@ -315,7 +315,7 @@ def test_wrong_transform_order_rejected_at_export(tmp_path: Path) -> None:
 @pytest.mark.requires_torch
 def test_complete_dict_export_and_key_mismatch(tmp_path: Path) -> None:
     bundle = export_module_policy(
-        out_dir=tmp_path / "d.rlx",
+        out_dir=tmp_path / "d.arena",
         name="dict",
         roles=["agent"],
         module=DictActor(),
@@ -364,7 +364,7 @@ def test_illegal_expected_actions_refuse_verify(tmp_path: Path) -> None:
         )
 
     bundle = export_module_policy(
-        out_dir=tmp_path / "md.rlx",
+        out_dir=tmp_path / "md.arena",
         name="md",
         roles=["agent"],
         module=MultiDiscreteActor(),
@@ -389,8 +389,8 @@ def test_illegal_expected_actions_refuse_verify(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    from rlx.core.identity import digest_uri, sha256_file
-    from rlx.core.manifests import dump_yaml
+    from arena.core.identity import digest_uri, sha256_file
+    from arena.core.manifests import dump_yaml
 
     manifest = load_manifest(bundle / "policy.yaml")
     manifest["payloads"]["reference_cases"]["digest"] = digest_uri(sha256_file(cases_path))
@@ -473,7 +473,7 @@ def test_match_validate_action_all_cases() -> None:
 def test_trajectory_roundtrip_non_discrete(tmp_path: Path) -> None:
     writer = TrajectoryWriter(tmp_path / "traj")
     episode = {
-        "schema": "rlx.trajectory/v0alpha1",
+        "schema": "arena.trajectory/v0alpha1",
         "episode_index": 0,
         "seed": 1,
         "status": "completed",
@@ -523,7 +523,7 @@ def test_trajectory_roundtrip_non_discrete(tmp_path: Path) -> None:
 @pytest.mark.requires_torch
 def test_tamper_still_detected_for_multidiscrete_bundle(tmp_path: Path) -> None:
     bundle = export_module_policy(
-        out_dir=tmp_path / "md.rlx",
+        out_dir=tmp_path / "md.arena",
         name="md",
         roles=["agent"],
         module=MultiDiscreteActor(),
@@ -551,7 +551,7 @@ def test_deterministic_box_refuses_stochastic_without_gaussian_case(tmp_path: Pa
             return torch.tanh(observation[:, :2])
 
     bundle = export_module_policy(
-        out_dir=tmp_path / "box.rlx",
+        out_dir=tmp_path / "box.arena",
         name="box",
         roles=["agent"],
         module=Bounded(),

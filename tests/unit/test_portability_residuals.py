@@ -5,16 +5,16 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from rlx.adapters.policy_custom_torch.preprocess import PreprocessPipeline
-from rlx.core.errors import ConformanceError, SchemaError
-from rlx.runtime.match import _validate_action
+from arena.adapters.policy_custom_torch.preprocess import PreprocessPipeline
+from arena.core.errors import ConformanceError, SchemaError
+from arena.runtime.match import _validate_action
 
 
 def test_hwc_to_chw_norm_and_frame_stack_are_explicit_and_stateful() -> None:
     pipe = PreprocessPipeline(
         {
             "pipeline": {
-                "version": "rlx.preprocess/v1",
+                "version": "arena.preprocess/v1",
                 "steps": [
                     {"op": "layout", "from": "HWC", "to": "CHW"},
                     {"op": "running_norm", "mean": 1.0, "std": 2.0},
@@ -35,14 +35,14 @@ def test_hwc_to_chw_norm_and_frame_stack_are_explicit_and_stateful() -> None:
 
 def test_image_pipeline_refuses_shape_or_layout_lies() -> None:
     pipe = PreprocessPipeline(
-        {"pipeline": {"version": "rlx.preprocess/v1", "steps": [{"op": "layout", "from": "HWC", "to": "CHW"}]}},
+        {"pipeline": {"version": "arena.preprocess/v1", "steps": [{"op": "layout", "from": "HWC", "to": "CHW"}]}},
         {"type": "Box", "shape": [2, 3, 1], "layout": "HWC"},
     )
     with pytest.raises(ConformanceError, match="raw observation shape"):
         pipe(np.ones((1, 2, 3), dtype=np.float32))
     with pytest.raises(ConformanceError, match="rank-3"):
         PreprocessPipeline(
-            {"pipeline": {"version": "rlx.preprocess/v1", "steps": [{"op": "layout", "from": "HWC", "to": "CHW"}]}},
+            {"pipeline": {"version": "arena.preprocess/v1", "steps": [{"op": "layout", "from": "HWC", "to": "CHW"}]}},
             {"type": "Box", "shape": [6], "layout": None},
         )(np.ones(6, dtype=np.float32))
 
@@ -68,7 +68,7 @@ def test_box_actions_are_checked_without_clipping() -> None:
 
 def test_unknown_preprocess_op_fails_loudly() -> None:
     pipe = PreprocessPipeline(
-        {"pipeline": {"version": "rlx.preprocess/v1", "steps": [{"op": "invented"}]}},
+        {"pipeline": {"version": "arena.preprocess/v1", "steps": [{"op": "invented"}]}},
         {"type": "Box", "shape": [2]},
     )
     with pytest.raises(SchemaError, match="Unknown preprocess|unknown preprocessing|extension"):

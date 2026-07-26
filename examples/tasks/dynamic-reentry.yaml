@@ -1,7 +1,7 @@
-schema: rlx.task/v0alpha1
+schema: arena.task/v0alpha1
 name: task:dynamic-reentry@0.5
 adapter: pettingzoo-parallel
-env: rlx/dynamic_reentry_aec_v0
+env: arena/dynamic_reentry_aec_v0
 interaction: dynamic_aec
 version: pilot+pettingzoo-1.25.0
 packaging:
@@ -18,4 +18,4 @@ lifecycle:
     join_eligibility:
       contestant:
         - sha256:0000000000000000000000000000000000000000000000000000000000000000
-digest: sha256:704aaa2f834a619e35513a82827334719f020801b8138a1ecbc951bfb12a3db9
+digest: sha256:57f33b400860ef015a081d517bf50579dc298ce3a878ae25e98be9cb4fc9c9ec

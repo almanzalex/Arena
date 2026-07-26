@@ -1,4 +1,4 @@
-# RLX 1.0.0rc1
+# Arena 1.0.0rc1
 
 Local-first Python CLI/SDK for **verifiable RL policy and evaluation handoff**
 across native and qualified external task runtimes, evaluation providers, and
@@ -17,21 +17,21 @@ gates are all attached to the exact release commit.
 ## Three-command verified handoff
 
 ```bash
-python -m pip install 'rlx[quickstart]==1.0.0rc1'
-rlx demo handoff --out ./rlx-demo
-rlx inspect ./rlx-demo/restored-policy.rlx
+python -m pip install 'arena[quickstart]==1.0.0rc1'
+arena demo handoff --out ./arena-demo
+arena inspect ./arena-demo/restored-policy.arena
 ```
 
 The demo is source-free and network-free after installation. It exports a
 packaged reference policy, verifies it, mirrors it through `file://`, pulls it
 to a new path, proves the digest is unchanged, and prints an evaluation-intent
 digest plus the next external-runtime step. It stages the entire destination,
-so interruption cannot leave `./rlx-demo` looking complete.
+so interruption cannot leave `./arena-demo` looking complete.
 
 ## 1.0 support truth
 
-The installed [`rlx/support-matrix.json`](rlx/support-matrix.json) is the source
-of truth used by `rlx doctor`; [`rlx/schema-registry.json`](rlx/schema-registry.json)
+The installed [`arena/support-matrix.json`](arena/support-matrix.json) is the source
+of truth used by `arena doctor`; [`arena/schema-registry.json`](arena/schema-registry.json)
 freezes the reader/writer compatibility contract.
 
 | Capability | RC status | Final 1.0 condition |
@@ -44,28 +44,28 @@ freezes the reader/writer compatibility contract.
 | OCI, W&B, MLflow | preview | May remain preview; never simulated into a live claim |
 
 ```bash
-rlx --version
-rlx doctor --json
-rlx schema list --json
+arena --version
+arena doctor --json
+arena schema list --json
 ```
 
 ## MVP workflow (0.1 portable policy)
 
 ```bash
-pip install 'rlx[all]'
+pip install 'arena[all]'
 
 # Researcher A
-rlx init
-rlx policy export --adapter custom-pytorch --source checkpoint.pt \
+arena init
+arena policy export --adapter custom-pytorch --source checkpoint.pt \
   --role player_0 --spec examples/handoff/export_spec_player_0.yaml \
-  --out ./artifacts/player_0.rlx
-rlx policy verify ./artifacts/player_0.rlx
+  --out ./artifacts/player_0.arena
+arena policy verify ./artifacts/player_0.arena
 
 # Researcher B (clean machine, no training repo)
-rlx inspect ./artifacts/player_0.rlx
-rlx check rlx/competitive_rps_v0 ./artifacts/player_0.rlx --role player_0
-rlx match run match.yaml --record --out ./runs/baseline-match
-rlx data inspect ./runs/baseline-match/trajectories
+arena inspect ./artifacts/player_0.arena
+arena check arena/competitive_rps_v0 ./artifacts/player_0.arena --role player_0
+arena match run match.yaml --record --out ./runs/baseline-match
+arena data inspect ./runs/baseline-match/trajectories
 ```
 
 ## Evaluation workflow (0.2)
@@ -73,18 +73,18 @@ rlx data inspect ./runs/baseline-match/trajectories
 Runnable cyclic RPS demo (checked in under `examples/eval/demo/`):
 
 ```bash
-pip install -e '.[torch,pettingzoo]'   # or 'rlx[torch,pettingzoo]'
+pip install -e '.[torch,pettingzoo]'   # or 'arena[torch,pettingzoo]'
 bash examples/eval/run_demo.sh
 ```
 
 Manual flow:
 
 ```bash
-rlx population create ./population.yaml --ref populations/opponents
-rlx eval run ./evaluation.yaml --policy … --population … --out ./eval-runs/x
-rlx eval report ./eval-runs/x --json
-rlx data select ./eval-runs/x --out ./datasets/losses --outcome loss
-rlx eval bundle ./eval-runs/x --out ./bundles/x
+arena population create ./population.yaml --ref populations/opponents
+arena eval run ./evaluation.yaml --policy … --population … --out ./eval-runs/x
+arena eval report ./eval-runs/x --json
+arena data select ./eval-runs/x --out ./datasets/losses --outcome loss
+arena eval bundle ./eval-runs/x --out ./bundles/x
 ```
 
 See [docs/populations.md](docs/populations.md), [docs/evaluation.md](docs/evaluation.md),
@@ -106,21 +106,21 @@ Deferred items: [docs/0.2-revisit.md](docs/0.2-revisit.md).
 
 ```bash
 # OpenEnv: launch/import the frozen RPS pilot, then prove native↔remote semantics.
-pip install 'rlx[openenv]'
-python -m rlx.adapters.task_openenv.server --port 8000
-rlx task import openenv://127.0.0.1:8000/rlx/competitive_rps_v0 \
+pip install 'arena[openenv]'
+python -m arena.adapters.task_openenv.server --port 8000
+arena task import openenv://127.0.0.1:8000/arena/competitive_rps_v0 \
   --name task:rps-openenv@0.3 --source-revision openenv-0.4.1
-rlx task verify-equivalence examples/tasks/native-rps.yaml task-rps-openenv-0.3.yaml \
+arena task verify-equivalence examples/tasks/native-rps.yaml task-rps-openenv-0.3.yaml \
   --trace-suite examples/tasks/rps-equivalence.yaml
 
 # OpenSpiel: deterministic frozen catalog with checked reference traces.
-pip install 'rlx[openspiel]'
-rlx task verify-equivalence examples/tasks/openspiel-connect-four.yaml \
+pip install 'arena[openspiel]'
+arena task verify-equivalence examples/tasks/openspiel-connect-four.yaml \
   --trace-suite examples/tasks/openspiel-connect-four-trace.yaml
 
 # Artifact mirrors preserve the policy's sha256 identity.
-rlx push examples/eval/demo/rock.rlx file:///tmp/rlx-mirror --verify
-rlx pull 'file:///tmp/rlx-mirror#sha256:…' --verify
+arena push examples/eval/demo/rock.arena file:///tmp/arena-mirror --verify
+arena pull 'file:///tmp/arena-mirror#sha256:…' --verify
 ```
 
 See [external tasks](docs/external-tasks.md), [evaluation providers](docs/eval-providers.md),
@@ -130,26 +130,26 @@ and [external stores](docs/external-stores.md).
 
 ```bash
 # Match/eval with forced agent birth + removal and explicit digest eligibility.
-rlx match run dynamic-match.yaml --out dynamic-run
+arena match run dynamic-match.yaml --out dynamic-run
 
 # Turn selected trajectories into a source-independent dataset, then train/reuse.
 # Content-stable train/validation splits.
-rlx data materialize selected/dataset.yaml --out portable-dataset \
+arena data materialize selected/dataset.yaml --out portable-dataset \
   --split train=.8 --split validation=.2 --split-seed 17
-rlx train behavior-cloning.yaml --out training-run
-rlx policy verify training-run/policy.rlx
+arena train behavior-cloning.yaml --out training-run
+arena policy verify training-run/policy.arena
 
 # Produce machine-readable push/pull evidence for any store implementation.
-rlx store qualify training-run/policy.rlx \
-  'oci://registry.example/lab/rlx?simulate=/tmp/rlx-oci' \
+arena store qualify training-run/policy.arena \
+  'oci://registry.example/lab/arena?simulate=/tmp/arena-oci' \
   --out store-qualification.json
 
 # Sign the artifact identity with a user-owned key; the detached signature remains
 # valid after any identity-preserving mirror round trip.
-rlx attest keygen --private lab-private.pem --public lab-public.pem
-rlx attest sign training-run/policy.rlx --key lab-private.pem \
+arena attest keygen --private lab-private.pem --public lab-public.pem
+arena attest sign training-run/policy.arena --key lab-private.pem \
   --issuer my-lab --out policy.attestation.json
-rlx attest verify training-run/policy.rlx policy.attestation.json \
+arena attest verify training-run/policy.arena policy.attestation.json \
   --key lab-public.pem
 
 # Run lifecycle re-entry, split/train/resume/reuse, three game semantics,
@@ -164,18 +164,18 @@ and the [0.5 boundary record](docs/0.5-boundaries.md).
 
 | | |
 |--|--|
-| **Task** | Bundled PettingZoo Parallel competitive RPS (`rlx/competitive_rps_v0`); AEC twin `rlx/competitive_rps_aec_v0` |
+| **Task** | Bundled PettingZoo Parallel competitive RPS (`arena/competitive_rps_v0`); AEC twin `arena/competitive_rps_aec_v0` |
 | **Policies** | Declarative custom-PyTorch categorical actors (`mlp_categorical` / `gru_categorical`) |
 
 See [rfcs/000-product-boundary.md](rfcs/000-product-boundary.md), [rfcs/001-portable-policy-contract.md](rfcs/001-portable-policy-contract.md), [rfcs/003-populations.md](rfcs/003-populations.md), [rfcs/004-evaluation.md](rfcs/004-evaluation.md).
 
 ## Portable actor boundaries (0.1)
 
-RLX supports fixed categorical templates and a narrow bring-your-own subset via an
+Arena supports fixed categorical templates and a narrow bring-your-own subset via an
 **axes + case registry**: new messy lab scenarios are handled by registering
 cases, not by reactive core patches. Dispatch is always `registry.get(kind)`;
 unknown kinds fail loud with an extension recipe (interface, tests, and
-`rlx adapter qualify` before claiming support). No silent coerce/flatten/pad.
+`arena adapter qualify` before claiming support). No silent coerce/flatten/pad.
 
 A scriptable TorchScript tensor actor is the preferred BYO payload (script-first;
 trace is explicit opt-in). The actor must declare `forward(obs[, hidden][, action_mask])`,
@@ -183,12 +183,12 @@ recurrence/hidden shape, preprocessing/layout, and action semantics. The receive
 imports no trainer package.
 
 - Image observations must declare `layout: CHW|HWC`; preprocessing uses a
-  serializable `rlx.preprocess/v1` pipeline (layout, running normalization, clipping,
+  serializable `arena.preprocess/v1` pipeline (layout, running normalization, clipping,
   frame stack, flatten) via registered preprocess ops. Shape changes are errors.
 - PettingZoo tasks may declare a SuperSuit wrapper chain (`color_reduction`,
   `resize`, `frame_stack`) plus `observation_layout` so `check`/`match` use the
   **wrapped** spaces. Unknown/missing wrappers fail loud via the wrapper registry.
-- BYO TorchScript export is available via `rlx policy export --module pkg:factory`
+- BYO TorchScript export is available via `arena policy export --module pkg:factory`
   or `export_module_policy()`. Opt-in `trusted_source` (digest-pinned `.py`,
   `--trust-source`) exists but is **not sandboxed** and is not the default.
 - Discrete actors support explicit in-graph masks. Deterministic bounded `Box`
@@ -198,9 +198,9 @@ imports no trainer package.
 - Task packaging defaults to `pettingzoo_wrappers`; opt-in `entrypoint_bundle`
   (digest-pinned env entrypoint, `--trust-task-code`) is registry-backed and
   refused by default.
-- `rlx capture --task …` drafts spaces/action cases from a live env (best-effort;
+- `arena capture --task …` drafts spaces/action cases from a live env (best-effort;
   human confirms before publish).
-- `rlx policy verify` requires source-captured evidence by default.
+- `arena policy verify` requires source-captured evidence by default.
 
 TorchScript is a portability format, not a malware sandbox: only load policy bundles
 from a trusted lab/source. Full-module pickle checkpoints remain refused by default.
@@ -233,10 +233,10 @@ Capability claims are limited to **registry-registered + qualified** cases.
 
 ### How to add a case
 
-1. Implement the axis interface under `rlx/plugins/` (e.g. `ActionCase`, `DistributionCase`, `PreprocessOp`, `WrapperOp`, `PayloadCase`, `TaskPackager`).
-2. Register it (`register_action_case(kind, case)`, etc., or an entry point group `rlx.plugins`).
+1. Implement the axis interface under `arena/plugins/` (e.g. `ActionCase`, `DistributionCase`, `PreprocessOp`, `WrapperOp`, `PayloadCase`, `TaskPackager`).
+2. Register it (`register_action_case(kind, case)`, etc., or an entry point group `arena.plugins`).
 3. Add fail-loud incomplete-claim tests and a complete end-to-end export/verify/act test.
-4. Run `rlx adapter qualify <fixture>` on a fixture that exercises the new case before claiming support.
+4. Run `arena adapter qualify <fixture>` on a fixture that exercises the new case before claiming support.
 
 Every rejected category fails before a final bundle is published. The error names the
 missing semantic contract and a safe repair; no action is coerced, flattened, reordered,
@@ -247,12 +247,13 @@ clipped, or approximated.
 ```bash
 pip install -e '.[dev]'   # from a checkout
 # or
-pip install 'rlx[torch,pettingzoo]'
-pip install 'rlx[openenv]'    # optional external task runtime
-pip install 'rlx[openspiel]'  # optional frozen game adapter
-pip install 'rlx[hf]'         # optional Hugging Face mirror
-pip install 'rlx[wandb]'      # optional W&B artifact mirror
-pip install 'rlx[mlflow]'     # optional MLflow artifact mirror
+pip install 'arena[torch,pettingzoo]'
+pip install 'arena[openenv]'    # optional external task runtime
+pip install 'arena[openspiel]'  # optional frozen game adapter
+pip install 'arena[gimitest]'   # Gimitest worker support; install provider separately
+pip install 'arena[hf]'         # optional Hugging Face mirror
+pip install 'arena[wandb]'      # optional W&B artifact mirror
+pip install 'arena[mlflow]'     # optional MLflow artifact mirror
 # OCI uses the ORAS CLI and its normal `oras login` credentials.
 ```
 
@@ -289,7 +290,7 @@ The strongest automated approximation of the human clean-room step lives in
 `tests/acceptance/test_u01_hermetic.py`. It builds a real wheel + sdist
 (`python -m build`), installs **only the wheel** into a throwaway
 `python3.12 -m venv` with a scrubbed `HOME`/`XDG`/`PYTHONPATH` (no repo on the
-import path), copies in **only** the `.rlx` bundles + `match.yaml` + the guide,
+import path), copies in **only** the `.arena` bundles + `match.yaml` + the guide,
 disables the network, and runs the commands **parsed out of** `docs/clean-room.md`
 in order. If Docker is present it also runs the same flow in a minimal
 `python:3.12-slim` image with `--network none`.
@@ -301,7 +302,7 @@ pytest -m docker -q          # only the Docker --network none variant
 
 These gates are marked `slow`/`docker` and deselected from the default run. In
 CI they run as a separate `hermetic` job (see `.github/workflows/ci.yml`). A CPU
-torch index can be supplied via `RLX_TORCH_INDEX_URL` to avoid large CUDA wheels.
+torch index can be supplied via `ARENA_TORCH_INDEX_URL` to avoid large CUDA wheels.
 See [docs/clean-room.md](docs/clean-room.md) for the coverage matrix, the
 machine-parseable command block, and the design of a third (LLM-reader) technique.
 See [docs/adapter-qualification.md](docs/adapter-qualification.md) for the
@@ -311,10 +312,10 @@ evidence required before an adapter is called supported, and
 ## Layout
 
 ```text
-rlx/
+arena/
   core/           # manifests, store, compatibility, SDK, registry, capture, population, dataset
   plugins/        # axis case registrations (action, samplers, metrics, …)
-  cli/            # rlx commands
+  cli/            # arena commands
   runtime/        # match + fixed/dynamic AEC + evaluation + training + trajectories
   conformance/    # fixtures F1–F6
   adapters/
@@ -327,7 +328,7 @@ rlx/
 
 ## Deliberate 1.0 boundaries
 
-No hosted RLX service/auth, provider billing/dashboard replacement, universal OpenSpiel
+No hosted Arena service/auth, provider billing/dashboard replacement, universal OpenSpiel
 catalog, arbitrary online RL algorithm, silent lifecycle inference, artifact certificate
 authority/revocation service, or silent Elo-only ranking. Live remote smokes require the
 user's own credentials and are never conflated with `?simulate=` evidence. The exact

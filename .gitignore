@@ -1,4 +1,4 @@
-.rlx/
+.arena/
 .demo/
 examples/handoff/.demo/
 __pycache__/
@@ -18,7 +18,7 @@ artifacts/
 *.pt
 !examples/eval/demo/**/*.pt
 .DS_Store
-examples/eval/demo/.rlx/
+examples/eval/demo/.arena/
 examples/eval/demo/eval-run/
 examples/eval/demo/slice/
 examples/eval/demo/bundle/

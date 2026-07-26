@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from rlx.core.errors import SchemaError
-from rlx.core.manifests import (
+from arena.core.errors import SchemaError
+from arena.core.manifests import (
     EVALUATION_SCHEMA,
     POPULATION_SCHEMA,
     evaluation_content_digest,
@@ -21,7 +21,7 @@ def test_population_requires_digest_members() -> None:
             {
                 "schema": POPULATION_SCHEMA,
                 "name": "x",
-                "members": [{"policy": "./local.rlx"}],
+                "members": [{"policy": "./local.arena"}],
             }
         )
 
@@ -46,7 +46,7 @@ def test_evaluation_requires_transform_on_role_swap() -> None:
             {
                 "schema": EVALUATION_SCHEMA,
                 "name": "e",
-                "task": {"adapter": "pettingzoo-parallel", "env": "rlx/competitive_rps_v0"},
+                "task": {"adapter": "pettingzoo-parallel", "env": "arena/competitive_rps_v0"},
                 "assignments": {"player_0": "sha256:" + "c" * 64},
                 "seeds": [0],
                 "action_mode": "deterministic",
@@ -61,7 +61,7 @@ def test_evaluation_digest_stable() -> None:
         {
             "schema": EVALUATION_SCHEMA,
             "name": "e",
-            "task": {"adapter": "pettingzoo-parallel", "env": "rlx/competitive_rps_v0"},
+            "task": {"adapter": "pettingzoo-parallel", "env": "arena/competitive_rps_v0"},
             "assignments": {
                 "player_0": {"kind": "policy", "policy": "sha256:" + "c" * 64},
                 "player_1": {"kind": "crossplay", "population": "sha256:" + "d" * 64},

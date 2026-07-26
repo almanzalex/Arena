@@ -5,14 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from rlx.adapters.policy_custom_torch import (
+from arena.adapters.policy_custom_torch import (
     _embed_reference_cases,
     generate_reference_cases,
     load_runtime,
 )
-from rlx.conformance.fixtures import build_fixed_action_rps_policy
-from rlx.core.manifests import dump_yaml
-from rlx.core.sdk import Policy
+from arena.conformance.fixtures import build_fixed_action_rps_policy
+from arena.core.manifests import dump_yaml
+from arena.core.sdk import Policy
 
 
 def _with_source_cases(bundle: Path) -> Path:
@@ -35,32 +35,32 @@ def build_cyclic_rps_eval_fixture(root: Path, *, interaction: str = "parallel") 
     root.mkdir(parents=True, exist_ok=True)
     roles = ["player_0", "player_1"]
     rock = _with_source_cases(
-        build_fixed_action_rps_policy(root / "rock.rlx", role=roles, action=0, name="rock")
+        build_fixed_action_rps_policy(root / "rock.arena", role=roles, action=0, name="rock")
     )
     paper = _with_source_cases(
-        build_fixed_action_rps_policy(root / "paper.rlx", role=roles, action=1, name="paper")
+        build_fixed_action_rps_policy(root / "paper.arena", role=roles, action=1, name="paper")
     )
     scissors = _with_source_cases(
-        build_fixed_action_rps_policy(root / "scissors.rlx", role=roles, action=2, name="scissors")
+        build_fixed_action_rps_policy(root / "scissors.arena", role=roles, action=2, name="scissors")
     )
     env = (
-        "rlx/competitive_rps_aec_v0"
+        "arena/competitive_rps_aec_v0"
         if interaction == "aec"
-        else "rlx/competitive_rps_v0"
+        else "arena/competitive_rps_v0"
     )
     population = {
-        "schema": "rlx.population/v0alpha1",
+        "schema": "arena.population/v0alpha1",
         "name": "cyclic-rps",
         "members": [
-            {"policy": "./rock.rlx", "weight": 1.0, "tags": ["rock"]},
-            {"policy": "./paper.rlx", "weight": 1.0, "tags": ["paper"]},
-            {"policy": "./scissors.rlx", "weight": 1.0, "tags": ["scissors"]},
+            {"policy": "./rock.arena", "weight": 1.0, "tags": ["rock"]},
+            {"policy": "./paper.arena", "weight": 1.0, "tags": ["paper"]},
+            {"policy": "./scissors.arena", "weight": 1.0, "tags": ["scissors"]},
         ],
     }
     pop_path = root / "population.yaml"
     dump_yaml(population, pop_path)
     evaluation = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "cyclic-matrix",
         "interaction": interaction,
         "task": {

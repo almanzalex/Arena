@@ -1,22 +1,22 @@
-schema: rlx.evaluation/v0alpha1
+schema: arena.evaluation/v0alpha1
 name: rps-gimitest-robustness
 provider: gimitest
 provider_config:
   suite: base-hooks
-  test_class: rlx.adapters.eval_gimitest.scenarios:RewardTransformScenario
+  test_class: arena.adapters.eval_gimitest.scenarios:RewardTransformScenario
   parameters:
-    purpose: RLX non-no-op provider qualification
+    purpose: Arena non-no-op provider qualification
     reward_scale: -1.0
 interaction: parallel
 task:
   adapter: pettingzoo-parallel
-  env: rlx/competitive_rps_v0
+  env: arena/competitive_rps_v0
   interaction: parallel
   config:
     max_cycles: 1
 assignments:
-  player_0: ./demo/rock.rlx
-  player_1: ./demo/paper.rlx
+  player_0: ./demo/rock.arena
+  player_1: ./demo/paper.arena
 seeds:
   start: 0
   count: 2

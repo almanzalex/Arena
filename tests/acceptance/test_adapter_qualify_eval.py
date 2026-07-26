@@ -12,7 +12,7 @@ pytest.importorskip("pettingzoo")
 
 from _eval_fixtures import build_cyclic_rps_eval_fixture
 
-from rlx.conformance.qualification import qualify_adapter_fixture
+from arena.conformance.qualification import qualify_adapter_fixture
 
 
 @pytest.mark.acceptance
@@ -29,4 +29,4 @@ def test_qualifies_evaluation_population_fixture(tmp_path: Path) -> None:
     assert report["checks"]["eval_report_evidence"]["nontransitivity_warning"]
     assert report["checks"]["eval_report_evidence"]["ranking"] is None
     persisted = json.loads(out.read_text(encoding="utf-8"))
-    assert persisted["schema"] == "rlx.adapter-qualification/v1"
+    assert persisted["schema"] == "arena.adapter-qualification/v1"

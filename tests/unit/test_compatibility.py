@@ -1,6 +1,6 @@
 """Compatibility check unit tests."""
 
-from rlx.core.compatibility import compose_check
+from arena.core.compatibility import compose_check
 
 
 def _policy(**overrides):

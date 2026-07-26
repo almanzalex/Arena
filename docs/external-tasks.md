@@ -1,6 +1,6 @@
-# External tasks in RLX 0.5
+# External tasks in Arena 0.5
 
-RLX executes external tasks only through the `task_packaging` registry. A packager
+Arena executes external tasks only through the `task_packaging` registry. A packager
 must implement both `make_env(spec)` and `describe_task(spec)`. The second method is
 mandatory because remote/container tasks otherwise hide role spaces, agent lifecycle,
 runtime revision, and mask semantics from preflight checks.
@@ -9,22 +9,22 @@ runtime revision, and mask semantics from preflight checks.
 
 The qualification set includes competitive RPS and vector coordination served over
 OpenEnv 0.4.x. The server wraps PettingZoo tasks with OpenEnv's own
-FastAPI/WebSocket transport; RLX does not replace OpenEnv containers or hosting.
+FastAPI/WebSocket transport; Arena does not replace OpenEnv containers or hosting.
 
 ```bash
-pip install 'rlx[openenv]'
-python -m rlx.adapters.task_openenv.server --port 8000
-rlx task import openenv://127.0.0.1:8000/rlx/competitive_rps_v0 \
+pip install 'arena[openenv]'
+python -m arena.adapters.task_openenv.server --port 8000
+arena task import openenv://127.0.0.1:8000/arena/competitive_rps_v0 \
   --name task:rps-openenv@0.3 --source-revision openenv-0.4.1
-rlx task verify-equivalence examples/tasks/native-rps.yaml task-rps-openenv-0.3.yaml \
+arena task verify-equivalence examples/tasks/native-rps.yaml task-rps-openenv-0.3.yaml \
   --trace-suite examples/tasks/rps-equivalence.yaml
-rlx adapter qualify task-rps-openenv-0.3.yaml \
+arena adapter qualify task-rps-openenv-0.3.yaml \
   --peer examples/tasks/native-rps.yaml \
   --trace-suite examples/tasks/rps-equivalence.yaml --out openenv-qualification.json
 ```
 
 Import reads `/schema`, records its SHA-256 digest, pins the endpoint/revision, and
-embeds the RLX per-role contract plus an `rlx.openenv-capabilities/v1` protocol
+embeds the Arena per-role contract plus an `arena.openenv-capabilities/v1` protocol
 declaration. Each new client session refuses a changed schema or contract pin. For
 non-pilot environments, pass `--contract`; an
 OpenEnv action/observation JSON Schema does not by itself define multi-agent Gym spaces.
@@ -38,7 +38,7 @@ and agent selection. T-02 crosses the actual WebSocket JSON boundary. T-03 recor
 The qualified catalog is organized by OpenSpiel semantics rather than one generic
 wrapper:
 
-| Family | Qualified game | RLX interaction |
+| Family | Qualified game | Arena interaction |
 |---|---|---|
 | Sequential, deterministic, perfect information | `tic_tac_toe`, `connect_four`, `breakthrough` | `aec` |
 | Sequential with explicit chance and imperfect information | `kuhn_poker` | `aec` using information-state tensors |
@@ -50,19 +50,19 @@ infos. Each game support claim requires a checked trace generated from OpenSpiel
 authoritative state.
 
 ```bash
-pip install 'rlx[openspiel]'
-rlx task verify-equivalence examples/tasks/openspiel-tic-tac-toe.yaml \
+pip install 'arena[openspiel]'
+arena task verify-equivalence examples/tasks/openspiel-tic-tac-toe.yaml \
   --trace-suite examples/tasks/openspiel-tic-tac-toe-trace.yaml
-rlx adapter qualify examples/tasks/openspiel-tic-tac-toe.yaml \
+arena adapter qualify examples/tasks/openspiel-tic-tac-toe.yaml \
   --trace-suite examples/tasks/openspiel-tic-tac-toe-trace.yaml \
   --out openspiel-qualification.json
 
-rlx task verify-equivalence examples/tasks/openspiel-connect-four.yaml \
+arena task verify-equivalence examples/tasks/openspiel-connect-four.yaml \
   --trace-suite examples/tasks/openspiel-connect-four-trace.yaml
 
-rlx task verify-equivalence examples/tasks/openspiel-kuhn-poker.yaml \
+arena task verify-equivalence examples/tasks/openspiel-kuhn-poker.yaml \
   --trace-suite examples/tasks/openspiel-kuhn-poker-trace.yaml
-rlx task verify-equivalence examples/tasks/openspiel-matrix-rps.yaml \
+arena task verify-equivalence examples/tasks/openspiel-matrix-rps.yaml \
   --trace-suite examples/tasks/openspiel-matrix-rps-trace.yaml
 ```
 

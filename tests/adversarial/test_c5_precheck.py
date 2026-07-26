@@ -11,15 +11,15 @@ from pathlib import Path
 
 import pytest
 
-from rlx.core.compatibility import compose_check
+from arena.core.compatibility import compose_check
 
 pytest.importorskip("torch")
 pytest.importorskip("pettingzoo")
 
 from _adv_envs import LargeDiscreteParallel, make_discrete_policy  # noqa: E402
 
-from rlx.core.errors import CompatibilityError  # noqa: E402
-from rlx.core.sdk import Match, Policy, Task  # noqa: E402
+from arena.core.errors import CompatibilityError  # noqa: E402
+from arena.core.sdk import Match, Policy, Task  # noqa: E402
 
 
 def _box_policy(**box) -> dict:
@@ -94,7 +94,7 @@ def test_unknown_agent_assignment_precheck_no_dir(tmp_path: Path) -> None:
     """An assignment key that is not an agent in the task fails before any episode and
     creates no run directory."""
     p0 = make_discrete_policy(tmp_path / "p0", role="ghost")
-    task = Task.load({"adapter": "pettingzoo-parallel", "env": "rlx/competitive_rps_v0"})
+    task = Task.load({"adapter": "pettingzoo-parallel", "env": "arena/competitive_rps_v0"})
     out = tmp_path / "never"
     match = Match(task=task, assignments={"ghost": Policy.load(p0)})
     with pytest.raises(CompatibilityError, match="not an agent"):

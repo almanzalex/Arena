@@ -1,9 +1,9 @@
-schema: rlx.evaluation/v0alpha1
+schema: arena.evaluation/v0alpha1
 name: cyclic-matrix
 interaction: parallel
 task:
   adapter: pettingzoo-parallel
-  env: rlx/competitive_rps_v0
+  env: arena/competitive_rps_v0
   config:
     max_cycles: 1
 assignments:

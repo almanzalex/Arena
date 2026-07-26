@@ -1,4 +1,4 @@
-schema: rlx.trace-suite/v1
+schema: arena.trace-suite/v1
 name: openspiel-tic-tac-toe-reference
 interaction: aec
 episodes:

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from rlx.adapters.task_pettingzoo.wrappers import (
+from arena.adapters.task_pettingzoo.wrappers import (
     SUPPORTED_WRAPPER_OPS,
     normalize_wrappers,
     wrappers_provenance,
 )
-from rlx.core.errors import SchemaError
-from rlx.core.spaces import spaces_compatible
+from arena.core.errors import SchemaError
+from arena.core.spaces import spaces_compatible
 
 
 def test_normalize_wrappers_accepts_supersuit_aliases() -> None:

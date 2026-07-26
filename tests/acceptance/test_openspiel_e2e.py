@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from rlx.adapters.policy_custom_torch import build_module, export_policy
-from rlx.cli.main import main
-from rlx.conformance.qualification import qualify_task_fixture
-from rlx.core.sdk import Match, Policy, Task
-from rlx.runtime.aec_match import run_aec_match
-from rlx.runtime.evaluation import run_evaluation
+from arena.adapters.policy_custom_torch import build_module, export_policy
+from arena.cli.main import main
+from arena.conformance.qualification import qualify_task_fixture
+from arena.core.sdk import Match, Policy, Task
+from arena.runtime.aec_match import run_aec_match
+from arena.runtime.evaluation import run_evaluation
 
 pytest.importorskip("pyspiel")
 torch = pytest.importorskip("torch")
@@ -61,8 +61,8 @@ def _masked_policy(
 @pytest.mark.acceptance
 @pytest.mark.requires_openspiel
 def test_openspiel_tic_tac_toe_match_and_eval(tmp_path: Path) -> None:
-    left = _masked_policy(tmp_path / "left.rlx", name="first-legal-left")
-    right = _masked_policy(tmp_path / "right.rlx", name="first-legal-right")
+    left = _masked_policy(tmp_path / "left.arena", name="first-legal-left")
+    right = _masked_policy(tmp_path / "right.arena", name="first-legal-right")
     task = {
         "adapter": "openspiel",
         "env": "openspiel://tic_tac_toe",
@@ -89,7 +89,7 @@ def test_openspiel_tic_tac_toe_match_and_eval(tmp_path: Path) -> None:
     assert episode["status"] == "completed"
 
     suite = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "openspiel-tic-tac-toe",
         "provider": "native",
         "interaction": "aec",
@@ -151,7 +151,7 @@ def test_openspiel_semantic_family_match_and_qualification(
     action_n: int,
 ) -> None:
     bundle = _masked_policy(
-        tmp_path / f"{game}.rlx",
+        tmp_path / f"{game}.arena",
         name=f"{game}-first-legal",
         observation_dim=observation_dim,
         action_n=action_n,

@@ -1,11 +1,11 @@
-# Example evaluation suite (RLX 0.2)
+# Example evaluation suite (Arena 0.2)
 
 ## Runnable demo (use this)
 
 Checked-in cyclic RPS population + suite (no placeholders):
 
 ```bash
-# from repo root, with 'rlx[torch,pettingzoo]' installed
+# from repo root, with 'arena[torch,pettingzoo]' installed
 bash examples/eval/run_demo.sh
 ```
 
@@ -27,13 +27,13 @@ with `REPLACE_*` digests. Prefer the `demo/` pack for a first run.
 `crossplay_script.py` is **retired**. Use `run_demo.sh` or:
 
 ```bash
-rlx init
-rlx population create ./population.yaml --ref populations/rps-opp
-rlx eval run ./evaluation.yaml \
-  --policy <digest>=./candidate.rlx \
+arena init
+arena population create ./population.yaml --ref populations/rps-opp
+arena eval run ./evaluation.yaml \
+  --policy <digest>=./candidate.arena \
   --population ./population.yaml \
   --out ./eval-runs/crossplay
-rlx eval report ./eval-runs/crossplay --json
+arena eval report ./eval-runs/crossplay --json
 ```
 
 Docs: [populations](../../docs/populations.md), [evaluation](../../docs/evaluation.md),

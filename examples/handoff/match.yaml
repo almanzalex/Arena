@@ -1,10 +1,10 @@
-schema: rlx.match/v0alpha1
+schema: arena.match/v0alpha1
 task:
   adapter: pettingzoo-parallel
-  env: rlx/competitive_rps_v0
+  env: arena/competitive_rps_v0
 assignments:
-  player_0: ./artifacts/player_0.rlx
-  player_1: ./artifacts/player_1.rlx
+  player_0: ./artifacts/player_0.arena
+  player_1: ./artifacts/player_1.arena
 seeds: {start: 0, count: 10}
 action_mode: deterministic
 record:

@@ -9,27 +9,27 @@ from pathlib import Path
 
 import pytest
 
-from rlx.core.attestation import generate_signing_keypair
-from rlx.core.errors import (
+from arena.core.attestation import generate_signing_keypair
+from arena.core.errors import (
     ConformanceError,
     ExternalUnavailableError,
     SchemaError,
 )
-from rlx.core.identity import canonical_json, parse_digest
-from rlx.core.manifests import (
+from arena.core.identity import canonical_json, parse_digest
+from arena.core.manifests import (
     evaluation_binding_digest,
     evaluation_intent_digest,
     load_manifest,
 )
-from rlx.core.release import (
+from arena.core.release import (
     assemble_release_evidence,
     sign_qualification_ledger,
     sign_release_evidence,
     verify_release_evidence,
 )
-from rlx.core.spaces import gymnasium_space_to_dict
-from rlx.core.supervisor import run_supervised
-from rlx.core.support import (
+from arena.core.spaces import gymnasium_space_to_dict
+from arena.core.supervisor import run_supervised
+from arena.core.support import (
     _probe_isolated_python,
     doctor_report,
     load_schema_registry,
@@ -82,10 +82,10 @@ def test_unbounded_box_uses_explicit_json_safe_sentinels() -> None:
 
 def test_evaluation_intent_excludes_operational_binding() -> None:
     base = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "task": {
             "adapter": "openenv",
-            "env": "openenv://rlx/competitive_rps_v0",
+            "env": "openenv://arena/competitive_rps_v0",
             "interaction": "parallel",
             "packaging": {
                 "kind": "openenv",
@@ -138,25 +138,25 @@ def test_evaluation_intent_excludes_operational_binding() -> None:
 def test_hard_budget_eval_process_is_complete_and_schedule_stable(
     tmp_path: Path,
 ) -> None:
-    from rlx.conformance.fixtures import build_fixed_action_rps_policy
-    from rlx.runtime.evaluation import run_evaluation
+    from arena.conformance.fixtures import build_fixed_action_rps_policy
+    from arena.runtime.evaluation import run_evaluation
 
     left = build_fixed_action_rps_policy(
-        tmp_path / "left.rlx",
+        tmp_path / "left.arena",
         role=["player_0", "player_1"],
         action=0,
     )
     right = build_fixed_action_rps_policy(
-        tmp_path / "right.rlx",
+        tmp_path / "right.arena",
         role=["player_0", "player_1"],
         action=1,
     )
     suite = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "hard-budget",
         "task": {
             "adapter": "pettingzoo-parallel",
-            "env": "rlx/competitive_rps_v0",
+            "env": "arena/competitive_rps_v0",
             "interaction": "parallel",
             "config": {"max_cycles": 1},
         },
@@ -188,25 +188,25 @@ def test_hard_budget_eval_process_is_complete_and_schedule_stable(
 def test_hard_budget_timeout_publishes_failed_ledger_not_fake_success(
     tmp_path: Path,
 ) -> None:
-    from rlx.conformance.fixtures import build_fixed_action_rps_policy
-    from rlx.runtime.evaluation import build_eval_report, run_evaluation
+    from arena.conformance.fixtures import build_fixed_action_rps_policy
+    from arena.runtime.evaluation import build_eval_report, run_evaluation
 
     left = build_fixed_action_rps_policy(
-        tmp_path / "left.rlx",
+        tmp_path / "left.arena",
         role=["player_0", "player_1"],
         action=0,
     )
     right = build_fixed_action_rps_policy(
-        tmp_path / "right.rlx",
+        tmp_path / "right.arena",
         role=["player_0", "player_1"],
         action=1,
     )
     suite = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "forced-timeout",
         "task": {
             "adapter": "pettingzoo-parallel",
-            "env": "rlx/competitive_rps_v0",
+            "env": "arena/competitive_rps_v0",
             "interaction": "parallel",
         },
         "assignments": {
@@ -238,8 +238,8 @@ def test_schema_registry_is_unique_and_records_legacy_freeze() -> None:
     ids = [item["id"] for item in registry["schemas"]]
     assert len(ids) == len(set(ids))
     legacy = {item["id"]: item for item in registry["schemas"]}
-    assert legacy["rlx.policy/v0alpha1"]["status"] == "legacy-frozen"
-    assert legacy["rlx.eval-run/v1"]["status"] == "stable"
+    assert legacy["arena.policy/v0alpha1"]["status"] == "legacy-frozen"
+    assert legacy["arena.eval-run/v1"]["status"] == "stable"
 
 
 def test_doctor_does_not_authenticate(monkeypatch) -> None:
@@ -252,15 +252,15 @@ def test_doctor_does_not_authenticate(monkeypatch) -> None:
 
 def test_doctor_probes_isolated_gimitest_interpreter() -> None:
     probe = _probe_isolated_python(
-        Path(sys.executable).resolve(),
-        distributions=["rlx", "gimitest", "torch", "pettingzoo"],
-        release=version("rlx"),
+        Path(sys.executable),
+        distributions=["arena", "gimitest", "torch", "pettingzoo"],
+        release=version("arena"),
     )
     assert probe["status"] == "ready"
     assert probe["versions"]["gimitest"] == "1.0"
     mismatch = _probe_isolated_python(
-        Path(sys.executable).resolve(),
-        distributions=["rlx"],
+        Path(sys.executable),
+        distributions=["arena"],
         release="0.0-does-not-match",
     )
     assert mismatch["status"] == "incompatible"
@@ -271,18 +271,18 @@ def test_doctor_rejects_non_executable_isolated_worker(
 ) -> None:
     fake = tmp_path / "python"
     fake.write_text("not an interpreter", encoding="utf-8")
-    monkeypatch.setenv("RLX_GIMITEST_PYTHON", str(fake))
+    monkeypatch.setenv("ARENA_GIMITEST_PYTHON", str(fake))
     capability = doctor_report("gimitest")["capabilities"][0]
     assert capability["local_status"] == "locally-unqualified"
     assert capability["isolated_probe"]["status"] == "unavailable"
 
 
 def test_cli_json_grammar_help_and_secret_redaction(capsys) -> None:
-    from rlx.cli.main import main
+    from arena.cli.main import main
 
     assert main(["doctor", "--capability", "core", "--json"]) == 0
     success = json.loads(capsys.readouterr().out)
-    assert success["schema"] == "rlx.cli-result/v1"
+    assert success["schema"] == "arena.cli-result/v1"
     assert success["command"] == "doctor"
 
     assert main(["eval", "run", "--help", "--json"]) == 0
@@ -301,7 +301,7 @@ def test_cli_json_grammar_help_and_secret_redaction(capsys) -> None:
     assert code == 5
     assert secret not in output
     failure = json.loads(output)
-    assert failure["schema"] == "rlx.diagnostic/v1"
+    assert failure["schema"] == "arena.diagnostic/v1"
     assert failure["command"] == "pull"
 
 
@@ -337,7 +337,7 @@ def test_supervisor_enforces_output_budget() -> None:
 
 def test_signed_release_and_current_ledger_are_content_bound(tmp_path: Path) -> None:
     pytest.importorskip("cryptography")
-    artifact = tmp_path / "rlx-1.0.0-py3-none-any.whl"
+    artifact = tmp_path / "arena-1.0.0-py3-none-any.whl"
     artifact.write_bytes(b"release artifact")
     gate_files = {}
     for index in range(1, 15):
@@ -375,7 +375,7 @@ def test_signed_release_and_current_ledger_are_content_bound(tmp_path: Path) -> 
     ]
 
     ledger = {
-        "schema": "rlx.qualification-ledger/v1",
+        "schema": "arena.qualification-ledger/v1",
         "release": "1.0.0",
         "records": [{"capability": "hf", "status": "pass"}],
     }
@@ -429,7 +429,7 @@ def test_qualification_ledger_rejects_ambiguous_health(tmp_path: Path) -> None:
     ledger_path.write_bytes(
         canonical_json(
             {
-                "schema": "rlx.qualification-ledger/v1",
+                "schema": "arena.qualification-ledger/v1",
                 "release": "1.0.0",
                 "records": [
                     {"capability": "hf", "status": "pass"},

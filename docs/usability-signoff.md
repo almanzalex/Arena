@@ -1,7 +1,7 @@
-# RLX clean-room usability sign-off
+# Arena clean-room usability sign-off
 
 This checklist is for a researcher who did not create the policy or training
-repository. Give them only the built wheel, received `.rlx` bundles,
+repository. Give them only the built wheel, received `.arena` bundles,
 `match.yaml`, and `docs/clean-room.md`. Do not give them this repository,
 README, checkpoint, trainer source, or author assistance.
 

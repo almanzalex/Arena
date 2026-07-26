@@ -8,16 +8,16 @@ import pytest
 pytest.importorskip("torch")
 pytest.importorskip("pettingzoo")
 
-from rlx.conformance.fixtures import build_fixed_action_rps_policy
-from rlx.conformance.qualification import qualify_task_fixture
-from rlx.core.errors import CompatibilityError
-from rlx.core.sdk import Match, Policy, Task
-from rlx.runtime.evaluation import run_evaluation
+from arena.conformance.fixtures import build_fixed_action_rps_policy
+from arena.conformance.qualification import qualify_task_fixture
+from arena.core.errors import CompatibilityError
+from arena.core.sdk import Match, Policy, Task
+from arena.runtime.evaluation import run_evaluation
 
 
 def _policy(tmp_path: Path) -> Policy:
     bundle = build_fixed_action_rps_policy(
-        tmp_path / "dynamic.rlx",
+        tmp_path / "dynamic.arena",
         role=["agent_0", "agent_1", "agent_2"],
         action=0,
         name="dynamic-fixed-action",
@@ -28,7 +28,7 @@ def _policy(tmp_path: Path) -> Policy:
 def _task(policy: Policy) -> dict:
     return {
         "adapter": "pettingzoo-parallel",
-        "env": "rlx/dynamic_lineup_aec_v0",
+        "env": "arena/dynamic_lineup_aec_v0",
         "interaction": "dynamic_aec",
         "lifecycle": {"birth_eligibility": {"agent_2": [policy.digest]}},
     }
@@ -36,7 +36,7 @@ def _task(policy: Policy) -> dict:
 
 def _role_policy(tmp_path: Path) -> Policy:
     bundle = build_fixed_action_rps_policy(
-        tmp_path / "role-dynamic.rlx",
+        tmp_path / "role-dynamic.arena",
         role=["contestant"],
         action=0,
         name="dynamic-role-policy",
@@ -73,7 +73,7 @@ def test_dynamic_birth_removal_match_and_eval(tmp_path: Path) -> None:
     assert all("agents_alive" in step for step in episode["steps"])
 
     suite = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "dynamic-lineup-eval",
         "provider": "native",
         "interaction": "dynamic_aec",
@@ -119,7 +119,7 @@ def test_role_resolver_records_rejoin_as_a_new_agent_segment(
     policy = _role_policy(tmp_path)
     task = {
         "adapter": "pettingzoo-parallel",
-        "env": "rlx/dynamic_reentry_aec_v0",
+        "env": "arena/dynamic_reentry_aec_v0",
         "interaction": "dynamic_aec",
         "lifecycle": {
             "resolver": {

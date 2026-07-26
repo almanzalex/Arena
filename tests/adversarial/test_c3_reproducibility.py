@@ -21,21 +21,21 @@ pytest.importorskip("pettingzoo")
 
 from _adv_envs import BoxObsParallel  # noqa: E402
 
-from rlx.conformance.fixtures import build_f3_recurrent, build_rps_policy  # noqa: E402
-from rlx.core.sdk import Match, Policy, Task  # noqa: E402
+from arena.conformance.fixtures import build_f3_recurrent, build_rps_policy  # noqa: E402
+from arena.core.sdk import Match, Policy, Task  # noqa: E402
 
-_PILOT = "rlx/competitive_rps_v0"
+_PILOT = "arena/competitive_rps_v0"
 
 # A standalone runner used to prove *cross-process* determinism. It exports nothing
 # (bundles are prebuilt and shared); it only executes a match against fixed bundles.
 _RUNNER = """
 import sys, json
-from rlx.core.sdk import Match, Policy, Task
+from arena.core.sdk import Match, Policy, Task
 
 p0, p1, out, mode, seeds = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
 seed_list = [int(s) for s in seeds.split(",")]
 match = Match(
-    task=Task.load({"adapter": "pettingzoo-parallel", "env": "rlx/competitive_rps_v0",
+    task=Task.load({"adapter": "pettingzoo-parallel", "env": "arena/competitive_rps_v0",
                     "config": {"max_cycles": 8}}),
     assignments={"player_0": Policy.load(p0), "player_1": Policy.load(p1)},
     action_mode=mode,
@@ -135,7 +135,7 @@ def test_recurrent_state_actually_matters(tmp_path: Path) -> None:
     from a carried hidden state can differ from a fresh one."""
     import numpy as np
 
-    from rlx.adapters.policy_custom_torch import load_runtime
+    from arena.adapters.policy_custom_torch import load_runtime
 
     rt = load_runtime(build_f3_recurrent(tmp_path / "f3b"))
     stream = np.random.default_rng(1).normal(size=(6, 4)).astype(np.float32)

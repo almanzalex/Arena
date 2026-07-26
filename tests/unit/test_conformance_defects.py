@@ -1,4 +1,4 @@
-"""Regression tests for messy-trainer RLX 0.1 conformance defects."""
+"""Regression tests for messy-trainer Arena 0.1 conformance defects."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from rlx.adapters.policy_custom_torch import (  # noqa: E402
+from arena.adapters.policy_custom_torch import (  # noqa: E402
     PROVENANCE_SELF,
     PROVENANCE_SOURCE,
     build_module,
@@ -20,9 +20,9 @@ from rlx.adapters.policy_custom_torch import (  # noqa: E402
     load_runtime,
     verify_bundle_self,
 )
-from rlx.cli.main import main  # noqa: E402
-from rlx.core.errors import ConformanceError, SchemaError  # noqa: E402
-from rlx.core.sdk import Policy, Task, check  # noqa: E402
+from arena.cli.main import main  # noqa: E402
+from arena.core.errors import ConformanceError, SchemaError  # noqa: E402
+from arena.core.sdk import Policy, Task, check  # noqa: E402
 
 
 class _BenignNonTensorMarker:
@@ -62,7 +62,7 @@ def test_recurrent_verify_same_forward_pass_and_catches_wrong(tmp_path: Path) ->
     torch.manual_seed(0)
     state = build_module(arch).state_dict()
     bundle = export_policy(
-        out_dir=tmp_path / "gru.rlx",
+        out_dir=tmp_path / "gru.arena",
         name="gru",
         roles=["agent"],
         observation=_box_obs(),
@@ -77,7 +77,7 @@ def test_recurrent_verify_same_forward_pass_and_catches_wrong(tmp_path: Path) ->
     assert any(c.get("hidden_reset") is False for c in cases)
     assert any(c.get("expected_logits") for c in cases)
 
-    from rlx.adapters.policy_custom_torch import _embed_reference_cases
+    from arena.adapters.policy_custom_torch import _embed_reference_cases
 
     _embed_reference_cases(bundle, cases, provenance=PROVENANCE_SOURCE)
     assert verify_bundle_self(bundle)["ok"]
@@ -99,7 +99,7 @@ def test_reference_cases_exercise_recurrence_and_catch_double_step(tmp_path: Pat
     arch = _gru_arch()
     torch.manual_seed(1)
     bundle = export_policy(
-        out_dir=tmp_path / "gru2.rlx",
+        out_dir=tmp_path / "gru2.arena",
         name="gru2",
         roles=["agent"],
         observation=_box_obs(),
@@ -147,7 +147,7 @@ def test_reference_cases_exercise_recurrence_and_catch_double_step(tmp_path: Pat
         pytest.fail("no carry case to poison")
 
     # Finish with only the prefix we poisoned + ensure at least one carry mismatch.
-    from rlx.adapters.policy_custom_torch import _embed_reference_cases
+    from arena.adapters.policy_custom_torch import _embed_reference_cases
 
     _embed_reference_cases(bundle, poisoned, provenance=PROVENANCE_SOURCE)
     with pytest.raises(ConformanceError, match="logits_mismatch|self-verify failed"):
@@ -163,7 +163,7 @@ def test_export_embeds_source_conformance_and_self_warns(tmp_path: Path) -> None
     torch.save(build_module(arch).state_dict(), ckpt)
     bundle = export_from_checkpoint(
         source=ckpt,
-        out=tmp_path / "exp.rlx",
+        out=tmp_path / "exp.arena",
         role="agent",
         architecture=arch,
         observation=_box_obs(),
@@ -183,7 +183,7 @@ def test_export_embeds_source_conformance_and_self_warns(tmp_path: Path) -> None
         json.dumps(payload), encoding="utf-8"
     )
     # Fix digest after rewrite so integrity of cases entry matches if checked later.
-    from rlx.adapters.policy_custom_torch import _embed_reference_cases
+    from arena.adapters.policy_custom_torch import _embed_reference_cases
 
     _embed_reference_cases(bundle, payload["cases"], provenance=PROVENANCE_SELF)
     with pytest.raises(ConformanceError, match="insufficient evidence"):
@@ -227,7 +227,7 @@ def test_check_honors_task_config_simple_tag(tmp_path: Path) -> None:
     }
     torch.manual_seed(3)
     bundle = export_policy(
-        out_dir=tmp_path / "tag.rlx",
+        out_dir=tmp_path / "tag.arena",
         name="tag-agent",
         roles=["agent_0"],
         observation={
@@ -298,7 +298,7 @@ def test_nested_training_checkpoint_fails_atomically(tmp_path: Path) -> None:
         },
         ckpt,
     )
-    out = tmp_path / "should_not_exist.rlx"
+    out = tmp_path / "should_not_exist.arena"
     with pytest.raises(SchemaError, match="training checkpoint"):
         export_from_checkpoint(
             source=ckpt,
@@ -313,7 +313,7 @@ def test_nested_training_checkpoint_fails_atomically(tmp_path: Path) -> None:
     leftovers = [
         p
         for p in tmp_path.iterdir()
-        if p.name.startswith(".rlx-export-") or p.name.endswith(".rlx")
+        if p.name.startswith(".arena-export-") or p.name.endswith(".arena")
     ]
     assert leftovers == [], f"partial export left behind: {leftovers}"
 
@@ -324,7 +324,7 @@ def test_full_module_pickle_rejected_without_unsafe_opt_in(tmp_path: Path) -> No
     arch = _mlp_arch()
     ckpt = tmp_path / "full_pickle.pt"
     torch.save({"note": "not-a-state-dict", "marker": _BenignNonTensorMarker()}, ckpt)
-    out = tmp_path / "nope.rlx"
+    out = tmp_path / "nope.arena"
     with pytest.raises(SchemaError, match="unsafe pickle|weights_only|refusing"):
         export_from_checkpoint(
             source=ckpt,

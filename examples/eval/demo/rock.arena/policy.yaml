@@ -1,0 +1,51 @@
+schema: arena.policy/v0alpha1
+name: rock
+roles:
+  allowed:
+  - player_0
+  - player_1
+runtime:
+  adapter: custom-pytorch
+  python: '3.12'
+observation:
+  type: Discrete
+  n: 4
+  dtype: int64
+action:
+  type: Discrete
+  n: 3
+  dtype: int64
+  masks: none
+state:
+  recurrent: false
+  reset_on: []
+inference:
+  modes:
+  - deterministic
+  - stochastic
+preprocessing:
+  included: true
+  id: normalize_v0
+  mean: 0.0
+  std: 1.0
+architecture:
+  type: mlp_categorical
+  observation_dim: 4
+  hidden_dims:
+  - 8
+  action_n: 3
+payloads:
+  weights:
+    digest: sha256:ecece8a7d246ca096d78d39373e1ab9217b0d51c50d60b6e989103301ad7d93c
+    path: payloads/weights.pt
+  reference_cases:
+    digest: sha256:7b029d41a8a319a0131139313bfb9bbc035cbd6d2352e0e388810ff11dfa44ff
+    path: payloads/reference_cases.json
+lineage:
+  fixture: fixed-action
+  action: 0
+  pilot: arena/competitive_rps_v0
+conformance:
+  status: verified
+  cases: 11
+  verify_mode: source-conformance

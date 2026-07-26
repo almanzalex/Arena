@@ -12,7 +12,7 @@ Mean transport overhead was 0.957 ms per reset+step (57.8× this deliberately ti
 native task). Reproduce with:
 
 ```bash
-python -m rlx.adapters.task_openenv.server --port 8000
+python -m arena.adapters.task_openenv.server --port 8000
 python examples/tasks/benchmark_openenv.py --base-url http://127.0.0.1:8000 --iterations 100
 ```
 

@@ -1,4 +1,4 @@
-# RFC 003 — Policy Populations (RLX 0.2)
+# RFC 003 — Policy Populations (Arena 0.2)
 
 **Status:** Accepted for 0.2  
 **Date:** 2026-07-21  
@@ -8,10 +8,10 @@
 
 Define content-addressed **policy populations**: named/weighted sets of immutable 0.1 policy digests with optional generation/tags and role constraints. Populations enable cross-play and historical-checkpoint evaluation without trainer repositories.
 
-## Schema: `rlx.population/v0alpha1`
+## Schema: `arena.population/v0alpha1`
 
 ```yaml
-schema: rlx.population/v0alpha1
+schema: arena.population/v0alpha1
 name: opponents-v3
 members:
   - policy: sha256:…          # or path resolved to digest at create time

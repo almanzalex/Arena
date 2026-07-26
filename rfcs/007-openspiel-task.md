@@ -1,4 +1,4 @@
-# RFC 007 — OpenSpiel Task Adapter (RLX 0.3)
+# RFC 007 — OpenSpiel Task Adapter (Arena 0.3)
 
 **Status:** Accepted in 0.3; generalized by semantic family in 0.5
 **Date:** 2026-07-21
@@ -6,14 +6,14 @@
 
 ## User promise
 
-Where OpenSpiel’s game representation fits better than PettingZoo (small perfect-information / classic games), expose it as an RLX **task** without erasing OpenSpiel semantics.
+Where OpenSpiel’s game representation fits better than PettingZoo (small perfect-information / classic games), expose it as an Arena **task** without erasing OpenSpiel semantics.
 
 ## Requirements (OS-*)
 
 | ID | Requirement |
 |----|-------------|
 | OS-01 | Registered task packager `openspiel` with fail-loud unknown games |
-| OS-02 | Map OpenSpiel players ↔ RLX roles; document imperfect-information limits |
+| OS-02 | Map OpenSpiel players ↔ Arena roles; document imperfect-information limits |
 | OS-03 | Same match/eval entrypoints as PettingZoo/OpenEnv (`interaction` declared) |
 | OS-04 | Trace equivalence vs a declared reference (native OpenSpiel or twin) where claimed |
 | OS-05 | Optional: exploitability / game-theoretic metrics as **eval metric plugins**, not core |

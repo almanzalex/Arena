@@ -6,18 +6,18 @@ import pytest
 
 pytest.importorskip("pettingzoo")
 
-from rlx.adapters.task_openenv.adapter import (
+from arena.adapters.task_openenv.adapter import (
     PILOT_CONTRACT,
     PILOT_ENV,
     OpenEnvParallelEnv,
     _verify_schema_pin,
 )
-from rlx.adapters.task_pettingzoo.pilot_env import CompetitiveRPSParallel
-from rlx.conformance.fixtures import build_fixed_action_rps_policy
-from rlx.core.errors import SchemaError, TaskRuntimeError
-from rlx.core.sdk import Policy
-from rlx.core.tasks import verify_task_equivalence
-from rlx.runtime.match import run_match
+from arena.adapters.task_pettingzoo.pilot_env import CompetitiveRPSParallel
+from arena.conformance.fixtures import build_fixed_action_rps_policy
+from arena.core.errors import SchemaError, TaskRuntimeError
+from arena.core.sdk import Policy
+from arena.core.tasks import verify_task_equivalence
+from arena.runtime.match import run_match
 
 
 class _LoopbackClient:
@@ -60,12 +60,12 @@ def _openenv_spec(factory=lambda spec: _LoopbackClient()):
 def test_t01_native_openenv_trace_equivalence() -> None:
     native = {
         "adapter": "pettingzoo-parallel",
-        "env": "rlx/competitive_rps_v0",
+        "env": "arena/competitive_rps_v0",
         "interaction": "parallel",
         "config": {"max_cycles": 1},
     }
     suite = {
-        "schema": "rlx.trace-suite/v1",
+        "schema": "arena.trace-suite/v1",
         "interaction": "parallel",
         "episodes": [
             {"seed": 0, "actions": [{"player_0": 0, "player_1": 1}]},
@@ -131,10 +131,10 @@ def test_t03_transport_failure_is_recorded_on_run(tmp_path) -> None:
             raise TimeoutError("remote deadline")
 
     left = build_fixed_action_rps_policy(
-        tmp_path / "left.rlx", role=["player_0", "player_1"], action=0
+        tmp_path / "left.arena", role=["player_0", "player_1"], action=0
     )
     right = build_fixed_action_rps_policy(
-        tmp_path / "right.rlx", role=["player_0", "player_1"], action=1
+        tmp_path / "right.arena", role=["player_0", "player_1"], action=1
     )
     result = run_match(
         task_spec=_openenv_spec(lambda spec: TimedOutClient()),
@@ -154,10 +154,10 @@ def test_t03_connect_failure_is_recorded_as_disconnect(tmp_path) -> None:
         raise ConnectionError("connection refused")
 
     left = build_fixed_action_rps_policy(
-        tmp_path / "left.rlx", role=["player_0", "player_1"], action=0
+        tmp_path / "left.arena", role=["player_0", "player_1"], action=0
     )
     right = build_fixed_action_rps_policy(
-        tmp_path / "right.rlx", role=["player_0", "player_1"], action=1
+        tmp_path / "right.arena", role=["player_0", "player_1"], action=1
     )
     result = run_match(
         task_spec=_openenv_spec(cannot_connect),
@@ -171,7 +171,7 @@ def test_t03_connect_failure_is_recorded_as_disconnect(tmp_path) -> None:
 
 
 def test_openenv_schema_pin_is_rechecked_in_same_process(monkeypatch) -> None:
-    from rlx.core.identity import canonical_json, digest_uri, sha256_bytes
+    from arena.core.identity import canonical_json, digest_uri, sha256_bytes
 
     expected_schema = {"type": "object", "version": 1}
     changed_schema = {"type": "object", "version": 2}
@@ -196,7 +196,7 @@ def test_openenv_schema_pin_is_rechecked_in_same_process(monkeypatch) -> None:
             return self.payload
 
     monkeypatch.setattr(
-        "rlx.adapters.task_openenv.adapter.urlopen",
+        "arena.adapters.task_openenv.adapter.urlopen",
         lambda *args, **kwargs: Response(payloads.pop(0)),
     )
     _verify_schema_pin("http://task.invalid", expected, 1)

@@ -6,7 +6,7 @@
 
 ## Decision
 
-RLX generalizes by stable axes and qualification evidence, not by absorbing every
+Arena generalizes by stable axes and qualification evidence, not by absorbing every
 upstream feature. Version 0.5 adds trainer and lifecycle-resolver axes, broadens task
 adapters by semantic family, and makes provider/store evidence comparable.
 
@@ -30,7 +30,7 @@ A capability is supported only when all three are present:
 
 Content identity remains SHA-256 over canonical artifacts. Authenticity is a detached
 Ed25519 statement over identity and artifact kind. The user supplies the trusted
-public key; RLX does not create a global trust system.
+public key; Arena does not create a global trust system.
 
 This separation means an artifact may move across stores without being re-signed,
 while a modified artifact cannot reuse the old attestation.

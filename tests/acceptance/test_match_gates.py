@@ -13,13 +13,13 @@ pytest.importorskip("pettingzoo")
 
 import torch  # noqa: E402
 
-from rlx.adapters.policy_custom_torch import build_module, export_policy  # noqa: E402
-from rlx.conformance.fixtures import build_rps_policy  # noqa: E402
-from rlx.core.errors import CompatibilityError  # noqa: E402
-from rlx.core.sdk import Match, Policy, Task, check  # noqa: E402
-from rlx.runtime.trajectory import inspect_trajectory  # noqa: E402
+from arena.adapters.policy_custom_torch import build_module, export_policy  # noqa: E402
+from arena.conformance.fixtures import build_rps_policy  # noqa: E402
+from arena.core.errors import CompatibilityError  # noqa: E402
+from arena.core.sdk import Match, Policy, Task, check  # noqa: E402
+from arena.runtime.trajectory import inspect_trajectory  # noqa: E402
 
-_PILOT = "rlx/competitive_rps_v0"
+_PILOT = "arena/competitive_rps_v0"
 
 
 def _build_match(
@@ -145,8 +145,8 @@ def test_m01_reproducibility_stochastic(tmp_path: Path) -> None:
 def test_m02_adapter_runtime_error_recorded(tmp_path: Path) -> None:
     """M-02 (adapter runtime error): a policy that raises during act() is recorded as a
     per-episode failure with an actionable kind/agent/message; healthy episodes still complete."""
-    from rlx.adapters import policy_custom_torch as pct
-    from rlx.runtime import match as match_mod
+    from arena.adapters import policy_custom_torch as pct
+    from arena.runtime import match as match_mod
 
     match = _build_match(tmp_path, max_cycles=2)
     real_load = pct.load_runtime
@@ -189,7 +189,7 @@ def test_m02_adapter_runtime_error_recorded(tmp_path: Path) -> None:
 def test_m02_crash_recorded(tmp_path: Path) -> None:
     """M-02 (crash): an unexpected environment error is recorded as a `crash` failure with a
     traceback, and subsequent episodes still run — failures are never swallowed."""
-    from rlx.runtime import match as match_mod
+    from arena.runtime import match as match_mod
 
     match = _build_match(tmp_path, max_cycles=2)
     real_make_env = match_mod.make_env

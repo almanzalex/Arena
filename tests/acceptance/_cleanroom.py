@@ -12,18 +12,18 @@ import re
 from pathlib import Path
 
 # Info string that marks the machine-parseable command block in clean-room.md.
-CLEAN_ROOM_TAG = "rlx-clean-room"
+CLEAN_ROOM_TAG = "arena-clean-room"
 
 # The canonical U-01 clean-room flow. The documented block must match this
 # exactly (order included): any drift is treated as a release blocker.
 EXPECTED_COMMANDS: tuple[str, ...] = (
-    "rlx init",
-    "rlx inspect ./player_0.rlx",
-    "rlx inspect ./player_1.rlx",
-    "rlx check rlx/competitive_rps_v0 ./player_0.rlx --role player_0",
-    "rlx check rlx/competitive_rps_v0 ./player_1.rlx --role player_1",
-    "rlx match run ./match.yaml --record --out ./runs/baseline-match",
-    "rlx data inspect ./runs/baseline-match/trajectories",
+    "arena init",
+    "arena inspect ./player_0.arena",
+    "arena inspect ./player_1.arena",
+    "arena check arena/competitive_rps_v0 ./player_0.arena --role player_0",
+    "arena check arena/competitive_rps_v0 ./player_1.arena --role player_1",
+    "arena match run ./match.yaml --record --out ./runs/baseline-match",
+    "arena data inspect ./runs/baseline-match/trajectories",
 )
 
 # Tokens that must never appear in the clean-room block: they would imply the
@@ -50,7 +50,7 @@ _FENCE_RE = re.compile(
 
 
 def parse_cleanroom_commands(markdown_path: Path | str) -> list[str]:
-    """Return the ordered command list from the ``rlx-clean-room`` fenced block.
+    """Return the ordered command list from the ``arena-clean-room`` fenced block.
 
     Raises ``AssertionError`` (so the gate fails) if the block is missing or empty.
     """
@@ -58,7 +58,7 @@ def parse_cleanroom_commands(markdown_path: Path | str) -> list[str]:
     bodies: list[str] = []
     for m in _FENCE_RE.finditer(text):
         info = m.group("info").strip().split()
-        # Info string is e.g. ``bash rlx-clean-room`` — highlighted as bash,
+        # Info string is e.g. ``bash arena-clean-room`` — highlighted as bash,
         # tagged for automation.
         if CLEAN_ROOM_TAG in info:
             bodies.append(m.group("body"))
@@ -96,9 +96,9 @@ def validate_cleanroom_commands(commands: list[str]) -> None:
         "Update the docs or the CLI so they agree (doc drift is a release blocker)."
     )
     for cmd in commands:
-        assert cmd.startswith("rlx "), (
-            f"clean-room command does not invoke the rlx CLI: {cmd!r} "
-            "(a recipient must only need `rlx`, never the trainer or a re-install)"
+        assert cmd.startswith("arena "), (
+            f"clean-room command does not invoke the arena CLI: {cmd!r} "
+            "(a recipient must only need `arena`, never the trainer or a re-install)"
         )
         lowered = cmd.lower()
         for token in FORBIDDEN_TOKENS:

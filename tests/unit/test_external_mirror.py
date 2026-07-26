@@ -7,9 +7,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from rlx.cli.main import main
-from rlx.core.errors import StoreError
-from rlx.core.mirror import (
+from arena.cli.main import main
+from arena.core.errors import StoreError
+from arena.core.mirror import (
     FileStoreAdapter,
     HuggingFaceStoreAdapter,
     OCIStoreAdapter,
@@ -18,18 +18,18 @@ from rlx.core.mirror import (
     pull_artifact,
     push_artifact,
 )
-from rlx.core.sdk import Policy
+from arena.core.sdk import Policy
 
 
 def test_i02_file_round_trip_preserves_policy_identity(tmp_path: Path) -> None:
-    source = Path("examples/eval/demo/rock.rlx").resolve()
+    source = Path("examples/eval/demo/rock.arena").resolve()
     expected = Policy.load(source).digest
     mirror = tmp_path / "mirror"
     pushed = push_artifact(source, mirror.as_uri(), verify=True)
     assert pushed["identity"] == expected
     assert pushed["uri"].endswith(f"#{expected}")
 
-    restored = tmp_path / "restored.rlx"
+    restored = tmp_path / "restored.arena"
     result = pull_artifact(pushed["uri"], restored, verify=True)
     assert result["identity"] == expected
     assert Policy.load(restored).digest == expected
@@ -39,7 +39,7 @@ def test_i02_file_round_trip_preserves_policy_identity(tmp_path: Path) -> None:
 
 
 def test_file_pull_verify_rejects_mutated_blob(tmp_path: Path) -> None:
-    source = Path("examples/eval/demo/rock.rlx").resolve()
+    source = Path("examples/eval/demo/rock.arena").resolve()
     artifact = build_mirror_artifact(source)
     mirror = tmp_path / "mirror"
     uri = FileStoreAdapter().push(artifact, mirror.as_uri(), verify=True)
@@ -78,17 +78,17 @@ def test_hf_adapter_uses_backend_credentials_and_preserves_bytes(
     import huggingface_hub
 
     monkeypatch.setattr(huggingface_hub, "hf_hub_download", fake_download)
-    source = Path("examples/eval/demo/rock.rlx").resolve()
+    source = Path("examples/eval/demo/rock.arena").resolve()
     artifact = build_mirror_artifact(source)
     adapter = HuggingFaceStoreAdapter()
     uri = adapter.push(
         artifact,
-        "hf://datasets/lab/artifacts/rlx?revision=main",
+        "hf://datasets/lab/artifacts/arena?revision=main",
         verify=True,
     )
     assert uri.endswith(f"#{artifact.identity}")
     assert f"revision={'a' * 40}" in uri
-    restored = tmp_path / "hf-restored.rlx"
+    restored = tmp_path / "hf-restored.arena"
     result = adapter.pull(uri, restored, verify=True)
     assert result["identity"] == artifact.identity
     assert Policy.load(restored).digest == artifact.identity
@@ -125,15 +125,15 @@ def test_hf_pull_resolves_movable_revision_once_before_any_download(
     import huggingface_hub
 
     monkeypatch.setattr(huggingface_hub, "hf_hub_download", fake_download)
-    artifact = build_mirror_artifact(Path("examples/eval/demo/rock.rlx"))
+    artifact = build_mirror_artifact(Path("examples/eval/demo/rock.arena"))
     adapter = HuggingFaceStoreAdapter()
     adapter.push(
         artifact,
-        "hf://datasets/lab/artifacts/rlx?revision=main",
+        "hf://datasets/lab/artifacts/arena?revision=main",
         verify=False,
     )
     movable = (
-        "hf://datasets/lab/artifacts/rlx?revision=moving-tag"
+        "hf://datasets/lab/artifacts/arena?revision=moving-tag"
         f"#{artifact.identity}"
     )
     result = adapter.pull(movable, tmp_path / "restored", verify=False)
@@ -169,11 +169,11 @@ def test_hf_push_verify_rejects_remote_blob_mutation(tmp_path: Path, monkeypatch
     import huggingface_hub
 
     monkeypatch.setattr(huggingface_hub, "hf_hub_download", fake_download)
-    artifact = build_mirror_artifact(Path("examples/eval/demo/rock.rlx"))
+    artifact = build_mirror_artifact(Path("examples/eval/demo/rock.arena"))
     with pytest.raises(StoreError, match="push verification failed"):
         HuggingFaceStoreAdapter().push(
             artifact,
-            "hf://datasets/lab/artifacts/rlx?revision=main",
+            "hf://datasets/lab/artifacts/arena?revision=main",
             verify=True,
         )
     assert object_downloads >= 1
@@ -182,8 +182,8 @@ def test_hf_push_verify_rejects_remote_blob_mutation(tmp_path: Path, monkeypatch
 def test_policy_mirror_rejects_undeclared_files_and_symlinks(tmp_path: Path) -> None:
     import shutil
 
-    source = tmp_path / "policy.rlx"
-    shutil.copytree(Path("examples/eval/demo/rock.rlx"), source)
+    source = tmp_path / "policy.arena"
+    shutil.copytree(Path("examples/eval/demo/rock.arena"), source)
     (source / "undeclared.txt").write_text("not identity-bound", encoding="utf-8")
     with pytest.raises(StoreError, match="outside its content-addressed manifest"):
         build_mirror_artifact(source)
@@ -197,7 +197,7 @@ def test_policy_mirror_rejects_undeclared_files_and_symlinks(tmp_path: Path) -> 
 def test_mirror_rejects_portable_case_and_unicode_path_collisions() -> None:
     digest = "sha256:" + ("a" * 64)
     descriptor = {
-        "schema": "rlx.mirror/v1",
+        "schema": "arena.mirror/v1",
         "identity": "sha256:" + ("b" * 64),
         "kind": "directory",
         "files": [
@@ -219,7 +219,7 @@ def test_mirror_rejects_portable_case_and_unicode_path_collisions() -> None:
 def test_oci_extraction_rejects_expansion_budget_and_links(
     tmp_path: Path, monkeypatch
 ) -> None:
-    monkeypatch.setattr("rlx.core.mirror.MAX_MIRROR_BYTES", 10)
+    monkeypatch.setattr("arena.core.mirror.MAX_MIRROR_BYTES", 10)
     oversized = tmp_path / "oversized.tar"
     with tarfile.open(oversized, "w") as archive:
         info = tarfile.TarInfo("mirror/blob")
@@ -240,11 +240,11 @@ def test_oci_extraction_rejects_expansion_budget_and_links(
 def test_push_pull_cli_verified_round_trip(tmp_path: Path, capsys) -> None:
     import json
 
-    source = Path("examples/eval/demo/rock.rlx").resolve()
+    source = Path("examples/eval/demo/rock.arena").resolve()
     mirror = tmp_path / "mirror"
     assert main(["push", str(source), mirror.as_uri(), "--verify", "--json"]) == 0
     pushed = json.loads(capsys.readouterr().out)
-    restored = tmp_path / "cli-restored.rlx"
+    restored = tmp_path / "cli-restored.arena"
     assert main(
         ["pull", pushed["uri"], "--out", str(restored), "--verify", "--json"]
     ) == 0

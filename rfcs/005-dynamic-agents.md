@@ -2,7 +2,7 @@
 
 **Status:** Implemented and generalized through lifecycle resolvers in 0.5
 **Date:** 2026-07-21 (revived 2026-07-22)
-**Depends on:** RFC 000, RFC 004, interaction registry (`rlx.plugins.interactions`)
+**Depends on:** RFC 000, RFC 004, interaction registry (`arena.plugins.interactions`)
 
 ## Decision
 
@@ -16,11 +16,11 @@ additional dynamic environments need their own qualification evidence.
 
 ## Required interface (when revived)
 
-1. **Interaction case** `dynamic_aec` registered via `rlx.plugins.interactions`.
+1. **Interaction case** `dynamic_aec` registered via `arena.plugins.interactions`.
 2. **Assignment model:** map `agent_id → policy digest` that can grow/shrink; births must declare which policy digests are eligible; removals must freeze that agent’s trajectory segment.
 3. **Trajectory schema:** joint steps must record `agents_alive`, join/leave events, and per-agent reward accumulation across dead steps (PettingZoo AEC semantics).
 4. **Compose check:** every newly born agent must pass `compose_check` before first `act`.
-5. **Conformance + qualify:** fixture with forced birth/removal; `rlx adapter qualify` must include lifecycle evidence before any support claim.
+5. **Conformance + qualify:** fixture with forced birth/removal; `arena adapter qualify` must include lifecycle evidence before any support claim.
 
 ## Non-goals
 

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from rlx.cli.main import main
+from arena.cli.main import main
 
 
 def _run(argv: list[str], capsys) -> tuple[int, str, str]:
@@ -47,7 +47,7 @@ def test_missing_args_error_cleanly(argv, capsys) -> None:
 
 
 def test_inspect_nonexistent_artifact(tmp_path: Path, capsys) -> None:
-    code, _out, err = _run(["inspect", str(tmp_path / "nope.rlx")], capsys)
+    code, _out, err = _run(["inspect", str(tmp_path / "nope.arena")], capsys)
     assert code == 3
     assert err.startswith("error [")
     assert "Traceback" not in err
@@ -76,8 +76,8 @@ def test_match_run_wrong_schema_no_partial_write(tmp_path: Path, monkeypatch, ca
     monkeypatch.chdir(tmp_path)
     bad_match = tmp_path / "match.yaml"
     bad_match.write_text(
-        "schema: rlx.match/v999\n"
-        "task: {adapter: pettingzoo-parallel, env: rlx/competitive_rps_v0}\n"
+        "schema: arena.match/v999\n"
+        "task: {adapter: pettingzoo-parallel, env: arena/competitive_rps_v0}\n"
         "assignments: {player_0: ./p0}\n"
         "seeds: {start: 0, count: 5}\n"
         "action_mode: deterministic\n",

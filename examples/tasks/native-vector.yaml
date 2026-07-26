@@ -1,9 +1,9 @@
-schema: rlx.task/v0alpha1
+schema: arena.task/v0alpha1
 name: task:vector-native@0.5
 adapter: pettingzoo-parallel
-env: rlx/vector_coordination_v0
+env: arena/vector_coordination_v0
 interaction: parallel
 version: pilot
 packaging:
   kind: pettingzoo_wrappers
-digest: sha256:1ed25230501cba1f29b98924675802c9aa1021711feb99e517d84ceaf9a96be1
+digest: sha256:1fe86aaa28d9ebb7dac63fae40b69feb5c048cfdd36bb58994075f9827da89a0

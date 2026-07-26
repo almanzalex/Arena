@@ -11,12 +11,12 @@ pytest.importorskip("pettingzoo")
 
 from _eval_fixtures import build_cyclic_rps_eval_fixture
 
-from rlx.core.population import create_population_from_yaml
-from rlx.core.registry import UnknownKindError
-from rlx.core.sdk import Policy
-from rlx.core.store import LocalStore
-from rlx.plugins.interactions import INTERACTIONS, get_interaction
-from rlx.runtime.evaluation import run_evaluation
+from arena.core.population import create_population_from_yaml
+from arena.core.registry import UnknownKindError
+from arena.core.sdk import Policy
+from arena.core.store import LocalStore
+from arena.plugins.interactions import INTERACTIONS, get_interaction
+from arena.runtime.evaluation import run_evaluation
 
 
 @pytest.mark.requires_torch
@@ -29,12 +29,12 @@ def test_eval_run_interaction_aec(tmp_path: Path, monkeypatch) -> None:
     pop = create_population_from_yaml(fx["population"], store=store)
     policy_index = {Policy.load(p).digest: Path(p) for p in fx["bundles"].values()}
     suite = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "aec-cyclic",
         "interaction": "aec",
         "task": {
             "adapter": "pettingzoo-parallel",
-            "env": "rlx/competitive_rps_aec_v0",
+            "env": "arena/competitive_rps_aec_v0",
             "interaction": "aec",
             "config": {"max_cycles": 1},
         },

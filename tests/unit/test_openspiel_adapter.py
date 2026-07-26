@@ -4,9 +4,9 @@ import pytest
 
 pytest.importorskip("pyspiel")
 
-from rlx.adapters.task_openspiel import OpenSpielPackager, interaction_for_game
-from rlx.core.errors import SchemaError
-from rlx.core.tasks import capture_task_trace
+from arena.adapters.task_openspiel import OpenSpielPackager, interaction_for_game
+from arena.core.errors import SchemaError
+from arena.core.tasks import capture_task_trace
 
 
 def _task(game: str = "tic_tac_toe") -> dict:
@@ -27,7 +27,7 @@ def test_openspiel_frozen_game_contract_and_reference_trace() -> None:
     assert info["roles"]["player_0"]["action"]["n"] == 9
 
     suite = {
-        "schema": "rlx.trace-suite/v1",
+        "schema": "arena.trace-suite/v1",
         "interaction": "aec",
         "episodes": [
             {
@@ -58,7 +58,7 @@ def test_openspiel_connect_four_contract_and_reference_trace() -> None:
     assert info["roles"]["player_0"]["observation"]["shape"] == [126]
     assert info["roles"]["player_0"]["action"]["n"] == 7
     suite = {
-        "schema": "rlx.trace-suite/v1",
+        "schema": "arena.trace-suite/v1",
         "interaction": "aec",
         "episodes": [
             {
@@ -92,7 +92,7 @@ def test_openspiel_chance_imperfect_information_family_is_seeded() -> None:
     assert info["chance_rng"] == "numpy_generator"
     assert info["roles"]["player_0"]["observation"]["shape"] == [11]
     suite = {
-        "schema": "rlx.trace-suite/v1",
+        "schema": "arena.trace-suite/v1",
         "interaction": "aec",
         "episodes": [
             {
@@ -119,7 +119,7 @@ def test_openspiel_simultaneous_family_uses_parallel_joint_action() -> None:
     assert info["game_semantics"]["dynamics"] == "SIMULTANEOUS"
     assert info["roles"]["player_0"]["observation"]["shape"] == [1]
     suite = {
-        "schema": "rlx.trace-suite/v1",
+        "schema": "arena.trace-suite/v1",
         "interaction": "parallel",
         "episodes": [
             {

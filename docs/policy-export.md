@@ -12,7 +12,7 @@ Supported templates:
 - `gru_categorical`
 
 Custom modules use the BYO TorchScript path when `torch.jit.script` can capture
-their explicit tensor-only `forward(obs[, hidden][, action_mask])` contract. RLX stores
+their explicit tensor-only `forward(obs[, hidden][, action_mask])` contract. Arena stores
 the TorchScript archive and source-captured reference cases, not the trainer module.
 Trace is an explicit, opt-in fallback for control-flow-free actors only; it must not be
 used to freeze an example path for dynamic Python control flow.
@@ -20,7 +20,7 @@ used to freeze an example path for dynamic Python control flow.
 ## Action-space boundary
 
 Action schemas are a **discriminated union of typed cases**. Incomplete claims fail
-before publish; RLX never flattens, reorders, or coerces action types.
+before publish; Arena never flattens, reorders, or coerces action types.
 
 - **Templates** (`mlp_categorical` / `gru_categorical`): `Discrete` only.
 - **BYO TorchScript** supported cases when the contract is complete:
@@ -42,31 +42,31 @@ before publish; RLX never flattens, reorders, or coerces action types.
 `torch.export` is not a shipping runtime tier in this release. Bundling arbitrary Python
 source is also intentionally absent: an integrity digest and allowlist do not sandbox
 Python. An actor that cannot be scripted fails before export with a recommendation to
-refactor its inference path to explicit tensor operations. No partial `.rlx` bundle is
+refactor its inference path to explicit tensor operations. No partial `.arena` bundle is
 published.
 
 ## CLI — template export
 
 ```bash
-rlx policy export \
+arena policy export \
   --adapter custom-pytorch \
   --source ./checkpoint.pt \
   --role player_0 \
   --spec examples/handoff/export_spec_player_0.yaml \
-  --out ./artifacts/player_0.rlx
+  --out ./artifacts/player_0.arena
 
-rlx policy verify ./artifacts/player_0.rlx
+arena policy verify ./artifacts/player_0.arena
 ```
 
 ## CLI — BYO TorchScript export
 
-Exporter-side only: RLX imports `package.module:factory` to build the live module,
+Exporter-side only: Arena imports `package.module:factory` to build the live module,
 optionally loads `--source` weights (`weights_only=True` by default), scripts the
 module, and embeds source-captured reference cases. The receiver loads only the
 TorchScript payload + preprocess IR (no trainer imports).
 
 ```bash
-rlx policy export \
+arena policy export \
   --adapter custom-pytorch \
   --module mylab.actors:build_pistonball_actor \
   --source ./checkpoint.pt \
@@ -75,7 +75,7 @@ rlx policy export \
   --reference-cases ./cases.json \
   --source-revision 36bba61 \
   --wrappers-identity 'color_reduction(full)>resize(64,64)>frame_stack(4)' \
-  --out ./artifacts/piston_0.rlx
+  --out ./artifacts/piston_0.arena
 ```
 
 `--reference-cases` is required (JSON list of `{observation: ...}` objects, or
@@ -103,16 +103,16 @@ task:
 Supported wrapper ops: `color_reduction`, `resize`, `frame_stack` (SuperSuit aliases
 `*_v0` / `*_v1` accepted). Unknown ops fail before env construction with an
 extension recipe. Missing wrappers when the policy expects wrapped spaces fail at
-`rlx check` with an observation-shape mismatch — RLX never silently compares
+`arena check` with an observation-shape mismatch — Arena never silently compares
 against the unwrapped env.
 
 ## Axes + case registry
 
 Dispatch for action types, Box distributions, preprocess ops, wrapper ops, actor
-payloads, and task packaging goes through `rlx.core.registry` / `rlx.plugins`.
+payloads, and task packaging goes through `arena.core.registry` / `arena.plugins`.
 Unknown kinds fail loud. To add a case: implement the axis interface, register it,
-add incomplete + complete tests, and run `rlx adapter qualify` before claiming
-support. `rlx capture --task …` drafts spaces/action cases from a live env
+add incomplete + complete tests, and run `arena adapter qualify` before claiming
+support. `arena capture --task …` drafts spaces/action cases from a live env
 (best-effort; human confirms; stochastic Box / Dict `param_layout` are never invented).
 
 ### Opt-in trust tiers (not sandboxed)
@@ -122,12 +122,12 @@ support. `rlx capture --task …` drafts spaces/action cases from a live env
 - **Task packaging `entrypoint_bundle`**: digest-pinned env entrypoint. Refused
   without `--trust-task-code`. Prefer `pettingzoo_wrappers`.
 
-Policy-side preprocess (`rlx.preprocess/v1`) covers transforms **outside** the env
+Policy-side preprocess (`arena.preprocess/v1`) covers transforms **outside** the env
 wrappers (e.g. HWC→CHW layout). Ops that live inside the network (e.g. `/255`) stay
 in the scripted module.
 
-`rlx policy export` / `verify` captures the exported policy's behavior as reference cases
-(`payloads/reference_cases.json`) on the exporting machine. `rlx policy verify`
+`arena policy export` / `verify` captures the exported policy's behavior as reference cases
+(`payloads/reference_cases.json`) on the exporting machine. `arena policy verify`
 replays them and fails if the bundle no longer reproduces the same
 actions/logits (e.g. on a different torch version or platform). To verify
 against externally supplied cases, pass `--source-test <cases.json>`.
@@ -137,26 +137,26 @@ Checkpoint formats accepted: raw `state_dict`, or dict with `state_dict` / `mode
 ## SDK
 
 ```python
-from rlx import Policy, Task, Match, check
-from rlx.conformance.fixtures import build_rps_policy
+from arena import Policy, Task, Match, check
+from arena.conformance.fixtures import build_rps_policy
 
-bundle = build_rps_policy("./player_0.rlx", role="player_0", seed=1)
+bundle = build_rps_policy("./player_0.arena", role="player_0", seed=1)
 policy = Policy.load(bundle)
-task = Task.load({"adapter": "pettingzoo-parallel", "env": "rlx/competitive_rps_v0"})
+task = Task.load({"adapter": "pettingzoo-parallel", "env": "arena/competitive_rps_v0"})
 check(task, policy.as_role("player_0")).raise_for_errors()
 ```
 
 ```python
-from rlx.adapters.policy_custom_torch import export_module_policy
+from arena.adapters.policy_custom_torch import export_module_policy
 
 export_module_policy(
-    out_dir="./actor.rlx",
+    out_dir="./actor.arena",
     name="actor",
     roles=["piston_0"],
     module=my_module,
     observation={"type": "Box", "shape": [64, 64, 4], "layout": "HWC", "dtype": "uint8"},
     action={"type": "Discrete", "n": 3},
-    preprocessing={"pipeline": {"version": "rlx.preprocess/v1", "steps": [
+    preprocessing={"pipeline": {"version": "arena.preprocess/v1", "steps": [
         {"op": "layout", "from": "HWC", "to": "CHW"},
     ]}},
     reference_cases=cases,

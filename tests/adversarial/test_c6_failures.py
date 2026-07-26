@@ -23,9 +23,9 @@ from _adv_envs import (  # noqa: E402
     make_discrete_policy,
 )
 
-from rlx.core.sdk import Match, Policy, Task  # noqa: E402
+from arena.core.sdk import Match, Policy, Task  # noqa: E402
 
-_PILOT = "rlx/competitive_rps_v0"
+_PILOT = "arena/competitive_rps_v0"
 
 
 def _pilot_match(tmp_path: Path, *, action_mode: str = "deterministic", max_cycles: int = 2) -> Match:
@@ -53,8 +53,8 @@ def _rogue_load(real_load, target_substr: str, rogue):
 def test_out_of_bounds_action_recorded(tmp_path: Path) -> None:
     """A rogue policy that returns an out-of-range action is recorded as invalid_action
     (the pilot env would otherwise apply it silently)."""
-    from rlx.adapters import policy_custom_torch as pct
-    from rlx.runtime import match as match_mod
+    from arena.adapters import policy_custom_torch as pct
+    from arena.runtime import match as match_mod
 
     match = _pilot_match(tmp_path)
     real = pct.load_runtime
@@ -85,8 +85,8 @@ def test_out_of_bounds_action_recorded(tmp_path: Path) -> None:
 @pytest.mark.requires_torch
 @pytest.mark.requires_pettingzoo
 def test_non_integer_action_recorded(tmp_path: Path) -> None:
-    from rlx.adapters import policy_custom_torch as pct
-    from rlx.runtime import match as match_mod
+    from arena.adapters import policy_custom_torch as pct
+    from arena.runtime import match as match_mod
 
     match = _pilot_match(tmp_path)
     real = pct.load_runtime
@@ -117,8 +117,8 @@ def test_nan_logits_recorded_as_policy_failure(tmp_path: Path) -> None:
     end-to-end (the runtime refuses to emit an action from NaN/Inf)."""
     import torch
 
-    from rlx.adapters import policy_custom_torch as pct
-    from rlx.runtime import match as match_mod
+    from arena.adapters import policy_custom_torch as pct
+    from arena.runtime import match as match_mod
 
     match = _pilot_match(tmp_path)
     real = pct.load_runtime

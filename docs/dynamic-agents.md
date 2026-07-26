@@ -7,18 +7,18 @@ resolver maps every concrete agent ID to a policy:
 ```yaml
 task:
   adapter: pettingzoo-parallel
-  env: rlx/dynamic_lineup_aec_v0
+  env: arena/dynamic_lineup_aec_v0
   interaction: dynamic_aec
   lifecycle:
     birth_eligibility:
       agent_2: [sha256:...]
 assignments:
-  agent_0: ./policy.rlx
-  agent_1: ./policy.rlx
-  agent_2: ./policy.rlx
+  agent_0: ./policy.arena
+  agent_1: ./policy.arena
+  agent_2: ./policy.arena
 ```
 
-RLX validates complete assignment/eligibility coverage before creating a run.
+Arena validates complete assignment/eligibility coverage before creating a run.
 At birth it repeats compose-check, resets the born agent's policy state, and only
 then permits inference. At removal it freezes the agent segment and applies the
 declared termination reset.
@@ -28,7 +28,7 @@ For populations where many concrete IDs share one policy role, use `role`:
 ```yaml
 task:
   adapter: pettingzoo-parallel
-  env: rlx/dynamic_reentry_aec_v0
+  env: arena/dynamic_reentry_aec_v0
   interaction: dynamic_aec
   lifecycle:
     resolver:
@@ -40,7 +40,7 @@ task:
       join_eligibility:
         contestant: [sha256:...]
 assignments:
-  contestant: ./policy.rlx
+  contestant: ./policy.arena
 ```
 
 Role resolution is computed before the run and remains immutable. Eligibility is
@@ -60,11 +60,11 @@ The built-in lineup and re-entry cases have frozen traces and pass the same publ
 qualification command used by other task adapters:
 
 ```bash
-rlx adapter qualify examples/tasks/dynamic-lineup.yaml \
+arena adapter qualify examples/tasks/dynamic-lineup.yaml \
   --trace-suite examples/tasks/dynamic-lineup-trace.yaml \
   --out dynamic-qualification.json
 
-rlx adapter qualify examples/tasks/dynamic-reentry.yaml \
+arena adapter qualify examples/tasks/dynamic-reentry.yaml \
   --trace-suite examples/tasks/dynamic-reentry-trace.yaml \
   --out dynamic-reentry-qualification.json
 ```

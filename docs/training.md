@@ -2,14 +2,14 @@
 
 0.5 keeps training downstream of recorded evidence and dispatches algorithms
 through the trainer registry. The built-in qualified cases are seeded behavior
-cloning and return-weighted regression over RLX trajectory datasets.
+cloning and return-weighted regression over Arena trajectory datasets.
 
 ```bash
-rlx data select runs/teacher --out selected --role player_0
-rlx data materialize selected/dataset.yaml --out portable-dataset \
+arena data select runs/teacher --out selected --role player_0
+arena data materialize selected/dataset.yaml --out portable-dataset \
   --split train=.8 --split validation=.2 --split-seed 17
-rlx train recipe.yaml --out training-run
-rlx policy verify training-run/policy.rlx
+arena train recipe.yaml --out training-run
+arena policy verify training-run/policy.arena
 ```
 
 `data materialize` verifies every selected episode digest, copies episodes into a
@@ -22,7 +22,7 @@ observed counts, so the split is portable and content-addressed.
 A recipe is explicit and content-addressed:
 
 ```yaml
-schema: rlx.train/v1
+schema: arena.train/v1
 name: imitate-teacher
 algorithm: behavior_cloning
 dataset: portable-dataset/dataset.yaml
@@ -43,13 +43,13 @@ architecture:
 preprocessing: {id: normalize_v0, mean: 0.0, std: 1.0}
 ```
 
-Before training, RLX rehashes every episode. The run record contains dataset and
+Before training, Arena rehashes every episode. The run record contains dataset and
 recipe digests, seed, hyperparameters, example count, and the complete loss curve.
 The output bundle embeds source-captured cases from the trained module and can be
 verified or mirrored like any other policy.
 
 Every training run also writes `checkpoint.json` and `checkpoint.pt`. To resume,
-set `resume_from` to the earlier run directory and increase `epochs`. RLX verifies
+set `resume_from` to the earlier run directory and increase `epochs`. Arena verifies
 the payload digest, loads tensor-only state with `weights_only=True`, and requires
 an exact training-contract digest match before restoring model, optimizer, loss
 history, and NumPy sampler state. The contract includes algorithm/config,
@@ -62,7 +62,7 @@ The built-in cases support Discrete actions and Discrete/Box observations:
 - `return_weighted_regression` weights transitions by their episode return and
   accepts positive `temperature` and `max_weight` settings in `algorithm_config`.
 
-RLX refuses unknown algorithms rather than routing them through a similar case.
+Arena refuses unknown algorithms rather than routing them through a similar case.
 A new trainer implements `TrainingCase`, registers in `TRAINERS`, and supplies
 distinct-objective, reproducibility, interruption, mutation, and policy-conformance
 fixtures. Online/distributed RL and large sharded datasets remain outside the

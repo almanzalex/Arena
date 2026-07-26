@@ -10,13 +10,13 @@ import pytest
 pytest.importorskip("torch")
 pytest.importorskip("pettingzoo")
 
-from rlx.conformance.fixtures import build_fixed_action_rps_policy
-from rlx.core.dataset import select_episodes
-from rlx.core.eval_bundle import build_eval_bundle
-from rlx.core.population import create_population
-from rlx.core.sdk import Policy
-from rlx.core.store import LocalStore
-from rlx.runtime.evaluation import build_eval_report, run_evaluation
+from arena.conformance.fixtures import build_fixed_action_rps_policy
+from arena.core.dataset import select_episodes
+from arena.core.eval_bundle import build_eval_bundle
+from arena.core.population import create_population
+from arena.core.sdk import Policy
+from arena.core.store import LocalStore
+from arena.runtime.evaluation import build_eval_report, run_evaluation
 
 
 @pytest.mark.requires_torch
@@ -37,12 +37,12 @@ def test_data_select_and_eval_bundle_roundtrip(tmp_path: Path, monkeypatch) -> N
         store=store,
     )
     suite = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "slice-suite",
         "interaction": "parallel",
         "task": {
             "adapter": "pettingzoo-parallel",
-            "env": "rlx/competitive_rps_v0",
+            "env": "arena/competitive_rps_v0",
             "config": {"max_cycles": 1},
         },
         "assignments": {
@@ -72,7 +72,7 @@ def test_data_select_and_eval_bundle_roundtrip(tmp_path: Path, monkeypatch) -> N
         name="rock-losses",
         out_dir=tmp_path / "dataset",
     )
-    assert dataset["schema"] == "rlx.dataset/v0alpha1"
+    assert dataset["schema"] == "arena.dataset/v0alpha1"
     assert (tmp_path / "dataset" / "dataset.yaml").exists()
     # Rock vs paper: rock loses as player_0 — at least one episode selected.
     assert len(dataset["episodes"]) >= 1

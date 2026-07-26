@@ -11,20 +11,20 @@ def test_cleanrl_bridge_exports_source_conformance_without_receiver_import(
     tmp_path: Path,
 ) -> None:
     torch = pytest.importorskip("torch")
-    from examples.integrations.cleanrl_bridge import CleanRLQNetwork
-    from rlx.adapters.policy_custom_torch import (
+    from arena.adapters.policy_custom_torch import (
         export_module_from_checkpoint,
         load_runtime,
         verify_bundle_self,
     )
-    from rlx.core.sdk import Policy
+    from arena.core.sdk import Policy
+    from examples.integrations.cleanrl_bridge import CleanRLQNetwork
 
     torch.manual_seed(7)
     checkpoint = tmp_path / "dqn.cleanrl_model"
     torch.save(CleanRLQNetwork().state_dict(), checkpoint)
     bundle = export_module_from_checkpoint(
         module_ref="examples.integrations.cleanrl_bridge:build_actor",
-        out_dir=tmp_path / "cleanrl-cartpole.rlx",
+        out_dir=tmp_path / "cleanrl-cartpole.arena",
         role="agent",
         observation={
             "type": "Box",

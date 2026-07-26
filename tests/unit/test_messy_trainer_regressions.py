@@ -1,4 +1,4 @@
-"""Regression tests for messy-trainer evaluation defects in RLX 0.1."""
+"""Regression tests for messy-trainer evaluation defects in Arena 0.1."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from rlx.adapters.policy_custom_torch import (  # noqa: E402
+from arena.adapters.policy_custom_torch import (  # noqa: E402
     PROVENANCE_SELF,
     PROVENANCE_SOURCE,
     build_module,
@@ -21,7 +21,7 @@ from rlx.adapters.policy_custom_torch import (  # noqa: E402
     pack_reference_cases,
     verify_bundle_self,
 )
-from rlx.core.errors import ConformanceError, SchemaError  # noqa: E402
+from arena.core.errors import ConformanceError, SchemaError  # noqa: E402
 
 
 def _gru_arch(*, obs_dim: int = 4, action_n: int = 3, hidden: int = 8) -> dict:
@@ -62,7 +62,7 @@ def test_recurrent_bundle_verifies_clean_with_carried_logits(tmp_path: Path) -> 
     torch.manual_seed(0)
     state = build_module(arch).state_dict()
     bundle = export_policy(
-        out_dir=tmp_path / "gru.rlx",
+        out_dir=tmp_path / "gru.arena",
         name="gru",
         roles=["agent"],
         observation=_box_obs(),
@@ -78,7 +78,7 @@ def test_recurrent_bundle_verifies_clean_with_carried_logits(tmp_path: Path) -> 
     assert any(c.get("note") == "recurrent_reset_boundary" for c in cases)
     assert all("expected_logits" in c for c in cases if c.get("mode") == "deterministic")
 
-    from rlx.adapters.policy_custom_torch import _embed_reference_cases
+    from arena.adapters.policy_custom_torch import _embed_reference_cases
 
     _embed_reference_cases(bundle, cases, provenance=PROVENANCE_SOURCE)
     result = verify_bundle_self(bundle, allow_self_consistency=True)
@@ -93,7 +93,7 @@ def test_recurrent_verify_detects_genuinely_wrong_logits(tmp_path: Path) -> None
     torch.manual_seed(1)
     state = build_module(arch).state_dict()
     bundle = export_policy(
-        out_dir=tmp_path / "gru.rlx",
+        out_dir=tmp_path / "gru.arena",
         name="gru",
         roles=["agent"],
         observation=_box_obs(),
@@ -109,7 +109,7 @@ def test_recurrent_verify_detects_genuinely_wrong_logits(tmp_path: Path) -> None
     carry = next(c for c in cases if c.get("hidden_reset") is False and "expected_logits" in c)
     carry["expected_logits"] = [float(x) + 0.6 for x in carry["expected_logits"]]
 
-    from rlx.adapters.policy_custom_torch import _embed_reference_cases
+    from arena.adapters.policy_custom_torch import _embed_reference_cases
 
     _embed_reference_cases(bundle, cases, provenance=PROVENANCE_SOURCE)
     with pytest.raises(ConformanceError, match="logits_mismatch"):
@@ -126,13 +126,13 @@ def test_generate_reference_cases_carries_hidden_and_catches_reset_bug(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Carried reference cases must fail a runtime that incorrectly resets every step."""
-    from rlx.adapters.policy_custom_torch import TorchPolicyRuntime, _embed_reference_cases
+    from arena.adapters.policy_custom_torch import TorchPolicyRuntime, _embed_reference_cases
 
     arch = _gru_arch()
     torch.manual_seed(2)
     state = build_module(arch).state_dict()
     bundle = export_policy(
-        out_dir=tmp_path / "gru.rlx",
+        out_dir=tmp_path / "gru.arena",
         name="gru",
         roles=["agent"],
         observation=_box_obs(),
@@ -194,7 +194,7 @@ def test_export_embeds_source_conformance_cases_and_verify_labels(tmp_path: Path
     torch.save({"state_dict": build_module(arch).state_dict()}, ckpt)
     bundle = export_from_checkpoint(
         source=ckpt,
-        out=tmp_path / "exp.rlx",
+        out=tmp_path / "exp.arena",
         role="agent",
         architecture=arch,
         observation=_box_obs(),
@@ -214,7 +214,7 @@ def test_self_consistency_verify_emits_warning(tmp_path: Path) -> None:
     arch = _mlp_arch()
     torch.manual_seed(4)
     bundle = export_policy(
-        out_dir=tmp_path / "p.rlx",
+        out_dir=tmp_path / "p.arena",
         name="p",
         roles=["agent"],
         observation=_box_obs(),
@@ -238,7 +238,7 @@ def test_self_consistency_verify_emits_warning(tmp_path: Path) -> None:
     rt = load_runtime(bundle)
     rt.reset()
     action = rt.act([0.0, 0.0, 0.0, 0.0], mode="deterministic")
-    from rlx.adapters.policy_custom_torch import _embed_reference_cases
+    from arena.adapters.policy_custom_torch import _embed_reference_cases
 
     _embed_reference_cases(
         bundle,
@@ -262,7 +262,7 @@ def test_self_consistency_verify_emits_warning(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 4. rlx check must honor task config (simple_tag non-default spaces)
+# 4. arena check must honor task config (simple_tag non-default spaces)
 # ---------------------------------------------------------------------------
 
 
@@ -276,8 +276,8 @@ def test_check_uses_task_config_not_env_defaults(tmp_path: Path) -> None:
         importlib.import_module("pettingzoo.mpe.simple_tag_v3")
     except ImportError:
         pytest.importorskip("mpe2.simple_tag_v3")
-    from rlx.cli.main import main
-    from rlx.core.sdk import Policy, Task, check
+    from arena.cli.main import main
+    from arena.core.sdk import Policy, Task, check
 
     # Configured simple_tag: adversary obs dim 12 (default is 16).
     task_yaml = tmp_path / "task.yaml"
@@ -297,7 +297,7 @@ def test_check_uses_task_config_not_env_defaults(tmp_path: Path) -> None:
     arch = _mlp_arch(obs_dim=12, action_n=5)
     torch.manual_seed(5)
     bundle = export_policy(
-        out_dir=tmp_path / "tag.rlx",
+        out_dir=tmp_path / "tag.arena",
         name="tag-adv",
         roles=["adversary_0"],
         observation={
@@ -361,7 +361,7 @@ def test_nested_training_checkpoint_fails_clean_no_partial_bundle(tmp_path: Path
         },
         ckpt,
     )
-    out = tmp_path / "should_not_exist.rlx"
+    out = tmp_path / "should_not_exist.arena"
     with pytest.raises(SchemaError, match="training checkpoint") as exc:
         export_from_checkpoint(
             source=ckpt,
@@ -375,7 +375,7 @@ def test_nested_training_checkpoint_fails_clean_no_partial_bundle(tmp_path: Path
     assert "state_dict" in msg or "extract" in msg
     assert not out.exists(), "partial bundle was left on disk after failed export"
     # No leftover staging dirs either.
-    leftovers = [p for p in tmp_path.iterdir() if p.name.startswith(".rlx-export-")]
+    leftovers = [p for p in tmp_path.iterdir() if p.name.startswith(".arena-export-")]
     assert leftovers == [], leftovers
 
 
@@ -391,7 +391,7 @@ def test_full_module_pickle_rejected_without_partial_bundle(tmp_path: Path) -> N
     module = torch.nn.Linear(4, 3)
     ckpt = tmp_path / "full_module.pt"
     torch.save(module, ckpt)  # full module pickle, not a state_dict
-    out = tmp_path / "bundle.rlx"
+    out = tmp_path / "bundle.arena"
     with pytest.raises(SchemaError, match="unsafe pickle|weights_only|refusing"):
         export_from_checkpoint(
             source=ckpt,

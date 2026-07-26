@@ -11,14 +11,14 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from rlx.adapters.policy_custom_torch import (
+from arena.adapters.policy_custom_torch import (
     _embed_reference_cases,
     generate_reference_cases,
     load_runtime,
     verify_bundle_self,
 )
-from rlx.conformance.fixtures import build_fixed_action_rps_policy
-from rlx.core.manifests import dump_yaml
+from arena.conformance.fixtures import build_fixed_action_rps_policy
+from arena.core.manifests import dump_yaml
 
 
 def _with_source_cases(bundle: Path) -> Path:
@@ -60,31 +60,31 @@ def main() -> int:
             shutil.rmtree(out)
     out.mkdir(parents=True)
     roles = ["player_0", "player_1"]
-    _with_source_cases(build_fixed_action_rps_policy(out / "rock.rlx", role=roles, action=0, name="rock"))
-    _with_source_cases(build_fixed_action_rps_policy(out / "paper.rlx", role=roles, action=1, name="paper"))
+    _with_source_cases(build_fixed_action_rps_policy(out / "rock.arena", role=roles, action=0, name="rock"))
+    _with_source_cases(build_fixed_action_rps_policy(out / "paper.arena", role=roles, action=1, name="paper"))
     _with_source_cases(
-        build_fixed_action_rps_policy(out / "scissors.rlx", role=roles, action=2, name="scissors")
+        build_fixed_action_rps_policy(out / "scissors.arena", role=roles, action=2, name="scissors")
     )
     dump_yaml(
         {
-            "schema": "rlx.population/v0alpha1",
+            "schema": "arena.population/v0alpha1",
             "name": "cyclic-rps",
             "members": [
-                {"policy": "./rock.rlx", "weight": 1.0, "tags": ["rock"]},
-                {"policy": "./paper.rlx", "weight": 1.0, "tags": ["paper"]},
-                {"policy": "./scissors.rlx", "weight": 1.0, "tags": ["scissors"]},
+                {"policy": "./rock.arena", "weight": 1.0, "tags": ["rock"]},
+                {"policy": "./paper.arena", "weight": 1.0, "tags": ["paper"]},
+                {"policy": "./scissors.arena", "weight": 1.0, "tags": ["scissors"]},
             ],
         },
         out / "population.yaml",
     )
     dump_yaml(
         {
-            "schema": "rlx.evaluation/v0alpha1",
+            "schema": "arena.evaluation/v0alpha1",
             "name": "cyclic-matrix",
             "interaction": "parallel",
             "task": {
                 "adapter": "pettingzoo-parallel",
-                "env": "rlx/competitive_rps_v0",
+                "env": "arena/competitive_rps_v0",
                 "config": {"max_cycles": 1},
             },
             "assignments": {

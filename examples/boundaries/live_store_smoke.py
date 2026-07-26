@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from rlx.conformance.qualification import qualify_store
+from arena.conformance.qualification import qualify_store
 
 
 def main() -> int:

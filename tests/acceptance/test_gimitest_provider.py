@@ -10,32 +10,32 @@ pytest.importorskip("gimitest")
 pytest.importorskip("pettingzoo")
 pytest.importorskip("torch")
 
-from rlx.cli.main import main
-from rlx.conformance.qualification import qualify_evaluation_fixture
-from rlx.core.identity import canonical_json, digest_uri, sha256_bytes
-from rlx.runtime.evaluation import build_eval_report, run_evaluation
+from arena.cli.main import main
+from arena.conformance.qualification import qualify_evaluation_fixture
+from arena.core.identity import canonical_json, digest_uri, sha256_bytes
+from arena.runtime.evaluation import build_eval_report, run_evaluation
 
 
 @pytest.mark.acceptance
 @pytest.mark.requires_gimitest
 def test_i01_gimitest_provider_records_complete_lineage(tmp_path: Path) -> None:
-    rock = Path("examples/eval/demo/rock.rlx").resolve()
-    paper = Path("examples/eval/demo/paper.rlx").resolve()
+    rock = Path("examples/eval/demo/rock.arena").resolve()
+    paper = Path("examples/eval/demo/paper.arena").resolve()
     provider_config = {
         "semantic": {},
         "suite": "base-hooks",
         "test_class": "gimitest.gtest:GTest",
-        "parameters": {"purpose": "RLX provider qualification"},
+        "parameters": {"purpose": "Arena provider qualification"},
     }
     suite = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "gimitest-lineage",
         "provider": "gimitest",
         "provider_config": provider_config,
         "interaction": "parallel",
         "task": {
             "adapter": "pettingzoo-parallel",
-            "env": "rlx/competitive_rps_v0",
+            "env": "arena/competitive_rps_v0",
             "interaction": "parallel",
             "config": {"max_cycles": 1},
         },
@@ -72,8 +72,8 @@ def test_i01_gimitest_provider_records_complete_lineage(tmp_path: Path) -> None:
 
 
 def test_external_gimitest_class_requires_explicit_trust() -> None:
-    from rlx.adapters.eval_gimitest import _resolve_test_class
-    from rlx.core.errors import SchemaError
+    from arena.adapters.eval_gimitest import _resolve_test_class
+    from arena.core.errors import SchemaError
 
     with pytest.raises(SchemaError, match="execute Python"):
         _resolve_test_class("tests.some_lab:Scenario", allow_external=False)
@@ -83,25 +83,25 @@ def test_external_gimitest_class_requires_explicit_trust() -> None:
 @pytest.mark.requires_gimitest
 def test_gimitest_non_noop_scenario_changes_recorded_reward(tmp_path: Path) -> None:
     suite = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "gimitest-non-noop",
         "provider": "gimitest",
         "provider_config": {
             "test_class": (
-                "rlx.adapters.eval_gimitest.scenarios:RewardTransformScenario"
+                "arena.adapters.eval_gimitest.scenarios:RewardTransformScenario"
             ),
             "parameters": {"reward_scale": -1.0},
         },
         "interaction": "parallel",
         "task": {
             "adapter": "pettingzoo-parallel",
-            "env": "rlx/competitive_rps_v0",
+            "env": "arena/competitive_rps_v0",
             "interaction": "parallel",
             "config": {"max_cycles": 1},
         },
         "assignments": {
-            "player_0": str(Path("examples/eval/demo/rock.rlx").resolve()),
-            "player_1": str(Path("examples/eval/demo/paper.rlx").resolve()),
+            "player_0": str(Path("examples/eval/demo/rock.arena").resolve()),
+            "player_1": str(Path("examples/eval/demo/paper.arena").resolve()),
         },
         "seeds": [0],
         "action_mode": "deterministic",
@@ -153,27 +153,27 @@ def test_gimitest_can_run_across_isolated_python_worker_boundary(
         "suite": "base-hooks",
         "test_class": "gimitest.gtest:GTest",
         "parameters": {"purpose": "subprocess provider qualification"},
-        "isolation": {
-            "mode": "subprocess",
-            "python": str(Path(sys.executable).resolve()),
-            "timeout_seconds": 60,
-        },
+            "isolation": {
+                "mode": "subprocess",
+                "python": str(Path(sys.executable)),
+                "timeout_seconds": 60,
+            },
     }
     suite = {
-        "schema": "rlx.evaluation/v0alpha1",
+        "schema": "arena.evaluation/v0alpha1",
         "name": "gimitest-subprocess",
         "provider": "gimitest",
         "provider_config": provider_config,
         "interaction": "parallel",
         "task": {
             "adapter": "pettingzoo-parallel",
-            "env": "rlx/competitive_rps_v0",
+            "env": "arena/competitive_rps_v0",
             "interaction": "parallel",
             "config": {"max_cycles": 1},
         },
         "assignments": {
-            "player_0": str(Path("examples/eval/demo/rock.rlx").resolve()),
-            "player_1": str(Path("examples/eval/demo/paper.rlx").resolve()),
+            "player_0": str(Path("examples/eval/demo/rock.arena").resolve()),
+            "player_1": str(Path("examples/eval/demo/paper.arena").resolve()),
         },
         "seeds": [0],
         "action_mode": "deterministic",

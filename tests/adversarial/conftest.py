@@ -13,8 +13,8 @@ def patch_task_env(monkeypatch):
     independent references to ``make_env``; both must be patched for a custom env to
     flow through pre-run compatibility introspection *and* execution.
     """
-    from rlx.adapters.task_pettingzoo import adapter as adapter_mod
-    from rlx.runtime import match as match_mod
+    from arena.adapters.task_pettingzoo import adapter as adapter_mod
+    from arena.runtime import match as match_mod
 
     def _install(env_cls, **env_kwargs):
         def factory(spec, **_kwargs):

@@ -10,14 +10,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rlx.adapters.policy_custom_torch import (
+from arena.adapters.policy_custom_torch import (
     export_module_policy,
     load_runtime,
     verify_bundle_integrity,
     verify_bundle_self,
 )
-from rlx.core.errors import ConformanceError, SchemaError
-from rlx.core.manifests import dump_yaml, load_manifest
+from arena.core.errors import ConformanceError, SchemaError
+from arena.core.manifests import dump_yaml, load_manifest
 
 torch = pytest.importorskip("torch")
 nn = torch.nn
@@ -73,7 +73,7 @@ def _source_image(case: dict[str, object]) -> tuple[int, list[float]]:
 def test_hwc_cnn_source_capture_clean_room_and_loud_shape_failure(tmp_path: Path) -> None:
     image = np.full((2, 3, 1), 3, dtype=np.float32)
     bundle = export_module_policy(
-        out_dir=tmp_path / "cnn.rlx",
+        out_dir=tmp_path / "cnn.arena",
         name="cnn",
         roles=["agent"],
         module=HwcCnn(),
@@ -81,7 +81,7 @@ def test_hwc_cnn_source_capture_clean_room_and_loud_shape_failure(tmp_path: Path
         action={"type": "Discrete", "n": 3},
         preprocessing={
             "pipeline": {
-                "version": "rlx.preprocess/v1",
+                "version": "arena.preprocess/v1",
                 "steps": [
                     {"op": "layout", "from": "HWC", "to": "CHW"},
                     {"op": "running_norm", "mean": 1.0, "std": 2.0},
@@ -100,7 +100,7 @@ def test_hwc_cnn_source_capture_clean_room_and_loud_shape_failure(tmp_path: Path
 
     # No trainer module is made available to the child: TorchScript must stand alone.
     child = (
-        "from rlx.adapters.policy_custom_torch import load_runtime; "
+        "from arena.adapters.policy_custom_torch import load_runtime; "
         "import numpy as np; "
         f"print(load_runtime({str(bundle)!r}).act(np.full((2,3,1), 3, dtype=np.float32)))"
     )
@@ -134,7 +134,7 @@ def test_recurrent_masked_actor_carries_and_resets_in_clean_room(tmp_path: Path)
         },
     ]
     bundle = export_module_policy(
-        out_dir=tmp_path / "rnn.rlx",
+        out_dir=tmp_path / "rnn.arena",
         name="rnn",
         roles=["agent"],
         module=MaskedRecurrent(),
@@ -155,7 +155,7 @@ def test_recurrent_masked_actor_carries_and_resets_in_clean_room(tmp_path: Path)
     rt.reset("a")
     assert rt.act(np.array([-3], dtype=np.float32), action_mask=np.array([0, 1, 0]), agent_id="a") == 1
     child = (
-        "from rlx.adapters.policy_custom_torch import load_runtime; "
+        "from arena.adapters.policy_custom_torch import load_runtime; "
         "import numpy as np; "
         f"r=load_runtime({str(bundle)!r}); r.reset('a'); "
         "print(r.act(np.array([2], dtype=np.float32), action_mask=np.array([1,0,0]), agent_id='a'), "
@@ -174,7 +174,7 @@ def test_recurrent_masked_actor_carries_and_resets_in_clean_room(tmp_path: Path)
 @pytest.mark.requires_torch
 def test_box_actor_and_all_payload_tampering_fail_loudly(tmp_path: Path) -> None:
     bundle = export_module_policy(
-        out_dir=tmp_path / "box.rlx",
+        out_dir=tmp_path / "box.arena",
         name="box",
         roles=["agent"],
         module=BoundedBox(),
@@ -195,7 +195,7 @@ def test_box_actor_and_all_payload_tampering_fail_loudly(tmp_path: Path) -> None
 @pytest.mark.requires_torch
 def test_payload_path_traversal_rejects_before_loading(tmp_path: Path) -> None:
     bundle = export_module_policy(
-        out_dir=tmp_path / "path.rlx",
+        out_dir=tmp_path / "path.arena",
         name="path",
         roles=["agent"],
         module=BoundedBox(),
@@ -213,7 +213,7 @@ def test_payload_path_traversal_rejects_before_loading(tmp_path: Path) -> None:
 def test_incomplete_multidiscrete_rejects_before_publication() -> None:
     with pytest.raises(SchemaError, match="logit_layout"):
         export_module_policy(
-            out_dir=Path("/tmp") / "will-not-export.rlx",
+            out_dir=Path("/tmp") / "will-not-export.arena",
             name="bad",
             roles=["agent"],
             module=object(),

@@ -5,7 +5,7 @@ machine-readable qualification report. The command is intentionally a release
 gate, not a marketing probe:
 
 ```bash
-rlx adapter qualify ./match.yaml --out ./qualification.json
+arena adapter qualify ./match.yaml --out ./qualification.json
 ```
 
 The fixture is an ordinary match manifest whose assignments point at the
@@ -26,7 +26,7 @@ commands with the network disabled. Docker adds the stronger
 
 ## 0.1 qualification record
 
-The release fixture is the bundled `rlx/competitive_rps_v0` PettingZoo Parallel
+The release fixture is the bundled `arena/competitive_rps_v0` PettingZoo Parallel
 task with two `custom-pytorch` fixed categorical policies. The fixture must be
 exported with source-captured reference cases before running the command. Its
 report is release evidence, not a permanent repository artifact (absolute
@@ -39,8 +39,8 @@ template categorical exporter). See [policy-export.md](policy-export.md).
 
 ## 0.2 qualification (populations + evaluation)
 
-`rlx adapter qualify` accepts either a match fixture (0.1 gates) or an
-`rlx.evaluation/v0alpha1` suite. Evaluation fixtures must:
+`arena adapter qualify` accepts either a match fixture (0.1 gates) or an
+`arena.evaluation/v0alpha1` suite. Evaluation fixtures must:
 
 1. reference a population YAML with local policy bundle paths;
 2. embed source-captured policy evidence;
@@ -54,9 +54,9 @@ See [evaluation.md](evaluation.md) and [eval-clean-room.md](eval-clean-room.md).
 
 ## Registry cases and support claims
 
-Portable behavior is an **axes + case registry** (`rlx.core.registry` /
-`rlx.plugins`). Capability matrix rows may only name kinds that are both
-registered and covered by a passing `rlx adapter qualify` fixture. Unknown
+Portable behavior is an **axes + case registry** (`arena.core.registry` /
+`arena.plugins`). Capability matrix rows may only name kinds that are both
+registered and covered by a passing `arena adapter qualify` fixture. Unknown
 kinds raise `UnknownKindError` with an extension recipe (interface to
 implement, tests to add, qualify required). Do not claim support from a
 developer editable install alone.

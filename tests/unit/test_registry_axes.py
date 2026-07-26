@@ -8,9 +8,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rlx.core.action_cases import box_distribution, validate_action_case
-from rlx.core.errors import SchemaError
-from rlx.core.registry import (
+from arena.core.action_cases import box_distribution, validate_action_case
+from arena.core.errors import SchemaError
+from arena.core.registry import (
     ACTION_CASES,
     DISTRIBUTIONS,
     LIFECYCLE_RESOLVERS,
@@ -23,7 +23,7 @@ from rlx.core.registry import (
     capability_matrix,
     ensure_plugins_loaded,
 )
-from rlx.plugins.wrappers import resolve_wrapper_kind
+from arena.plugins.wrappers import resolve_wrapper_kind
 
 
 def test_capability_matrix_lists_registered_cases() -> None:
@@ -57,7 +57,7 @@ def test_capability_matrix_lists_registered_cases() -> None:
 )
 def test_unknown_kinds_include_extension_recipe(getter, kind: str) -> None:
     ensure_plugins_loaded()
-    with pytest.raises(UnknownKindError, match="extension|register|rlx adapter qualify") as exc:
+    with pytest.raises(UnknownKindError, match="extension|register|arena adapter qualify") as exc:
         getter()
     msg = str(exc.value)
     assert kind in msg
@@ -83,8 +83,8 @@ def test_wrapper_alias_resolves_via_registry() -> None:
 @pytest.mark.requires_torch
 def test_trusted_source_refused_by_default_and_digest_mismatch(tmp_path: Path) -> None:
     torch = pytest.importorskip("torch")
-    from rlx.adapters.policy_custom_torch import load_runtime, verify_bundle_self
-    from rlx.plugins.payloads import export_trusted_source_bundle
+    from arena.adapters.policy_custom_torch import load_runtime, verify_bundle_self
+    from arena.plugins.payloads import export_trusted_source_bundle
 
     src = tmp_path / "actor.py"
     src.write_text(
@@ -124,7 +124,7 @@ def test_trusted_source_refused_by_default_and_digest_mismatch(tmp_path: Path) -
 
     with pytest.raises(SchemaError, match="refusing to export trusted_source|trust_source"):
         export_trusted_source_bundle(
-            out_dir=tmp_path / "no.rlx",
+            out_dir=tmp_path / "no.arena",
             name="ts",
             roles=["agent"],
             source_py=src,
@@ -137,7 +137,7 @@ def test_trusted_source_refused_by_default_and_digest_mismatch(tmp_path: Path) -
         )
 
     bundle = export_trusted_source_bundle(
-        out_dir=tmp_path / "yes.rlx",
+        out_dir=tmp_path / "yes.arena",
         name="ts",
         roles=["agent"],
         source_py=src,
@@ -165,8 +165,8 @@ def test_trusted_source_refused_by_default_and_digest_mismatch(tmp_path: Path) -
 
 @pytest.mark.requires_torch
 def test_entrypoint_bundle_refused_without_trust(tmp_path: Path) -> None:
-    from rlx.adapters.task_pettingzoo.adapter import make_env
-    from rlx.core.identity import digest_uri, sha256_file
+    from arena.adapters.task_pettingzoo.adapter import make_env
+    from arena.core.identity import digest_uri, sha256_file
 
     src = tmp_path / "env.py"
     src.write_text(
@@ -227,7 +227,7 @@ def test_entrypoint_bundle_refused_without_trust(tmp_path: Path) -> None:
 @pytest.mark.requires_torch
 def test_capture_from_source_drafts_action_cases() -> None:
     gym = pytest.importorskip("gymnasium")
-    from rlx.core.capture import capture_action_case_from_space, capture_draft_from_actor
+    from arena.core.capture import capture_action_case_from_space, capture_draft_from_actor
 
     md = capture_action_case_from_space(gym.spaces.MultiDiscrete([2, 3]))
     assert md["type"] == "MultiDiscrete"

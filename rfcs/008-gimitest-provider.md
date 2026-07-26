@@ -1,4 +1,4 @@
-# RFC 008 — Gimitest Evaluation Provider (RLX 0.3)
+# RFC 008 — Gimitest Evaluation Provider (Arena 0.3)
 
 **Status:** Accepted in 0.3; dependency-isolation boundary added in 0.5
 **Date:** 2026-07-21
@@ -6,13 +6,13 @@
 
 ## User promise
 
-Apply Gimitest (or compatible) robustness scenarios to an RLX policy/task pair and keep **lineage**: exact policy digests, task digest, perturbation config, seeds, and raw evidence.
+Apply Gimitest (or compatible) robustness scenarios to an Arena policy/task pair and keep **lineage**: exact policy digests, task digest, perturbation config, seeds, and raw evidence.
 
 ## Interface
 
 ```yaml
 # evaluation.yaml
-schema: rlx.evaluation/v0alpha1
+schema: arena.evaluation/v0alpha1
 provider: gimitest          # default: native
 provider_config:
   suite: …
@@ -20,7 +20,7 @@ provider_config:
 ```
 
 ```text
-rlx eval run eval/robustness.yaml --provider gimitest
+arena eval run eval/robustness.yaml --provider gimitest
 ```
 
 Providers are a **registry axis** (like metrics/samplers): unknown provider → extension recipe.
@@ -37,7 +37,7 @@ Providers are a **registry axis** (like metrics/samplers): unknown provider → 
 
 ## Non-goals
 
-- Reimplementing Gimitest inside RLX
+- Reimplementing Gimitest inside Arena
 - Requiring Gimitest for ordinary cross-play
 
 ## Exit evidence

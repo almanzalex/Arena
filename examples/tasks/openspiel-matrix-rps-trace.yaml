@@ -1,4 +1,4 @@
-schema: rlx.trace-suite/v1
+schema: arena.trace-suite/v1
 name: openspiel-matrix-rps-reference
 interaction: parallel
 episodes:

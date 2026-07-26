@@ -1,7 +1,7 @@
 # U-03 integration author template
 
 An integration is supportable only when another user can add and qualify it without
-editing RLX core dispatch.
+editing Arena core dispatch.
 
 1. Implement one registered interface: `TaskPackager`, `EvalProvider`, or
    `ExternalStoreAdapter`.
@@ -11,8 +11,8 @@ editing RLX core dispatch.
    byte digests. Never use a mutable display name as identity.
 4. Add a smallest frozen fixture, fail-loud unknown/incomplete tests, failure accounting,
    and a successful end-to-end path.
-5. For tasks, add a trace suite and run `rlx task verify-equivalence`; declare tolerances.
-6. Run `rlx adapter qualify ...` and retain its JSON report with release evidence.
+5. For tasks, add a trace suite and run `arena task verify-equivalence`; declare tolerances.
+6. Run `arena adapter qualify ...` and retain its JSON report with release evidence.
 7. Document install, one runnable command, security/trust boundary, scope, non-goals,
    overhead, and how to uninstall/disable the optional integration.
 

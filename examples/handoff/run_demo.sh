@@ -9,22 +9,22 @@ mkdir -p "${DEMO}/artifacts" "${DEMO}/runs"
 DEMO_DIR="${DEMO}" python - <<'PY'
 import os
 from pathlib import Path
-from rlx.conformance.fixtures import build_rps_policy
+from arena.conformance.fixtures import build_rps_policy
 
 demo = Path(os.environ["DEMO_DIR"])
-build_rps_policy(demo / "artifacts" / "player_0.rlx", role="player_0", seed=1)
-build_rps_policy(demo / "artifacts" / "player_1.rlx", role="player_1", seed=2)
+build_rps_policy(demo / "artifacts" / "player_0.arena", role="player_0", seed=1)
+build_rps_policy(demo / "artifacts" / "player_1.arena", role="player_1", seed=2)
 print("exported policies ->", demo / "artifacts")
 PY
 
 cat > "${DEMO}/match.yaml" <<'EOF'
-schema: rlx.match/v0alpha1
+schema: arena.match/v0alpha1
 task:
   adapter: pettingzoo-parallel
-  env: rlx/competitive_rps_v0
+  env: arena/competitive_rps_v0
 assignments:
-  player_0: ./artifacts/player_0.rlx
-  player_1: ./artifacts/player_1.rlx
+  player_0: ./artifacts/player_0.arena
+  player_1: ./artifacts/player_1.arena
 seeds: {start: 0, count: 10}
 action_mode: deterministic
 record:
@@ -36,10 +36,10 @@ failure_policy:
 EOF
 
 cd "${DEMO}"
-rlx init
-rlx inspect ./artifacts/player_0.rlx
-rlx check rlx/competitive_rps_v0 ./artifacts/player_0.rlx --role player_0
-rlx check rlx/competitive_rps_v0 ./artifacts/player_1.rlx --role player_1
-rlx match run ./match.yaml --record --out ./runs/baseline-match
-rlx data inspect ./runs/baseline-match/trajectories
+arena init
+arena inspect ./artifacts/player_0.arena
+arena check arena/competitive_rps_v0 ./artifacts/player_0.arena --role player_0
+arena check arena/competitive_rps_v0 ./artifacts/player_1.arena --role player_1
+arena match run ./match.yaml --record --out ./runs/baseline-match
+arena data inspect ./runs/baseline-match/trajectories
 echo "Demo complete: ${DEMO}/runs/baseline-match"
