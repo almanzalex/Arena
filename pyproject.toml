@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "arena"
 dynamic = ["version"]
-description = "Portable RL policy/evaluation interoperability across native and external runtimes"
+description = "Local-first interoperability for portable RL policies, evaluations, and release evidence"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 license = "Apache-2.0"

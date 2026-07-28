@@ -14,3 +14,4 @@ its own RFC and qualification owner before it enters a stable claim.
 | CA, revocation, transparency, and hardware keys | Detached signatures intentionally use user-supplied trust anchors | A real organizational trust-lifecycle requirement appears |
 | Sandboxing untrusted Python/providers | Process isolation is not an OS security sandbox | Arena accepts a threat model requiring adversarial-code execution |
 | Shell completion, manpages, GUI, editor integrations, telemetry | Not necessary for the first verified handoff | Measured DX studies show one is a dominant friction source |
+| PyPI name ambiguity (`arena` vs `diambra-arena` / `rl-arena`) | Different products; users can install the wrong package | Documented in README; consider a more distinctive distribution name only if collisions cause real install harm |

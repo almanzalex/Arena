@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+title: Arena
+message: >-
+  If you use Arena in academic work, please cite it using the metadata below.
+type: software
+authors:
+  - family-names: Almanza
+    given-names: Alexander
+repository-code: "https://github.com/almanzalex/Arena"
+license: Apache-2.0
+version: "1.0.0rc1"
+date-released: "2026-07-25"
+abstract: >-
+  Arena is a local-first Python CLI and SDK for portable reinforcement-learning
+  policies, populations, evaluations, and release evidence across native and
+  qualified external task runtimes, providers, and artifact stores.
+keywords:
+  - reinforcement-learning
+  - multi-agent
+  - interoperability
+  - reproducibility
+  - pettingzoo

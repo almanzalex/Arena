@@ -1,20 +1,48 @@
-# Arena 1.0.0rc1
+# Arena
 
-Local-first Python CLI/SDK for **verifiable RL policy and evaluation handoff**
-across native and qualified external task runtimes, evaluation providers, and
-artifact stores.
+**Local-first, pairwise interoperability for RL artifact handoffs.**
 
-Export a custom PyTorch policy, hand it to a collaborator without the training repository, run a seeded PettingZoo Parallel (or AEC) match, evaluate populations with cross-play, and inspect complete joint trajectories.
+[![CI](https://github.com/almanzalex/Arena/actions/workflows/ci.yml/badge.svg)](https://github.com/almanzalex/Arena/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](pyproject.toml)
 
-The 1.0 release candidate freezes legacy identities, separates semantic
-evaluation intent from execution binding, publishes outputs transactionally,
-supervises hard-budget evaluation workers, emits versioned diagnostics, and
-binds release claims to signed evidence. The final `v1.0.0` tag is intentionally
-blocked until the public-distribution, live Hugging Face, separate-service
-OpenEnv, isolated Gimitest, claimed-platform CI, and independent-user evidence
-gates are all attached to the exact release commit.
+Arena is a Python CLI and SDK for **portable policies, populations, evaluations,
+and release evidence**. It defines content-addressed artifacts, checks whether
+they compose, runs seeded matches and evaluation suites, and preserves lineage
+across native and qualified external runtimes—without replacing trainers,
+environment servers, or artifact hosts.
 
-## Three-command verified handoff
+Value shows up in **bilateral handoffs**—producer and consumer, lab A ↔ lab B,
+training repo ↔ evaluation pipeline—when both sides use Arena for export, verify,
+and run. You do not need ecosystem-wide adoption or a network-effect “standard”;
+pairwise interoperability and auditability are enough.
+
+Current distribution: **`1.0.0rc1`**. The final `v1.0.0` tag stays blocked until
+the release-commit evidence gates in [docs/1.0-readiness.md](docs/1.0-readiness.md)
+are attached to that exact commit.
+
+---
+
+## Why it exists
+
+RL labs routinely exchange checkpoints, trajectories, and evaluation scripts
+that only work inside the training repository that produced them. Existing tools
+solve adjacent pieces:
+
+| Tool class | What it owns | What it usually does not own |
+|---|---|---|
+| Trainers (RLlib, CleanRL, …) | Learning | Cross-repo policy handoff |
+| Env APIs (Gymnasium, PettingZoo, OpenEnv) | Interaction | Artifact identity + eval lineage |
+| Experiment stores (W&B, MLflow, HF Hub) | Bytes / runs | Semantic compose-check before execution |
+| Datasets (Minari, …) | Offline data | Match/eval provenance binding |
+
+Arena sits in that gap for **two parties at a time**: verify that an exported
+policy, task, population, and evaluation claim compose and reproduce on the
+consumer’s clean machine, with digests and lineage both sides can audit.
+
+---
+
+## Quickstart
 
 ```bash
 python -m pip install 'arena[quickstart]==1.0.0rc1'
@@ -22,26 +50,26 @@ arena demo handoff --out ./arena-demo
 arena inspect ./arena-demo/restored-policy.arena
 ```
 
-The demo is source-free and network-free after installation. It exports a
-packaged reference policy, verifies it, mirrors it through `file://`, pulls it
-to a new path, proves the digest is unchanged, and prints an evaluation-intent
-digest plus the next external-runtime step. It stages the entire destination,
-so interruption cannot leave `./arena-demo` looking complete.
+After install, the demo is source-free and network-free. It exports a reference
+policy, verifies it, mirrors through `file://`, pulls to a new path, proves the
+digest is unchanged, and prints an evaluation-intent digest. The destination is
+staged transactionally so interruption cannot look like a finished handoff.
 
-## 1.0 support truth
+More flows: [docs/1.0-user-flows.md](docs/1.0-user-flows.md).
 
-The installed [`arena/support-matrix.json`](arena/support-matrix.json) is the source
-of truth used by `arena doctor`; [`arena/schema-registry.json`](arena/schema-registry.json)
-freezes the reader/writer compatibility contract.
+---
 
-| Capability | RC status | Final 1.0 condition |
-|---|---|---|
-| Core identity/inspect, native runtime, `file://`, quickstart | stable | Claimed-platform release CI |
-| OpenSpiel frozen qualified cases | stable | Claimed-platform release CI |
-| OpenEnv | preview, target stable | Fresh separate-service qualification |
-| Gimitest | preview, target stable | Non-no-op isolated-interpreter qualification |
-| Hugging Face | preview, required stable | Fresh credentialed immutable-revision round trip |
-| OCI, W&B, MLflow | preview | May remain preview; never simulated into a live claim |
+## What you can do
+
+- **Export / verify** portable policies (templates or BYO TorchScript) without
+  the trainer import path.
+- **Match & evaluate** with seeded reproducibility, failure accounting, and
+  non-transitivity-aware reports.
+- **Populate & cross-play** versioned policy sets with a sampling ledger.
+- **Bind external systems** (OpenEnv, OpenSpiel, Gimitest, HF/OCI/W&B/MLflow)
+  behind registries; unknown kinds fail with an extension recipe.
+- **Qualify & doctor** support claims via machine-readable evidence
+  (`arena doctor`, `arena adapter qualify`, packaged support matrix).
 
 ```bash
 arena --version
@@ -49,288 +77,92 @@ arena doctor --json
 arena schema list --json
 ```
 
-## MVP workflow (0.1 portable policy)
+Support truth (what is stable vs preview) lives in
+[`arena/support-matrix.json`](arena/support-matrix.json) and is summarized below.
 
-```bash
-pip install 'arena[all]'
-
-# Researcher A
-arena init
-arena policy export --adapter custom-pytorch --source checkpoint.pt \
-  --role player_0 --spec examples/handoff/export_spec_player_0.yaml \
-  --out ./artifacts/player_0.arena
-arena policy verify ./artifacts/player_0.arena
-
-# Researcher B (clean machine, no training repo)
-arena inspect ./artifacts/player_0.arena
-arena check arena/competitive_rps_v0 ./artifacts/player_0.arena --role player_0
-arena match run match.yaml --record --out ./runs/baseline-match
-arena data inspect ./runs/baseline-match/trajectories
-```
-
-## Evaluation workflow (0.2)
-
-Runnable cyclic RPS demo (checked in under `examples/eval/demo/`):
-
-```bash
-pip install -e '.[torch,pettingzoo]'   # or 'arena[torch,pettingzoo]'
-bash examples/eval/run_demo.sh
-```
-
-Manual flow:
-
-```bash
-arena population create ./population.yaml --ref populations/opponents
-arena eval run ./evaluation.yaml --policy … --population … --out ./eval-runs/x
-arena eval report ./eval-runs/x --json
-arena data select ./eval-runs/x --out ./datasets/losses --outcome loss
-arena eval bundle ./eval-runs/x --out ./bundles/x
-```
-
-See [docs/populations.md](docs/populations.md), [docs/evaluation.md](docs/evaluation.md),
-[docs/eval-clean-room.md](docs/eval-clean-room.md), [docs/eval-usability-signoff.md](docs/eval-usability-signoff.md).
-**0.2 sealed:** [docs/0.2-complete.md](docs/0.2-complete.md).
-**0.3 complete:** [docs/0.3-complete.md](docs/0.3-complete.md).
-**Release evidence:** [docs/0.3-evidence.md](docs/0.3-evidence.md).
-**0.4 boundary expansion:** [docs/0.4-boundaries.md](docs/0.4-boundaries.md).
-**0.4 evidence:** [docs/0.4-evidence.md](docs/0.4-evidence.md).
-**0.5 generalization boundary:** [docs/0.5-boundaries.md](docs/0.5-boundaries.md).
-**0.5 evidence:** [docs/0.5-evidence.md](docs/0.5-evidence.md).
-**1.0 release program:** [docs/1.0-readiness.md](docs/1.0-readiness.md).
-**Latest local RC evidence:** [docs/1.0-rc-local-evidence.md](docs/1.0-rc-local-evidence.md).
-**Executable 1.0 value flows:** [docs/1.0-user-flows.md](docs/1.0-user-flows.md).
-**Signed release procedure:** [docs/releasing.md](docs/releasing.md).
-Deferred items: [docs/0.2-revisit.md](docs/0.2-revisit.md).
-
-## External integration workflow (0.3)
-
-```bash
-# OpenEnv: launch/import the frozen RPS pilot, then prove native↔remote semantics.
-pip install 'arena[openenv]'
-python -m arena.adapters.task_openenv.server --port 8000
-arena task import openenv://127.0.0.1:8000/arena/competitive_rps_v0 \
-  --name task:rps-openenv@0.3 --source-revision openenv-0.4.1
-arena task verify-equivalence examples/tasks/native-rps.yaml task-rps-openenv-0.3.yaml \
-  --trace-suite examples/tasks/rps-equivalence.yaml
-
-# OpenSpiel: deterministic frozen catalog with checked reference traces.
-pip install 'arena[openspiel]'
-arena task verify-equivalence examples/tasks/openspiel-connect-four.yaml \
-  --trace-suite examples/tasks/openspiel-connect-four-trace.yaml
-
-# Artifact mirrors preserve the policy's sha256 identity.
-arena push examples/eval/demo/rock.arena file:///tmp/arena-mirror --verify
-arena pull 'file:///tmp/arena-mirror#sha256:…' --verify
-```
-
-See [external tasks](docs/external-tasks.md), [evaluation providers](docs/eval-providers.md),
-and [external stores](docs/external-stores.md).
-
-## Generalized boundary workflow (0.5)
-
-```bash
-# Match/eval with forced agent birth + removal and explicit digest eligibility.
-arena match run dynamic-match.yaml --out dynamic-run
-
-# Turn selected trajectories into a source-independent dataset, then train/reuse.
-# Content-stable train/validation splits.
-arena data materialize selected/dataset.yaml --out portable-dataset \
-  --split train=.8 --split validation=.2 --split-seed 17
-arena train behavior-cloning.yaml --out training-run
-arena policy verify training-run/policy.arena
-
-# Produce machine-readable push/pull evidence for any store implementation.
-arena store qualify training-run/policy.arena \
-  'oci://registry.example/lab/arena?simulate=/tmp/arena-oci' \
-  --out store-qualification.json
-
-# Sign the artifact identity with a user-owned key; the detached signature remains
-# valid after any identity-preserving mirror round trip.
-arena attest keygen --private lab-private.pem --public lab-public.pem
-arena attest sign training-run/policy.arena --key lab-private.pem \
-  --issuer my-lab --out policy.attestation.json
-arena attest verify training-run/policy.arena policy.attestation.json \
-  --key lab-public.pem
-
-# Run lifecycle re-entry, split/train/resume/reuse, three game semantics,
-# signing, and four simulated stores as one checked journey.
-bash examples/boundaries/run_demo.sh
-```
-
-See [training recipes](docs/training.md), [dynamic agents](docs/dynamic-agents.md),
-and the [0.5 boundary record](docs/0.5-boundaries.md).
-
-## Pilot pair (frozen in RFCs)
-
-| | |
-|--|--|
-| **Task** | Bundled PettingZoo Parallel competitive RPS (`arena/competitive_rps_v0`); AEC twin `arena/competitive_rps_aec_v0` |
-| **Policies** | Declarative custom-PyTorch categorical actors (`mlp_categorical` / `gru_categorical`) |
-
-See [rfcs/000-product-boundary.md](rfcs/000-product-boundary.md), [rfcs/001-portable-policy-contract.md](rfcs/001-portable-policy-contract.md), [rfcs/003-populations.md](rfcs/003-populations.md), [rfcs/004-evaluation.md](rfcs/004-evaluation.md).
-
-## Portable actor boundaries (0.1)
-
-Arena supports fixed categorical templates and a narrow bring-your-own subset via an
-**axes + case registry**: new messy lab scenarios are handled by registering
-cases, not by reactive core patches. Dispatch is always `registry.get(kind)`;
-unknown kinds fail loud with an extension recipe (interface, tests, and
-`arena adapter qualify` before claiming support). No silent coerce/flatten/pad.
-
-A scriptable TorchScript tensor actor is the preferred BYO payload (script-first;
-trace is explicit opt-in). The actor must declare `forward(obs[, hidden][, action_mask])`,
-recurrence/hidden shape, preprocessing/layout, and action semantics. The receiver
-imports no trainer package.
-
-- Image observations must declare `layout: CHW|HWC`; preprocessing uses a
-  serializable `arena.preprocess/v1` pipeline (layout, running normalization, clipping,
-  frame stack, flatten) via registered preprocess ops. Shape changes are errors.
-- PettingZoo tasks may declare a SuperSuit wrapper chain (`color_reduction`,
-  `resize`, `frame_stack`) plus `observation_layout` so `check`/`match` use the
-  **wrapped** spaces. Unknown/missing wrappers fail loud via the wrapper registry.
-- BYO TorchScript export is available via `arena policy export --module pkg:factory`
-  or `export_module_policy()`. Opt-in `trusted_source` (digest-pinned `.py`,
-  `--trust-source`) exists but is **not sandboxed** and is not the default.
-- Discrete actors support explicit in-graph masks. Deterministic bounded `Box`
-  and complete BYO cases for `MultiDiscrete`, recursive typed `Dict`, and
-  diagonal-Gaussian stochastic `Box` are registered cases when declared fully.
-  Template actors stay Discrete-only.
-- Task packaging defaults to `pettingzoo_wrappers`; opt-in `entrypoint_bundle`
-  (digest-pinned env entrypoint, `--trust-task-code`) is registry-backed and
-  refused by default.
-- `arena capture --task …` drafts spaces/action cases from a live env (best-effort;
-  human confirms before publish).
-- `arena policy verify` requires source-captured evidence by default.
-
-TorchScript is a portability format, not a malware sandbox: only load policy bundles
-from a trusted lab/source. Full-module pickle checkpoints remain refused by default.
-
-### Capability matrix
-
-Capability claims are limited to **registry-registered + qualified** cases.
-
-| Status | Policy/action subset | Exact contract and rationale |
+| Capability | RC status | Final 1.0 condition |
 |---|---|---|
-| Supported now | `Discrete` categorical template actors and scripted custom `nn.Module` actors | Integer action, optional declared mask, deterministic argmax or NumPy `Generator` categorical sampling. Scripted actors require a source-captured reference suite and load without the trainer repository. CLI: template `--source` or BYO `--module`. |
-| Supported now | Deterministic bounded `Box` scripted actors | Exact shape/dtype/bounds; finite output only; no clipping. |
-| Supported now | `MultiDiscrete` BYO TorchScript (complete case) | `nvec` + `logit_layout: {kind: concatenated}` + `sampling_order` + `masks`. Never flattened to Discrete. |
-| Supported now | Recursive typed `Dict` BYO TorchScript (complete case) | Canonical `key_order`, typed `spaces`, `param_layout: {kind: concatenated_fields}`. |
-| Supported now | Stochastic `Box` `diagonal_gaussian` BYO (complete case) | `param_layout`, `transform.order: [sample, tanh, affine]`, `rng.algorithm: numpy_generator`. |
-| Supported now | Declarative PettingZoo SuperSuit task wrappers (`pettingzoo_wrappers`) | `color_reduction` / `resize` / `frame_stack` (+ layout). |
-| Supported only with explicit trust | `trusted_source` payload; `entrypoint_bundle` task packaging | Digest-pinned Python; `--trust-source` / `--trust-task-code`; **not sandboxed**. Prefer TorchScript / pettingzoo_wrappers. |
-| Deliberately rejected | Incomplete claims; unknown registry kinds; untyped Dict; arbitrary mixtures | Fail loud with repair guidance or an extension recipe. No silent coercion. |
+| Core identity/inspect, native runtime, `file://`, quickstart | stable | Claimed-platform release CI |
+| OpenSpiel frozen qualified cases | stable | Claimed-platform release CI |
+| OpenEnv | preview → target stable | Fresh separate-service qualification |
+| Gimitest | preview → target stable | Non-no-op isolated-interpreter qualification |
+| Hugging Face | preview → required stable | Fresh credentialed immutable-revision round trip |
+| OCI, W&B, MLflow | preview | May remain preview; never simulated into a live claim |
 
-### Integration capability matrix
-
-| Axis | Supported | Boundary |
-|---|---|---|
-| Task runtime | OpenEnv 0.4.x; RPS plus typed vector-coordination qualification tasks | Endpoint, schema, role contract, source revision, and protocol capabilities are pinned; transport failures remain distinct. This is not a claim over every OpenEnv environment. |
-| Agent lifecycle | `dynamic_aec`; explicit-agent and role resolvers | Join eligibility, compatibility recheck, recurrent-state reset, removal/re-entry segment history, and joint boundary events. Unknown agents still fail loud. |
-| Training | Registry cases: behavior cloning and return-weighted regression | Materialized verified episodes, deterministic digest-bucket splits, exact seeded checkpoint resume; categorical Discrete actions with Discrete/Box observations. |
-| Game runtime | OpenSpiel 2.x semantic-family fixtures | Sequential perfect-information (`connect_four`), chance/imperfect-information (`kuhn_poker`), and simultaneous (`matrix_rps`) paths with legal masks and frozen traces. Game IDs remain qualification-scoped. |
-| Eval provider | Native; Gimitest 1.0 provider | Content-addressed lineage; Gimitest may execute through an explicit separate-Python subprocess. Native cells can run concurrently with stable result order. |
-| Artifact store | `file://`, `hf://`, `oci://`, `wandb://`, `mlflow://` | Machine-readable verified qualification, simulation/live labels, identity-preserving mirrors, and optional detached Ed25519 authenticity. |
-
-### How to add a case
-
-1. Implement the axis interface under `arena/plugins/` (e.g. `ActionCase`, `DistributionCase`, `PreprocessOp`, `WrapperOp`, `PayloadCase`, `TaskPackager`).
-2. Register it (`register_action_case(kind, case)`, etc., or an entry point group `arena.plugins`).
-3. Add fail-loud incomplete-claim tests and a complete end-to-end export/verify/act test.
-4. Run `arena adapter qualify <fixture>` on a fixture that exercises the new case before claiming support.
-
-Every rejected category fails before a final bundle is published. The error names the
-missing semantic contract and a safe repair; no action is coerced, flattened, reordered,
-clipped, or approximated.
+---
 
 ## Install
 
 ```bash
-pip install -e '.[dev]'   # from a checkout
-# or
-pip install 'arena[torch,pettingzoo]'
-pip install 'arena[openenv]'    # optional external task runtime
-pip install 'arena[openspiel]'  # optional frozen game adapter
-pip install 'arena[gimitest]'   # Gimitest worker support; install provider separately
-pip install 'arena[hf]'         # optional Hugging Face mirror
-pip install 'arena[wandb]'      # optional W&B artifact mirror
-pip install 'arena[mlflow]'     # optional MLflow artifact mirror
-# OCI uses the ORAS CLI and its normal `oras login` credentials.
+# From PyPI (release candidate)
+python -m pip install 'arena[quickstart]==1.0.0rc1'
+
+# From a checkout
+python -m pip install -e '.[dev]'
+
+# Optional integrations
+python -m pip install 'arena[openenv]'     # external task runtime
+python -m pip install 'arena[openspiel]'   # frozen game adapter
+python -m pip install 'arena[gimitest]'    # worker deps; install gimitest separately
+python -m pip install 'arena[hf]'          # Hugging Face mirrors
+python -m pip install 'arena[wandb]'
+python -m pip install 'arena[mlflow]'
+# OCI uses the ORAS CLI and its normal login credentials.
 ```
 
-Core stays small (`pyyaml`, `numpy`). Heavy deps are optional extras.
+Core stays small (`pyyaml`, `numpy`). Heavy dependencies are extras.
 
-## Acceptance gates
+> **Name note:** This project’s PyPI distribution is `arena`. Unrelated packages
+> such as `diambra-arena` (game envs) and `rl-arena` (competitive envs) solve
+> different problems. Prefer the pinned version above when installing.
 
-| ID | Gate |
-|----|------|
-| P-01…P-05 | Policy export fidelity, masks, recurrence, repo independence |
-| M-01…M-02 | Seeded match reproducibility + failure accounting |
-| D-01 | Trajectory completeness / provenance |
-| U-01 | Clean-room handoff (scripted + hermetic + human checklist) |
-| E-01…E-06 | Eval compose-check, sampling ledger, metrics, non-transitivity |
-| A-01/A-02 | AEC runner + Parallel regression |
-| D-02/D-03 | Dataset slice lineage + eval release bundles |
-| Q-02 | Adapter qualify covers population/eval fixtures |
-| U-02 | In-repo cross-play script replaced by population+eval |
-| T-01…T-03 | External trace equivalence, serialization, and failure semantics |
-| I-01…I-03 | Provider lineage, store round-trip, offline native core |
-| S-01/U-03 | Overhead budget and integration-author qualification workflow |
-| L-01…L-04 | Dynamic birth eligibility, compose-check/reset, lifecycle trajectories |
-| TR-01…TR-04 | Materialized dataset integrity, seeded recipe, policy verify/reuse |
-| ST-07 | Simulated and opt-in live OCI/W&B/MLflow/HF identity round trips |
-| G-01…G-10 | Registry generalization, lifecycle re-entry, exact resume, semantic game families, external isolation, store qualification, authenticity, concurrency, composition |
+---
+
+## Documentation
+
+| Start here | |
+|---|---|
+| [1.0 user flows](docs/1.0-user-flows.md) | Executable producer/consumer journeys |
+| [1.0 readiness](docs/1.0-readiness.md) | What blocks `v1.0.0` |
+| [1.0 RC local evidence](docs/1.0-rc-local-evidence.md) | Latest local proof record |
+| [Releasing](docs/releasing.md) | Signed release procedure |
+| [Clean-room handoff](docs/clean-room.md) | Second-machine install guide |
+| [Adapter qualification](docs/adapter-qualification.md) | Evidence required before “supported” |
+| [Docs index](docs/README.md) | Full map of guides, milestones, RFCs |
+
+Milestone records (0.2–0.5) and RFCs remain under [`docs/`](docs/) and
+[`rfcs/`](rfcs/). They are the historical contract trail, not the landing page.
+
+---
+
+## Development
 
 ```bash
-pytest -q                    # fast default selection (slow/docker gates deselected)
+python -m pip install -e '.[dev]'
+ruff check .
+pytest -q                       # fast suite (slow/docker deselected)
+pytest -m slow -q               # hermetic wheel + clean-room gates
 ```
 
-### Hermetic U-01 clean-room gate
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md).
 
-The strongest automated approximation of the human clean-room step lives in
-`tests/acceptance/test_u01_hermetic.py`. It builds a real wheel + sdist
-(`python -m build`), installs **only the wheel** into a throwaway
-`python3.12 -m venv` with a scrubbed `HOME`/`XDG`/`PYTHONPATH` (no repo on the
-import path), copies in **only** the `.arena` bundles + `match.yaml` + the guide,
-disables the network, and runs the commands **parsed out of** `docs/clean-room.md`
-in order. If Docker is present it also runs the same flow in a minimal
-`python:3.12-slim` image with `--network none`.
+---
 
-```bash
-pytest -m slow -q            # wheel build + hermetic venv (+ Docker if available)
-pytest -m docker -q          # only the Docker --network none variant
-```
+## Deliberate non-goals
 
-These gates are marked `slow`/`docker` and deselected from the default run. In
-CI they run as a separate `hermetic` job (see `.github/workflows/ci.yml`). A CPU
-torch index can be supplied via `ARENA_TORCH_INDEX_URL` to avoid large CUDA wheels.
-See [docs/clean-room.md](docs/clean-room.md) for the coverage matrix, the
-machine-parseable command block, and the design of a third (LLM-reader) technique.
-See [docs/adapter-qualification.md](docs/adapter-qualification.md) for the
-evidence required before an adapter is called supported, and
-[docs/usability-signoff.md](docs/usability-signoff.md) for the real-reader record.
+Arena is **not** a hosted service, trainer replacement, universal OpenSpiel
+catalog, malware sandbox for untrusted Python, silent Elo ranking system, or a
+bet that every lab must adopt one artifact model before anyone benefits.
+Live remote qualifications require the user’s own credentials and are never
+conflated with `?simulate=` evidence. Deferred work is listed in
+[TODOS.md](TODOS.md).
 
-## Layout
+---
 
-```text
-arena/
-  core/           # manifests, store, compatibility, SDK, registry, capture, population, dataset
-  plugins/        # axis case registrations (action, samplers, metrics, …)
-  cli/            # arena commands
-  runtime/        # match + fixed/dynamic AEC + evaluation + training + trajectories
-  conformance/    # fixtures F1–F6
-  adapters/
-    policy_custom_torch/
-    task_pettingzoo/
-    task_openenv/
-    task_openspiel/
-    eval_gimitest/
-```
+## License
 
-## Deliberate 1.0 boundaries
+Apache License 2.0. See [LICENSE](LICENSE).
 
-No hosted Arena service/auth, provider billing/dashboard replacement, universal OpenSpiel
-catalog, arbitrary online RL algorithm, silent lifecycle inference, artifact certificate
-authority/revocation service, or silent Elo-only ranking. Live remote smokes require the
-user's own credentials and are never conflated with `?simulate=` evidence. The exact
-release gates—not vague future scope—are tracked in
-[docs/1.0-readiness.md](docs/1.0-readiness.md).
+## Citation
+
+If you use Arena in academic work, see [CITATION.cff](CITATION.cff).
