@@ -1,6 +1,6 @@
 # Arena
 
-**Local-first, pairwise interoperability for RL artifact handoffs.**
+**Local-first interoperability for RL artifacts.**
 
 [![CI](https://github.com/almanzalex/Arena/actions/workflows/ci.yml/badge.svg)](https://github.com/almanzalex/Arena/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -12,10 +12,8 @@ they compose, runs seeded matches and evaluation suites, and preserves lineage
 across native and qualified external runtimes—without replacing trainers,
 environment servers, or artifact hosts.
 
-Value shows up in **bilateral handoffs**—producer and consumer, lab A ↔ lab B,
-training repo ↔ evaluation pipeline—when both sides use Arena for export, verify,
-and run. You do not need ecosystem-wide adoption or a network-effect “standard”;
-pairwise interoperability and auditability are enough.
+That is useful inside one lab (train → eval → claim on a clean machine) and when
+sharing artifacts with another party.
 
 Current distribution: **`1.0.0rc1`**. The final `v1.0.0` tag stays blocked until
 the release-commit evidence gates in [docs/1.0-readiness.md](docs/1.0-readiness.md)
@@ -25,9 +23,8 @@ are attached to that exact commit.
 
 ## Why it exists
 
-RL labs routinely exchange checkpoints, trajectories, and evaluation scripts
-that only work inside the training repository that produced them. Existing tools
-solve adjacent pieces:
+Adjacent tools solve nearby problems; they usually do not own portable policy
+identity, compose-checks before execution, or match/eval provenance binding:
 
 | Tool class | What it owns | What it usually does not own |
 |---|---|---|
@@ -36,9 +33,8 @@ solve adjacent pieces:
 | Experiment stores (W&B, MLflow, HF Hub) | Bytes / runs | Semantic compose-check before execution |
 | Datasets (Minari, …) | Offline data | Match/eval provenance binding |
 
-Arena sits in that gap for **two parties at a time**: verify that an exported
-policy, task, population, and evaluation claim compose and reproduce on the
-consumer’s clean machine, with digests and lineage both sides can audit.
+Arena fills that gap: export, verify, and re-run policies, populations, and
+evaluation claims with digests and lineage.
 
 ---
 
@@ -151,8 +147,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY
 ## Deliberate non-goals
 
 Arena is **not** a hosted service, trainer replacement, universal OpenSpiel
-catalog, malware sandbox for untrusted Python, silent Elo ranking system, or a
-bet that every lab must adopt one artifact model before anyone benefits.
+catalog, malware sandbox for untrusted Python, or silent Elo ranking system.
 Live remote qualifications require the user’s own credentials and are never
 conflated with `?simulate=` evidence. Deferred work is listed in
 [TODOS.md](TODOS.md).
