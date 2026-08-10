@@ -52,6 +52,7 @@ def main(argv: list[str] | None = None) -> int:
     nested_commands = {
         "adapter",
         "attest",
+        "catalog",
         "data",
         "demo",
         "eval",
@@ -674,6 +675,27 @@ def main(argv: list[str] | None = None) -> int:
     p_sq.add_argument("destination", help="Registered store URI")
     p_sq.add_argument("--out", required=True, help="Qualification report JSON")
 
+    p_catalog = sub.add_parser(
+        "catalog",
+        help=(
+            "Local catalog stubs (file:// listing only; not a hosted Arena catalog "
+            "or control plane)"
+        ),
+    )
+    p_cat = p_catalog.add_subparsers(dest="catalog_command", required=True)
+    p_cl = p_cat.add_parser(
+        "local",
+        help=(
+            "List arena.mirror/v1 artifacts from a local file:// mirror directory "
+            "(deferred hosted plane foreshadowing only)"
+        ),
+    )
+    p_cl.add_argument(
+        "source",
+        help="Filesystem mirror root or file:///absolute/path URI",
+    )
+    p_cl.add_argument("--json", action="store_true")
+
     p_help = sub.add_parser(
         "help",
         help="Show short topic help (overview, install, handoff, completion, naming)",
@@ -877,6 +899,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return cmd_pull(args)
     if args.command == "store" and args.store_command == "qualify":
         return cmd_store_qualify(args)
+    if args.command == "catalog" and args.catalog_command == "local":
+        return cmd_catalog_local(args)
     if args.command == "help":
         return cmd_help(args)
     if args.command == "completion":
@@ -2115,6 +2139,17 @@ def cmd_store_qualify(args: argparse.Namespace) -> int:
             context=report,
         )
     _print(report, as_json=bool(args.json))
+    return 0
+
+
+def cmd_catalog_local(args: argparse.Namespace) -> int:
+    from arena.core.catalog import format_catalog_human, list_local_catalog
+
+    report = list_local_catalog(args.source)
+    if args.json:
+        _print(report, as_json=True)
+    else:
+        print(format_catalog_human(report), end="")
     return 0
 
 
