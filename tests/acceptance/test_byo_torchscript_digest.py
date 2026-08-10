@@ -23,7 +23,6 @@ from examples.byo.cartpole_mlp import (  # noqa: E402
     build_actor,
 )
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
