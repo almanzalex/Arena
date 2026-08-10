@@ -258,6 +258,8 @@ def _execute_evaluation_cell(
         if not report.ok:
             raise CompatibilityError(str(report))
         assignments[role] = policy
+    # Bind immutable digests into the claim surface (never leave movable paths).
+    bound_assignments = {role: policy.digest for role, policy in assignments.items()}
     match_out = run_root / cell["cell_id"]
     result = get_interaction(suite.get("interaction", "parallel")).run_match(
         task_spec=task_spec,
@@ -288,12 +290,13 @@ def _execute_evaluation_cell(
             evidence_refs.insert(0, str(bundle.relative_to(run_root)))
     return {
         **cell,
+        "assignments": bound_assignments,
         "run": result,
         "episodes": episodes,
         "evidence_refs": evidence_refs,
         "failures": len(result.get("failures") or []),
         "lineage": {
-            "policy_digests": sorted(set(cell["assignments"].values())),
+            "policy_digests": sorted(set(bound_assignments.values())),
             "task_digest": task_digest,
             "provider": provider_lineage,
         },
@@ -316,12 +319,31 @@ def _supervised_failure_kind(exc: BaseException) -> str:
     return "executor_failure"
 
 
+def _bound_policy_assignments(
+    cell: dict[str, Any], *, policy_index: dict[str, Path]
+) -> dict[str, str]:
+    """Resolve cell assignment refs to sha256 digests for claim binding."""
+    bound: dict[str, str] = {}
+    for role, pref in (cell.get("assignments") or {}).items():
+        value = str(pref)
+        if value.startswith("sha256:"):
+            bound[role] = value
+            continue
+        try:
+            bound[role] = _policy_from_digest_or_path(value, policy_index=policy_index).digest
+        except SchemaError:
+            # Leave unresolved refs for the ledger; report building refuses them.
+            bound[role] = value
+    return bound
+
+
 def _supervised_cell_failure(
     *,
     cell: dict[str, Any],
     task_digest: str,
     provider_lineage: dict[str, Any],
     exc: BaseException,
+    policy_index: dict[str, Path] | None = None,
 ) -> dict[str, Any]:
     safe_message = str(redact(str(exc)))
     kind = _supervised_failure_kind(exc)
@@ -337,8 +359,10 @@ def _supervised_cell_failure(
         if isinstance(code, str) and code:
             entry["code"] = code
         failures.append(entry)
+    bound_assignments = _bound_policy_assignments(cell, policy_index=policy_index or {})
     return {
         **cell,
+        "assignments": bound_assignments,
         "run": {
             "failures": failures,
             "outcome": {
@@ -352,7 +376,7 @@ def _supervised_cell_failure(
         "evidence_refs": [],
         "failures": len(failures),
         "lineage": {
-            "policy_digests": sorted(set(cell["assignments"].values())),
+            "policy_digests": sorted(set(bound_assignments.values())),
             "task_digest": task_digest,
             "provider": provider_lineage,
         },
@@ -647,6 +671,7 @@ def _run_native_evaluation_impl(
                 task_digest=task_digest,
                 provider_lineage=provider_lineage,
                 exc=exc,
+                policy_index=policy_index,
             )
 
     if workers == 1 or len(cells) <= 1:

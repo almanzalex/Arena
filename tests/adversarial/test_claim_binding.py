@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from arena.core.errors import IntegrityError, SchemaError
+from arena.core.errors import IncompleteExecutionError, IntegrityError, SchemaError
 from arena.core.eval_bundle import build_eval_bundle, verify_eval_bundle
 from arena.core.identity import digest_uri, sha256_bytes
 from arena.core.io import publish_directory
@@ -358,7 +358,7 @@ def test_hard_timeout_eval_refuses_report_and_bundle(tmp_path: Path) -> None:
     }
     result = run_evaluation(suite, policy_index={}, out_dir=tmp_path / "failed-run")
     assert result["state"] in {"failed", "incomplete"}
-    with pytest.raises(SchemaError, match="incomplete evaluation"):
+    with pytest.raises(IncompleteExecutionError, match="incomplete evaluation"):
         build_eval_report(result)
     out = tmp_path / "should-not-publish"
     with pytest.raises(SchemaError, match="refusing to bundle incomplete"):
