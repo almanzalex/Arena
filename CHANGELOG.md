@@ -18,6 +18,9 @@
   binds policy+task provenance, re-binds after materialize, then runs the
   existing offline behavior-cloning trainer. Distributed/Ray/online algorithms
   remain deferred.
+- Expand the qualified OpenSpiel chance/imperfect-information family with frozen
+  `leduc_poker` task/trace fixtures, legality-checked match smoke, and support-doc
+  verify-equivalence commands.
 - Strengthen the PettingZoo `classic/rps_v2` multi-agent path with portable
   fixed-action policies, parallel/AEC task YAMLs, a packaged
   `arena demo multiagent` flow, and acceptance coverage that checks digests and

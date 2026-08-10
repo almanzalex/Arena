@@ -1,0 +1,13 @@
+schema: arena.trace-suite/v1
+name: openspiel-leduc-poker-reference
+interaction: aec
+episodes:
+  - seed: 0
+    actions:
+      - {agent: player_0, action: 1}
+      - {agent: player_1, action: 1}
+      - {agent: player_0, action: 1}
+      - {agent: player_1, action: 1}
+tolerances:
+  default: 0.0
+reference_digest: sha256:44db33dc7e7342bb79b08a94b8217bd03c194bccd1786159093f95c20a06c29d

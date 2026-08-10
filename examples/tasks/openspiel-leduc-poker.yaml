@@ -1,0 +1,9 @@
+schema: arena.task/v0alpha1
+name: task:openspiel-leduc-poker@0.5
+adapter: openspiel
+env: openspiel://leduc_poker
+interaction: aec
+version: open_spiel-2.0.1:leduc_poker
+packaging:
+  kind: openspiel
+digest: sha256:7d36d87decd821b1b20231fff5f902b2a804c40df7ad36ec22835ae77676e733
