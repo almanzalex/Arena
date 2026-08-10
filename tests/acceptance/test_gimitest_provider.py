@@ -81,39 +81,52 @@ def test_external_gimitest_class_requires_explicit_trust() -> None:
 
 @pytest.mark.acceptance
 @pytest.mark.requires_gimitest
-def test_gimitest_non_noop_scenario_changes_recorded_reward(tmp_path: Path) -> None:
-    suite = {
-        "schema": "arena.evaluation/v0alpha1",
-        "name": "gimitest-non-noop",
-        "provider": "gimitest",
-        "provider_config": {
-            "test_class": (
-                "arena.adapters.eval_gimitest.scenarios:RewardTransformScenario"
-            ),
-            "parameters": {"reward_scale": -1.0},
-        },
+def test_gimitest_non_noop_scenario_changes_intent_and_result_digests(
+    tmp_path: Path,
+) -> None:
+    rock = str(Path("examples/eval/demo/rock.arena").resolve())
+    paper = str(Path("examples/eval/demo/paper.arena").resolve())
+    task = {
+        "adapter": "pettingzoo-parallel",
+        "env": "arena/competitive_rps_v0",
         "interaction": "parallel",
-        "task": {
-            "adapter": "pettingzoo-parallel",
-            "env": "arena/competitive_rps_v0",
-            "interaction": "parallel",
-            "config": {"max_cycles": 1},
-        },
-        "assignments": {
-            "player_0": str(Path("examples/eval/demo/rock.arena").resolve()),
-            "player_1": str(Path("examples/eval/demo/paper.arena").resolve()),
-        },
+        "config": {"max_cycles": 1},
+    }
+    base = {
+        "schema": "arena.evaluation/v0alpha1",
+        "interaction": "parallel",
+        "task": task,
+        "assignments": {"player_0": rock, "player_1": paper},
         "seeds": [0],
         "action_mode": "deterministic",
         "metrics": ["mean_return"],
     }
-    result = run_evaluation(
-        suite,
+    native = run_evaluation(
+        {**base, "name": "gimitest-native-baseline", "provider": "native"},
+        policy_index={},
+        out_dir=tmp_path / "native",
+    )
+    transformed = run_evaluation(
+        {
+            **base,
+            "name": "gimitest-non-noop",
+            "provider": "gimitest",
+            "provider_config": {
+                "test_class": (
+                    "arena.adapters.eval_gimitest.scenarios:RewardTransformScenario"
+                ),
+                "parameters": {"reward_scale": -1.0},
+            },
+        },
         policy_index={},
         out_dir=tmp_path / "transformed",
     )
-    returns = result["cell_results"][0]["episodes"][0]["returns"]
+    returns = transformed["cell_results"][0]["episodes"][0]["returns"]
     assert returns == {"player_0": 1.0, "player_1": -1.0}
+    assert (
+        transformed["evaluation_intent_digest"] != native["evaluation_intent_digest"]
+    )
+    assert transformed["semantic_result_digest"] != native["semantic_result_digest"]
 
 
 @pytest.mark.acceptance
