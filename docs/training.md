@@ -66,7 +66,10 @@ Arena refuses unknown algorithms rather than routing them through a similar case
 A new trainer implements `TrainingCase`, registers in `TRAINERS`, and supplies
 distinct-objective, reproducibility, interruption, mutation, and policy-conformance
 fixtures. Online/distributed RL and large sharded datasets remain outside the
-built-in cases.
+built-in cases. A library spike for stream-read and sharded materialize lives
+under `arena.dataset` and is documented in
+`rfcs/012-streaming-sharded-datasets.md`; it does not change the default
+atomic flat `data materialize` path.
 
 ## Mini lab loop (CartPole)
 
