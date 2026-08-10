@@ -47,6 +47,37 @@ public key. When gate evidence paths are available locally, `verify` also
 rehashes every R-01…R-14 evidence file; the signature cannot turn missing or
 modified local proof into a passing verification.
 
+## Lab artifact attestation (user-owned keys)
+
+Release-index signing above is for the published distribution. Labs that only need
+to prove *this artifact identity was signed by a key we trust* use
+`arena attest` with their own Ed25519 PEM files. No certificate authority, no
+Sigstore account, and no PyPI publisher identity is required—trust is whoever
+you choose to distribute the public key to.
+
+Install the optional crypto extra once, then:
+
+```bash
+pip install 'arena[signing]'
+
+arena attest keygen --private lab-private.pem --public lab-public.pem
+arena attest sign policy.arena \
+  --key lab-private.pem --issuer example-lab --out policy.attestation.json
+arena attest verify policy.arena policy.attestation.json --key lab-public.pem
+```
+
+`keygen` writes an unencrypted PKCS8 private PEM (`0600`) and SPKI public PEM
+(`0644`) and refuses overwrite. `sign` binds the artifact's content-addressed
+identity into a detached `arena.attestation/v1` JSON. `verify` rehashes the
+local path, checks `key_id` against the supplied public key, and verifies the
+Ed25519 signature over the canonical statement. Byte-tampered artifacts and
+altered signature blobs fail closed.
+
+Detached attestations survive identity-preserving `arena push` / `arena pull`
+mirrors; authenticity is independent of where the bytes are stored. Arena does
+not invent accounts, CAs, revocation, or transparency logs—operators keep and
+distribute their own keys.
+
 Current qualification is a separate signed ledger so an outage or expired
 provider record can change today’s verdict without rewriting release history:
 
