@@ -76,6 +76,7 @@ markers = [
   "requires_openenv: needs the OpenEnv extra",
   "requires_openspiel: needs the OpenSpiel extra",
   "requires_gimitest: needs a compatible Gimitest provider install",
+  "requires_hf: needs HF_TOKEN or HUGGING_FACE_HUB_TOKEN for live Hub round-trip",
 ]
 
 [tool.ruff]

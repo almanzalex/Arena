@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from arena.conformance.qualification import qualify_store
+from arena.core.store_hf import HF_LIVE_RECIPE, qualify_hf_live
 
 
 def main() -> int:
@@ -33,6 +34,22 @@ def main() -> int:
     report_path = args.report or args.out.with_name(
         args.out.name + ".qualification.json"
     )
+
+    if parsed.scheme == "hf":
+        report = qualify_hf_live(
+            args.source,
+            args.destination,
+            report_path=report_path,
+            restored_out=args.out,
+        )
+        print(json.dumps(report, indent=2))
+        if report.get("mode") != "live" or not report.get("ok"):
+            raise SystemExit(
+                f"HF live smoke did not pass (mode={report.get('mode')!r}). "
+                f"Recipe: {HF_LIVE_RECIPE}"
+            )
+        return 0
+
     report = qualify_store(
         args.source,
         destination=args.destination,
