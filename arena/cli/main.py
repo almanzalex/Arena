@@ -1772,7 +1772,7 @@ def cmd_attest(args: argparse.Namespace) -> int:
             public_key=args.key,
         )
     else:
-        raise ArenaError(f"unknown attest command: {args.attest_command}")
+        raise CliUsageError(f"unknown attest command {args.attest_command!r}")
     _print(result, as_json=bool(args.json))
     return 0
 
