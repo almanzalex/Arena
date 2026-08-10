@@ -11,10 +11,13 @@ import yaml
 pytest.importorskip("pyspiel")
 torch = pytest.importorskip("torch")
 
-from arena.adapters.policy_custom_torch import build_module, export_policy
-from arena.cli.main import main
-from arena.conformance.qualification import qualify_task_fixture
-from arena.core.sdk import Match, Policy, Task
+from arena.adapters.policy_custom_torch import (  # noqa: E402  (after importorskip)
+    build_module,
+    export_policy,
+)
+from arena.cli.main import main  # noqa: E402
+from arena.conformance.qualification import qualify_task_fixture  # noqa: E402
+from arena.core.sdk import Match, Policy, Task  # noqa: E402
 
 
 def _masked_policy(
