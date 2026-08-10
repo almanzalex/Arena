@@ -193,6 +193,106 @@ def redact(value: Any, *, key: str = "") -> Any:
     return value
 
 
+
+def missing_extra(
+    extra: str,
+    *,
+    feature: str,
+    install: str | None = None,
+    capability: str | None = None,
+) -> SchemaError:
+    """Optional dependency missing — fail loud with install recipe."""
+    cap = capability or extra
+    cmd = install or f"python -m pip install 'arena[{extra}]'"
+    return SchemaError(
+        f"{feature} requires optional extra {extra!r}. Install with: {cmd}",
+        code="CAPABILITY_MISSING",
+        cause=f"optional extra {extra!r} is not installed",
+        repair=(
+            f"Install the missing extra, then retry: {cmd}. "
+            f"Confirm with `arena doctor --capability {cap}`."
+        ),
+        context={"extra": extra, "capability": cap},
+    )
+
+
+def wrong_schema(
+    *,
+    expected: str | set[str] | tuple[str, ...],
+    got: object,
+    kind: str | None = None,
+) -> SchemaError:
+    """Wrong/missing schema id — list supported ids and migration next step."""
+    if isinstance(expected, str):
+        supported = [expected]
+    else:
+        supported = sorted(expected)
+    supported_text = " or ".join(supported)
+    kind_bit = f" for {kind}" if kind else ""
+    return SchemaError(
+        (
+            f"unsupported schema{kind_bit}: got {got!r}; "
+            f"supported: {supported_text}. "
+            f"Set schema to one of the supported ids (creating a new artifact if migrating). "
+            f"List schemas with `arena schema list`; Arena will not silently coerce versions."
+        ),
+        code="SCHEMA_VERSION_UNSUPPORTED",
+        cause="manifest schema version is not supported by this Arena release",
+        repair=(
+            f"Update the `schema` field to {supported_text}. "
+            "If migrating from another version, rewrite/export a new artifact "
+            "(identity migration creates a new digest). Run `arena schema list` / `arena doctor` "
+            "to see supported schemas."
+        ),
+        context={"expected": supported, "got": got, "kind": kind},
+    )
+
+
+def missing_digest(
+    *,
+    field: str,
+    value: object = None,
+    require_sha256_prefix: bool = True,
+) -> SchemaError:
+    got = f", got {value!r}" if value is not None else ""
+    prefix = "sha256:<64-hex>" if require_sha256_prefix else "sha256:<64-hex> or raw 64-hex"
+    return SchemaError(
+        (
+            f"{field} requires a content digest ({prefix}){got}. "
+            "Compute with `sha256sum <file>` or use the digest returned by `arena push` / policy export. "
+            "Arena will not invent or skip digests."
+        ),
+        code="DIGEST_MISSING",
+        cause=f"{field} is missing or not a sha256 digest",
+        repair=(
+            f"Set {field} to a sha256 digest ({prefix}). "
+            "For mirrored artifacts, copy the `#sha256:…` fragment from the URI returned by `arena push`."
+        ),
+        context={"field": field, "value": value},
+    )
+
+
+def bad_uri(
+    message: str,
+    *,
+    scheme: str | None = None,
+    example: str | None = None,
+    repair: str | None = None,
+) -> SchemaError:
+    example_bit = f" Example: {example}." if example else ""
+    default_repair = repair or (
+        "Correct the URI grammar for the scheme, include required path/digest fragments, "
+        "and retry. See `arena doctor` for store/task capability status."
+    )
+    return SchemaError(
+        f"{message.rstrip('.')}." + example_bit,
+        code="URI_INVALID",
+        cause="URI failed Arena grammar checks",
+        repair=default_repair,
+        context={"scheme": scheme} if scheme else {},
+    )
+
+
 def diagnostic_from_exception(
     exc: BaseException,
     *,
