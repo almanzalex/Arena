@@ -6,6 +6,7 @@ when `example://` is referenced, through the entry point
 
 ```bash
 python -m pip install .
+arena store qualify examples/eval/demo/rock.arena example:///tmp/arena-example
 arena push policy.arena example:///tmp/arena-example --verify
 arena pull 'example:///tmp/arena-example#sha256:…' --out restored.arena --verify
 python -m pip uninstall -y arena-example-store

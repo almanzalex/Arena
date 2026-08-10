@@ -1,0 +1,19 @@
+{
+  "schema": "arena.perf-smoke-baseline/v1",
+  "description": "Lightweight export/verify/match smoke baselines. Not R-10. Fail only on catastrophic (>10x) regressions or absolute ceilings.",
+  "regression_factor": 10.0,
+  "absolute_ceilings_seconds": {
+    "export": 60.0,
+    "verify": 30.0,
+    "match": 120.0
+  },
+  "baselines_seconds": {
+    "export": 1.0,
+    "verify": 1.0,
+    "match": 2.0
+  },
+  "fixture": {
+    "export_verify": "build_f1_deterministic (tiny mlp)",
+    "match": "build_rps_policy + Match 2 seeds max_cycles=2"
+  }
+}

@@ -60,6 +60,7 @@ path = "arena/_version.py"
 packages = ["arena"]
 
 [tool.pytest.ini_options]
+pythonpath = ["tests"]
 testpaths = ["tests"]
 # Keep the default selection fast: the slow wheel-build / hermetic-venv and
 # Docker gates are opt-in. Run them with `pytest -m slow` / `pytest -m docker`.
