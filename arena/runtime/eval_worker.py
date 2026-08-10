@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 from arena import __version__
@@ -10,6 +13,41 @@ from arena.core.identity import canonical_json, digest_uri, sha256_bytes
 from arena.core.io import atomic_write_bytes
 from arena.core.manifests import load_manifest
 from arena.runtime.evaluation import _execute_evaluation_cell
+
+_HANG_BOUNDARIES = frozenset({"reset", "action", "step", "close"})
+
+
+def _maybe_adversarial_hang() -> None:
+    """Test-only hang at reset/action/step/close with a grandchild process.
+
+    Enabled only when ``ARENA_TEST_HANG_BOUNDARY`` is one of the four native
+    boundaries. Production workers never set the variable, so this is a no-op.
+    """
+    boundary = os.environ.get("ARENA_TEST_HANG_BOUNDARY")
+    if boundary not in _HANG_BOUNDARIES:
+        return
+    marker = os.environ.get("ARENA_TEST_HANG_MARKER")
+    child = (
+        "import pathlib,sys,time;"
+        "time.sleep(2.0);"
+        "path=sys.argv[1];"
+        "pathlib.Path(path).write_text('grandchild-survived', encoding='utf-8')"
+        if marker
+        else "import time; time.sleep(30)"
+    )
+    argv = [sys.executable, "-c", child]
+    if marker:
+        argv.append(marker)
+    # Inherit the worker process group so supervisor killpg reaps the grandchild.
+    subprocess.Popen(
+        argv,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=False,
+    )
+    while True:
+        time.sleep(30)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -31,6 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     if request["request_digest"] != actual_request_digest:
         raise SystemExit("eval-cell request digest mismatch")
+    _maybe_adversarial_hang()
     result = _execute_evaluation_cell(
         cell=dict(request["cell"]),
         suite=dict(request["suite"]),

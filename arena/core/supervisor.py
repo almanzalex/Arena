@@ -1,4 +1,9 @@
-"""Hard-budget subprocess supervision for optional execution boundaries."""
+"""Hard-budget subprocess supervision for optional execution boundaries.
+
+Stable hard budgets terminate the entire descendant process group (POSIX
+``killpg``) so hung ``reset`` / policy action / ``step`` / ``close`` calls that
+spawn grandchildren cannot outlive the wall-time budget.
+"""
 
 from __future__ import annotations
 
@@ -23,6 +28,13 @@ class SupervisedResult:
     duration_seconds: float
 
 
+def terminate_process_group(
+    process: subprocess.Popen[bytes], *, grace_seconds: float = 2.0
+) -> None:
+    """Public process-group teardown used by budgets and adversarial proofs."""
+    _terminate_tree(process, grace_seconds=grace_seconds)
+
+
 def _terminate_tree(process: subprocess.Popen[bytes], *, grace_seconds: float) -> None:
     if process.poll() is not None:
         return
@@ -45,7 +57,17 @@ def _terminate_tree(process: subprocess.Popen[bytes], *, grace_seconds: float) -
             return
     else:  # pragma: no cover
         process.kill()
-    process.wait(timeout=max(grace_seconds, 1.0))
+    try:
+        process.wait(timeout=max(grace_seconds, 1.0))
+    except subprocess.TimeoutExpired:  # pragma: no cover - extreme hang
+        if os.name == "posix":
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                return
+        else:
+            process.kill()
+        process.wait(timeout=max(grace_seconds, 1.0))
 
 
 def run_supervised(
@@ -89,24 +111,29 @@ def run_supervised(
                     context={"executable": argv[0]},
                 ) from exc
             reason: str | None = None
-            while process.poll() is None:
-                elapsed = time.monotonic() - started
-                stdout.flush()
-                stderr.flush()
-                if elapsed > timeout_seconds:
-                    reason = "timeout"
-                    break
-                if stdout_path.stat().st_size > max_stdout_bytes:
-                    reason = "stdout_limit"
-                    break
-                if stderr_path.stat().st_size > max_stderr_bytes:
-                    reason = "stderr_limit"
-                    break
-                time.sleep(0.025)
-            if reason is not None:
+            try:
+                while process.poll() is None:
+                    elapsed = time.monotonic() - started
+                    stdout.flush()
+                    stderr.flush()
+                    if elapsed > timeout_seconds:
+                        reason = "timeout"
+                        break
+                    if stdout_path.stat().st_size > max_stdout_bytes:
+                        reason = "stdout_limit"
+                        break
+                    if stderr_path.stat().st_size > max_stderr_bytes:
+                        reason = "stderr_limit"
+                        break
+                    time.sleep(0.025)
+                if reason is not None:
+                    _terminate_tree(process, grace_seconds=grace_seconds)
+                else:
+                    process.wait()
+            except BaseException:
+                # Never leave a descendant tree running after an unexpected fault.
                 _terminate_tree(process, grace_seconds=grace_seconds)
-            else:
-                process.wait()
+                raise
             stdout.flush()
             stderr.flush()
             if reason is None and stdout_path.stat().st_size > max_stdout_bytes:

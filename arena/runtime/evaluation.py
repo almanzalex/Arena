@@ -12,7 +12,13 @@ from typing import Any
 
 from arena.adapters.task_pettingzoo.adapter import describe_task
 from arena.core.compatibility import compose_check
-from arena.core.errors import CompatibilityError, SchemaError, redact
+from arena.core.errors import (
+    CompatibilityError,
+    ExternalUnavailableError,
+    IncompleteExecutionError,
+    SchemaError,
+    redact,
+)
 from arena.core.identity import canonical_json, digest_uri, sha256_bytes, sha256_canonical
 from arena.core.io import atomic_write_bytes, publish_directory
 from arena.core.manifests import (
@@ -293,6 +299,22 @@ def _execute_evaluation_cell(
     }
 
 
+def _supervised_failure_kind(exc: BaseException) -> str:
+    """Map hard-budget executor faults onto ledger kinds (never fake success)."""
+    code = getattr(exc, "code", None)
+    if isinstance(exc, ExternalUnavailableError):
+        if code == "EXTERNAL_TIMEOUT":
+            return "timeout"
+        if code in {"EXTERNAL_STDOUT_LIMIT", "EXTERNAL_STDERR_LIMIT"}:
+            return "executor_budget"
+        if code == "EXTERNAL_START_FAILED":
+            return "executor_start_failed"
+    message = str(exc).lower()
+    if "timeout" in message or "wall time" in message:
+        return "timeout"
+    return "executor_failure"
+
+
 def _supervised_cell_failure(
     *,
     cell: dict[str, Any],
@@ -301,15 +323,19 @@ def _supervised_cell_failure(
     exc: BaseException,
 ) -> dict[str, Any]:
     safe_message = str(redact(str(exc)))
-    failures = [
-        {
+    kind = _supervised_failure_kind(exc)
+    code = getattr(exc, "code", None)
+    failures: list[dict[str, Any]] = []
+    for index, seed in enumerate(cell["seeds"]):
+        entry: dict[str, Any] = {
             "episode_index": index,
             "seed": seed,
-            "kind": "executor_failure",
+            "kind": kind,
             "message": safe_message,
         }
-        for index, seed in enumerate(cell["seeds"])
-    ]
+        if isinstance(code, str) and code:
+            entry["code"] = code
+        failures.append(entry)
     return {
         **cell,
         "run": {
@@ -319,6 +345,7 @@ def _supervised_cell_failure(
                 "episodes_completed": 0,
                 "failure_count": len(failures),
             },
+            "status": "failed",
         },
         "episodes": [],
         "evidence_refs": [],
@@ -746,13 +773,31 @@ def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
     suite = eval_run.get("suite") or {}
     failure_policy = suite.get("failure_policy") or {}
     allow_missing = failure_policy.get("missingness", "fail") == "allow"
-    failed = int((eval_run.get("denominators") or {}).get("failed", 0))
+    denominators = eval_run.get("denominators") or {}
+    failed = int(denominators.get("failed", 0))
+    attempted = int(denominators.get("attempted", 0))
+    completed = int(denominators.get("completed", 0))
     max_failed = int(failure_policy.get("max_failed_episodes", 0))
     if state != "complete" and (not allow_missing or failed > max_failed):
-        raise SchemaError(
+        raise IncompleteExecutionError(
             "refusing to report an incomplete evaluation: "
             f"state={state}, failed={failed}; set failure_policy.missingness=allow "
-            "with an explicit max_failed_episodes threshold to opt in"
+            "with an explicit max_failed_episodes threshold to opt in",
+            code="EVALUATION_INCOMPLETE",
+            cause=str(state),
+            repair=(
+                "Inspect eval_run denominators and failure ledgers, repair the "
+                "recorded failures, or set failure_policy.missingness=allow with "
+                "max_failed_episodes covering the failed count."
+            ),
+            context={
+                "state": state,
+                "attempted": attempted,
+                "completed": completed,
+                "failed": failed,
+                "missingness": failure_policy.get("missingness", "fail"),
+                "max_failed_episodes": max_failed,
+            },
         )
     metrics_plugins.register_builtins()
     metric_kinds = suite.get("metrics") or ["payoff_matrix", "mean_return"]
