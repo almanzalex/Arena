@@ -1,8 +1,15 @@
-"""Frozen OpenEnv RPS pilot server used for T-01/T-03 qualification.
+"""Frozen OpenEnv RPS pilot server used for T-01/T-03 / R-05 qualification.
 
-Run with ``python -m arena.adapters.task_openenv.server --port 8000``. The server
-uses OpenEnv's own FastAPI/WebSocket transport and wraps Arena's existing frozen
-PettingZoo RPS environment; it does not implement a competing container layer.
+Run as a **separate** process or container — the Arena client must connect via
+``packaging.base_url`` / ``ARENA_OPENENV_BASE_URL``, not embed this server:
+
+* Process: ``python -m arena.adapters.task_openenv.server --port 8000``
+* Docker: ``docker compose -f docker/openenv/docker-compose.yml up --build -d``
+* Recipe helper: ``arena.adapters.task_openenv.service_recipe``
+
+The server uses OpenEnv's own FastAPI/WebSocket transport and wraps Arena's
+frozen PettingZoo RPS (or vector) environment; it does not implement a competing
+container layer.
 """
 
 from __future__ import annotations

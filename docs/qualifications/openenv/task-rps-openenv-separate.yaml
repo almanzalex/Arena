@@ -1,0 +1,52 @@
+schema: arena.task/v0alpha1
+name: task:rps-openenv-separate@1.0
+adapter: openenv
+env: openenv://arena/competitive_rps_v0
+interaction: parallel
+version: openenv-0.4.1
+packaging:
+  kind: openenv
+  base_url: http://127.0.0.1:18000
+  source_revision: openenv-0.4.1
+  schema_digest: sha256:d7b2dda8ba2d7a8529d9854d0d045a4a36d4e7805ce14c0834899fb0b0ea1fa8
+  connect_timeout_seconds: 10.0
+  message_timeout_seconds: 60
+  protocol:
+    schema: arena.openenv-capabilities/v1
+    interaction: parallel
+    features:
+    - seeded_reset
+    - joint_action
+    - typed_contract
+    - failure_taxonomy
+    contract_digest: sha256:d13418407fa3e10097bccadd4cfd109ae4926a13718edb6002845635d283ec82
+contract:
+  agents:
+  - player_0
+  - player_1
+  roles:
+    player_0:
+      agents:
+      - player_0
+      observation:
+        type: Discrete
+        n: 4
+        dtype: int64
+      action:
+        type: Discrete
+        n: 3
+        dtype: int64
+    player_1:
+      agents:
+      - player_1
+      observation:
+        type: Discrete
+        n: 4
+        dtype: int64
+      action:
+        type: Discrete
+        n: 3
+        dtype: int64
+  provides_masks: false
+  dynamic_agents: false
+digest: sha256:9800e52a95130869257117123fae0272f23feb188a201bbefd1c3e3f662edc09
