@@ -65,7 +65,7 @@ wrapper:
 | Family | Qualified game | Arena interaction |
 |---|---|---|
 | Sequential, deterministic, perfect information | `tic_tac_toe`, `connect_four`, `breakthrough` | `aec` |
-| Sequential with explicit chance and imperfect information | `kuhn_poker` | `aec` using information-state tensors |
+| Sequential with explicit chance and imperfect information | `kuhn_poker`, `leduc_poker` | `aec` using information-state tensors |
 | Simultaneous, deterministic | `matrix_rps` | `parallel` using one joint `apply_actions` |
 
 Observation/action dimensions remain game-specific; legal actions are required masks.
@@ -86,6 +86,8 @@ arena task verify-equivalence examples/tasks/openspiel-connect-four.yaml \
 
 arena task verify-equivalence examples/tasks/openspiel-kuhn-poker.yaml \
   --trace-suite examples/tasks/openspiel-kuhn-poker-trace.yaml
+arena task verify-equivalence examples/tasks/openspiel-leduc-poker.yaml \
+  --trace-suite examples/tasks/openspiel-leduc-poker-trace.yaml
 arena task verify-equivalence examples/tasks/openspiel-matrix-rps.yaml \
   --trace-suite examples/tasks/openspiel-matrix-rps-trace.yaml
 ```

@@ -54,6 +54,15 @@ FROZEN_GAMES: dict[str, dict[str, Any]] = {
         "observation_size": 11,
         "actions": 2,
     },
+    "leduc_poker": {
+        "interaction": "aec",
+        "dynamics": "SEQUENTIAL",
+        "chance_mode": "EXPLICIT_STOCHASTIC",
+        "information": "IMPERFECT_INFORMATION",
+        "observation_kind": "information_state",
+        "observation_size": 30,
+        "actions": 3,
+    },
     # Representative deterministic simultaneous-action family.
     "matrix_rps": {
         "interaction": "parallel",

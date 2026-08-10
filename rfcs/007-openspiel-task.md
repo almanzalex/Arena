@@ -34,8 +34,8 @@ families on OpenSpiel 2.x:
 
 - sequential deterministic perfect information: `tic_tac_toe`, `connect_four`,
   `breakthrough`;
-- sequential chance/imperfect information: `kuhn_poker`, with seeded chance
-  consumption and information-state tensors;
+- sequential chance/imperfect information: `kuhn_poker`, `leduc_poker`, with
+  seeded chance consumption and information-state tensors;
 - simultaneous deterministic: `matrix_rps`, with one joint `apply_actions`.
 
 All use roles `player_0`/`player_1`, game-specific tensors/actions, required legal

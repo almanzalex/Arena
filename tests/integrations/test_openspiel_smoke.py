@@ -69,6 +69,7 @@ def _masked_policy(
         ("tic_tac_toe", "tic-tac-toe", 27, 9, [0, 1, 2]),
         ("connect_four", "connect-four", 126, 7, [0, 1]),
         ("kuhn_poker", "kuhn-poker", 11, 2, [0, 1]),
+        ("leduc_poker", "leduc-poker", 30, 3, [0, 1]),
         ("matrix_rps", "matrix-rps", 1, 3, [0]),
     ],
 )

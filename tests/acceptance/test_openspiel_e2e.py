@@ -141,6 +141,7 @@ def test_openspiel_tic_tac_toe_match_and_eval(tmp_path: Path) -> None:
     ("game", "observation_dim", "action_n"),
     [
         ("kuhn-poker", 11, 2),
+        ("leduc-poker", 30, 3),
         ("matrix-rps", 1, 3),
     ],
 )
