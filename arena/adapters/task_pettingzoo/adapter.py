@@ -9,7 +9,7 @@ from arena.adapters.task_pettingzoo.wrappers import (
     normalize_wrappers,
     wrappers_provenance,
 )
-from arena.core.errors import ArenaError, SchemaError, missing_extra
+from arena.core.errors import missing_extra, ArenaError, SchemaError
 from arena.core.spaces import gymnasium_space_to_dict
 
 ADAPTER_NAME = "pettingzoo-parallel"

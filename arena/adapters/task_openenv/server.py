@@ -7,6 +7,8 @@ PettingZoo RPS environment; it does not implement a competing container layer.
 
 from __future__ import annotations
 
+from arena.core.errors import missing_extra
+
 from typing import Any
 
 from arena.core.errors import missing_extra

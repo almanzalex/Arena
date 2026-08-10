@@ -24,7 +24,7 @@ from arena.core.contracts import (
     validate_architecture_spaces,
     validate_reference_case_action,
 )
-from arena.core.errors import ArenaError, ConformanceError, SchemaError
+from arena.core.errors import missing_extra, ArenaError, ConformanceError, SchemaError
 from arena.core.identity import digest_uri, sha256_file
 from arena.core.manifests import (
     POLICY_SCHEMA,
@@ -119,9 +119,10 @@ def _require_torch():
         import torch.nn as nn
         import torch.nn.functional as F
     except ImportError as e:
-        raise ArenaError(
-            "PyTorch is required for the custom-pytorch adapter. "
-            "Install with: pip install 'arena[torch]'"
+        raise missing_extra(
+            "torch",
+            feature="custom-pytorch adapter",
+            capability="torch",
         ) from e
     return torch, nn, F
 
