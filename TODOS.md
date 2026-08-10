@@ -9,6 +9,8 @@ its own RFC and qualification owner before it enters a stable claim.
 | Linux arm64 and macOS x86_64 stable support | Experimental optional-arch CI scaffolding only; current evidence does not cover a stable claim | Native runners stay green without `allow-failure`, plus source-free handoff evidence |
 | Hosted accounts/catalog/control plane | Changes Arena from local protocol/tooling into a service business; see [RFC 013](rfcs/013-hosted-control-plane.md) (deferred; local `arena catalog local` stub only) | Repeated user demand cannot be met by user-owned stores |
 | Distributed/online RL training | Requires collection, replay, orchestration, and new failure semantics | A separate trainer/runtime RFC proves a bounded use case |
+| Hosted accounts/catalog/control plane | Changes Arena from local protocol/tooling into a service business | Repeated user demand cannot be met by user-owned stores |
+| Distributed/online RL training | Requires collection, replay, orchestration, and new failure semantics | RFC 011 + CPU spike prove **bounded** collect→bind→offline-train only; Ray/PPO/replay remain deferred |
 | Arbitrary OpenSpiel catalog support | Semantic qualification is per game/family | A game has an owner and frozen trace/legality evidence |
 | Streaming, sharded, compressed datasets | Current verified episode files are adequate for the 1.0 corpus | Corpus scale makes materialization the measured bottleneck |
 | CA, revocation, transparency, and hardware keys | Detached signatures intentionally use user-supplied trust anchors | A real organizational trust-lifecycle requirement appears |

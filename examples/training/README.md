@@ -47,6 +47,17 @@ Every training run writes `checkpoint.json` and `checkpoint.pt`. To continue:
 3. Keep algorithm, dataset, seed, batch size, learning rate, spaces, and
    architecture identical — Arena refuses contract mismatches.
 
+## Bounded online collection wedge (spike)
+
+Single-process collect → bind → materialize → re-bind → offline BC, documented in
+[RFC 011](../../rfcs/011-online-collection-dataset-binding.md). Not Ray / not PPO:
+
+```bash
+python examples/training/online_collect_loop.py --out ./arena-online-wedge
+```
+
+Coverage: `tests/training/test_online_collect_wedge.py`.
+
 ## Hermetic test
 
 The integration suite lives at `tests/training/test_offline_trainer_e2e.py`

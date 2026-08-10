@@ -12,6 +12,12 @@
   [RFC 013](rfcs/013-hosted-control-plane.md) and add a local-only
   `arena catalog local` stub that lists `file://` mirror descriptors
   (not a hosted SaaS product).
+- Propose RFC 011 for a bounded online collection → Arena dataset-binding wedge
+  (failure semantics + explicit non-goals). Add a CPU-only single-process spike
+  (`examples/training/online_collect_loop.py`) that collects RPS trajectories,
+  binds policy+task provenance, re-binds after materialize, then runs the
+  existing offline behavior-cloning trainer. Distributed/Ray/online algorithms
+  remain deferred.
 - Strengthen the PettingZoo `classic/rps_v2` multi-agent path with portable
   fixed-action policies, parallel/AEC task YAMLs, a packaged
   `arena demo multiagent` flow, and acceptance coverage that checks digests and
