@@ -22,16 +22,14 @@ class CartPoleMLP(nn.Module):
             nn.ReLU(),
             nn.Linear(84, action_n),
         )
-        self._init_deterministic()
-
-    def _init_deterministic(self) -> None:
-        # Fixed seed so export→verify→inspect digests are stable without a ckpt.
-        torch.manual_seed(0)
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                nn.init.xavier_uniform_(module.weight)
-                if module.bias is not None:
-                    nn.init.zeros_(module.bias)
+        # Fixed fills (not RNG) so export→verify→inspect digests are stable
+        # across processes without a real checkpoint.
+        with torch.no_grad():
+            for idx, module in enumerate(self.network):
+                if isinstance(module, nn.Linear):
+                    module.weight.fill_(0.01 * (idx + 1))
+                    if module.bias is not None:
+                        module.bias.fill_(0.001 * (idx + 1))
 
     def forward(self, observation: torch.Tensor) -> torch.Tensor:
         return self.network(observation)

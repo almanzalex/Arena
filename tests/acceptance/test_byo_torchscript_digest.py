@@ -76,6 +76,10 @@ def test_byo_export_verify_inspect_digest_stable(tmp_path: Path) -> None:
 @pytest.mark.acceptance
 @pytest.mark.requires_torch
 def test_byo_export_script_cli_digest_stable(tmp_path: Path) -> None:
+    # Share one checkpoint across CLI runs so digests isolate TorchScript
+    # serialization stability (not RNG re-init of demo weights).
+    checkpoint = tmp_path / "shared.pt"
+    torch.save(build_actor().state_dict(), checkpoint)
     out_a = tmp_path / "a.arena"
     out_b = tmp_path / "b.arena"
     digests: list[str] = []
@@ -86,6 +90,8 @@ def test_byo_export_script_cli_digest_stable(tmp_path: Path) -> None:
                 str(REPO_ROOT / "examples/byo/export_cartpole_mlp.py"),
                 "--out",
                 str(out),
+                "--source",
+                str(checkpoint),
             ],
             cwd=REPO_ROOT,
             text=True,
@@ -107,6 +113,29 @@ def test_byo_export_script_cli_digest_stable(tmp_path: Path) -> None:
         )
         assert verify.returncode == 0, verify.stderr
     assert digests[0] == digests[1]
+
+
+@pytest.mark.acceptance
+@pytest.mark.requires_torch
+def test_byo_export_script_no_source_demo_works(tmp_path: Path) -> None:
+    out = tmp_path / "demo.arena"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "examples/byo/export_cartpole_mlp.py"),
+            "--out",
+            str(out),
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    report = json.loads(proc.stdout)
+    assert report["ok"] is True
+    assert Policy.load(out).digest == report["policy_digest"]
+    assert verify_bundle_self(out)["verify_mode"] == "source-conformance"
 
 
 @pytest.mark.acceptance
