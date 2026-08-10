@@ -207,3 +207,60 @@ def test_expand_cartesian_two_populations(tmp_path: Path, monkeypatch) -> None:
     cells, ledger = expand_evaluation_cells(suite, populations={pop["digest"]: pop})
     assert len(cells) == 4
     assert len(ledger) == 4  # 2 roles × 2 members
+
+
+@pytest.mark.requires_torch
+@pytest.mark.requires_pettingzoo
+def test_process_budget_timeout_denominators_and_report_gate(tmp_path: Path) -> None:
+    from arena.core.errors import IncompleteExecutionError
+    from arena.runtime.evaluation import build_eval_report
+
+    left = build_fixed_action_rps_policy(
+        tmp_path / "left", role=["player_0", "player_1"], action=0
+    )
+    right = build_fixed_action_rps_policy(
+        tmp_path / "right", role=["player_0", "player_1"], action=1
+    )
+    suite = {
+        "schema": "arena.evaluation/v0alpha1",
+        "name": "budget-unit",
+        "interaction": "parallel",
+        "task": {
+            "adapter": "pettingzoo-parallel",
+            "env": "arena/competitive_rps_v0",
+            "config": {"max_cycles": 1},
+        },
+        "assignments": {
+            "player_0": str(left.resolve()),
+            "player_1": str(right.resolve()),
+        },
+        "seeds": [0, 1, 2],
+        "action_mode": "deterministic",
+        "metrics": ["mean_return"],
+        "budgets": {"executor": "process", "timeout_seconds": 0.000001},
+        "failure_policy": {"missingness": "fail"},
+    }
+    result = run_evaluation(
+        suite, policy_index={}, out_dir=tmp_path / "budget-unit", record=False
+    )
+    assert result["state"] == "failed"
+    assert result["denominators"] == {"attempted": 3, "completed": 0, "failed": 3}
+    kinds = {
+        f["kind"]
+        for cell in result["cell_results"]
+        for f in (cell.get("run") or {}).get("failures") or []
+    }
+    assert kinds == {"timeout"}
+    with pytest.raises(IncompleteExecutionError, match="incomplete evaluation"):
+        build_eval_report(result)
+
+    allowed = {
+        **result,
+        "suite": {
+            **suite,
+            "failure_policy": {"missingness": "allow", "max_failed_episodes": 3},
+        },
+    }
+    report = build_eval_report(allowed)
+    assert report["denominators"]["failed"] == 3
+    assert report["state"] == "failed"

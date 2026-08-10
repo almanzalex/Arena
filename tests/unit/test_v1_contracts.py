@@ -13,6 +13,7 @@ from arena.core.attestation import generate_signing_keypair
 from arena.core.errors import (
     ConformanceError,
     ExternalUnavailableError,
+    IncompleteExecutionError,
     SchemaError,
 )
 from arena.core.identity import canonical_json, parse_digest
@@ -229,7 +230,7 @@ def test_hard_budget_timeout_publishes_failed_ledger_not_fake_success(
         "completed": 0,
         "failed": 1,
     }
-    with pytest.raises(SchemaError, match="incomplete evaluation"):
+    with pytest.raises(IncompleteExecutionError, match="incomplete evaluation"):
         build_eval_report(result)
 
 

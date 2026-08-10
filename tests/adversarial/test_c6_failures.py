@@ -218,3 +218,51 @@ def test_zero_length_episode_recorded_and_accounted(tmp_path: Path, patch_task_e
     ep = json.loads((out / "trajectories" / "episode_0000.json").read_text())
     assert ep["steps"] == []
     assert ep["seed"] == 0
+
+
+@pytest.mark.requires_torch
+@pytest.mark.requires_pettingzoo
+def test_process_budget_timeout_is_accounted_not_silent(tmp_path: Path) -> None:
+    """Claim 6 + hard budgets: a timed-out cell accounts every seed as failed."""
+    from arena.conformance.fixtures import build_fixed_action_rps_policy
+    from arena.core.errors import IncompleteExecutionError
+    from arena.runtime.evaluation import build_eval_report, run_evaluation
+
+    left = build_fixed_action_rps_policy(
+        tmp_path / "p0", role=["player_0", "player_1"], action=0
+    )
+    right = build_fixed_action_rps_policy(
+        tmp_path / "p1", role=["player_0", "player_1"], action=1
+    )
+    suite = {
+        "schema": "arena.evaluation/v0alpha1",
+        "name": "c6-budget",
+        "task": {
+            "adapter": "pettingzoo-parallel",
+            "env": _PILOT,
+            "interaction": "parallel",
+            "config": {"max_cycles": 1},
+        },
+        "assignments": {
+            "player_0": str(left.resolve()),
+            "player_1": str(right.resolve()),
+        },
+        "seeds": [0, 1],
+        "action_mode": "deterministic",
+        "metrics": ["mean_return"],
+        "budgets": {"executor": "process", "timeout_seconds": 0.000001},
+    }
+    result = run_evaluation(
+        suite, policy_index={}, out_dir=tmp_path / "c6-budget", record=False
+    )
+    assert result["denominators"]["attempted"] == 2
+    assert result["denominators"]["failed"] == 2
+    assert result["denominators"]["completed"] == 0
+    seeds = {
+        f["seed"]
+        for cell in result["cell_results"]
+        for f in (cell.get("run") or {}).get("failures") or []
+    }
+    assert seeds == {0, 1}
+    with pytest.raises(IncompleteExecutionError):
+        build_eval_report(result)

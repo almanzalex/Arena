@@ -7,7 +7,6 @@ timeouts never fake success, denominators stay coherent, and ``eval report`` exi
 
 from __future__ import annotations
 
-import json
 import sys
 import time
 from pathlib import Path
@@ -168,6 +167,11 @@ def test_one_cell_fails_others_finish_no_valid_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """T-502: one hung cell + one finishing cell → incomplete, report refused."""
+    from arena.core.population import create_population
+    from arena.core.sdk import Policy
+    from arena.core.store import LocalStore
+    from arena.runtime import evaluation as evaluation_mod
+
     left, right = _pair(tmp_path)
     rock = build_fixed_action_rps_policy(
         tmp_path / "rock.arena", role=["player_0", "player_1"], action=0
@@ -175,37 +179,7 @@ def test_one_cell_fails_others_finish_no_valid_report(
     paper = build_fixed_action_rps_policy(
         tmp_path / "paper.arena", role=["player_0", "player_1"], action=1
     )
-    # Two cells via distinct opponent paths as two separate one-seed suites run
-    # under process budgets: hang env forces first worker path.
     marker = tmp_path / "partial-grandchild"
-    hang_calls = {"n": 0}
-    real_run = run_evaluation
-
-    def run_once(hang: bool, out: Path) -> dict:
-        if hang:
-            monkeypatch.setenv("ARENA_TEST_HANG_BOUNDARY", "step")
-            monkeypatch.setenv("ARENA_TEST_HANG_MARKER", str(marker))
-            budgets = {"executor": "process", "timeout_seconds": 0.35}
-        else:
-            monkeypatch.delenv("ARENA_TEST_HANG_BOUNDARY", raising=False)
-            monkeypatch.delenv("ARENA_TEST_HANG_MARKER", raising=False)
-            budgets = {"executor": "process", "timeout_seconds": 30}
-        suite = _suite(
-            left=left if hang else rock,
-            right=right if hang else paper,
-            seeds=[0],
-            budgets=budgets,
-            failure_policy={"missingness": "fail"},
-        )
-        return real_run(suite, policy_index={}, out_dir=out, record=False)
-
-    # Compose a two-cell suite with population crossplay so one process budget
-    # covers both cells; inject hang only for the first scheduled cell via env
-    # that the first worker inherits, then clear for subsequent workers.
-    from arena.core.population import create_population
-    from arena.core.sdk import Policy
-    from arena.core.store import LocalStore
-
     LocalStore(tmp_path).init()
     store = LocalStore(tmp_path)
     pop = create_population(
@@ -215,8 +189,6 @@ def test_one_cell_fails_others_finish_no_valid_report(
     )
     cand = Policy.load(left)
     hang_calls = {"n": 0}
-    from arena.runtime import evaluation as evaluation_mod
-
     real_supervised = evaluation_mod._run_cell_supervised
 
     def selective_supervised(**kwargs):
