@@ -36,6 +36,29 @@ _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _TAG_RE = re.compile(r"^v?[0-9]+\.[0-9]+\.[0-9]+(?:[A-Za-z0-9.-]+)?$")
 
 
+def _eval_bundle_manifest_path(raw_path: Path | str) -> Path:
+    path = Path(raw_path).resolve()
+    if path.is_dir():
+        path = path / "bundle.json"
+    if not path.is_file():
+        raise SchemaError(f"eval bundle manifest is unavailable: {path}")
+    return path
+
+
+def _assemble_eval_bundle_entry(raw_path: Path | str) -> dict[str, Any]:
+    path = _eval_bundle_manifest_path(raw_path)
+    manifest = load_manifest(path)
+    evaluation_digest = manifest.get("evaluation_digest")
+    if not isinstance(evaluation_digest, str) or not evaluation_digest:
+        raise SchemaError(f"eval bundle missing evaluation_digest: {path}")
+    parse_digest(evaluation_digest)
+    return {
+        "path": str(path),
+        "evaluation_digest": evaluation_digest,
+        "bundle_digest": digest_uri(sha256_file(path)),
+    }
+
+
 def assemble_release_evidence(
     *,
     release: str,
@@ -44,6 +67,7 @@ def assemble_release_evidence(
     gates: dict[str, Path | str],
     artifacts: list[Path | str],
     out: Path | str,
+    eval_bundles: list[Path | str] | None = None,
 ) -> dict[str, Any]:
     out_path = Path(out)
     if out_path.exists() or out_path.is_symlink():
@@ -73,7 +97,7 @@ def assemble_release_evidence(
                 "size": path.stat().st_size,
             }
         )
-    document = {
+    document: dict[str, Any] = {
         "schema": EVIDENCE_SCHEMA,
         "release": release,
         "tag": tag,
@@ -81,6 +105,10 @@ def assemble_release_evidence(
         "gates": gate_entries,
         "artifacts": artifact_entries,
     }
+    if eval_bundles:
+        document["eval_bundles"] = [
+            _assemble_eval_bundle_entry(path) for path in eval_bundles
+        ]
     _validate_evidence(document)
     dump_json(document, out_path)
     return document
@@ -135,6 +163,22 @@ def _validate_evidence(document: dict[str, Any]) -> None:
         if not isinstance(artifact, dict):
             raise SchemaError("release artifacts must be mappings")
         parse_digest(str(artifact.get("digest", "")))
+    eval_bundles = document.get("eval_bundles")
+    if eval_bundles is not None:
+        if not isinstance(eval_bundles, list):
+            raise SchemaError("release evidence eval_bundles must be a list when present")
+        seen_paths: set[str] = set()
+        for entry in eval_bundles:
+            if not isinstance(entry, dict):
+                raise SchemaError("eval_bundles entries must be mappings")
+            path = entry.get("path")
+            if not isinstance(path, str) or not path:
+                raise SchemaError("eval_bundles entries require path")
+            if path in seen_paths:
+                raise SchemaError(f"duplicate eval bundle path: {path}")
+            seen_paths.add(path)
+            parse_digest(str(entry.get("evaluation_digest", "")))
+            parse_digest(str(entry.get("bundle_digest", "")))
 
 
 def sign_release_evidence(
@@ -275,6 +319,39 @@ def _verify_local_gate_evidence(document: dict[str, Any], *, root: Path) -> list
     return checked
 
 
+def _verify_local_eval_bundles(document: dict[str, Any], *, root: Path) -> list[str]:
+    entries = document.get("eval_bundles")
+    if entries is None:
+        return []
+    checked: list[str] = []
+    for entry in entries:
+        raw_path = entry.get("path")
+        if not raw_path:
+            continue
+        path = Path(str(raw_path))
+        if not path.is_absolute():
+            path = root / path
+        if path.is_dir():
+            path = path / "bundle.json"
+        if not path.is_file():
+            raise ConformanceError(f"eval bundle manifest is unavailable: {path}")
+        actual_bundle = digest_uri(sha256_file(path))
+        if actual_bundle != entry["bundle_digest"]:
+            raise ConformanceError(
+                f"eval bundle digest mismatch for {path}: "
+                f"expected {entry['bundle_digest']}, got {actual_bundle}"
+            )
+        manifest = load_manifest(path)
+        actual_eval = manifest.get("evaluation_digest")
+        if actual_eval != entry["evaluation_digest"]:
+            raise ConformanceError(
+                f"eval bundle evaluation_digest mismatch for {path}: "
+                f"expected {entry['evaluation_digest']}, got {actual_eval!r}"
+            )
+        checked.append(str(path))
+    return checked
+
+
 def _validate_qualification_ledger(ledger: dict[str, Any]) -> list[dict[str, Any]]:
     if ledger.get("schema") != CURRENT_SCHEMA:
         raise SchemaError(f"expected current ledger schema {CURRENT_SCHEMA}")
@@ -360,6 +437,7 @@ def verify_release_evidence(
     )
     artifacts = _verify_local_artifacts(document, root=index_path.parent)
     gate_evidence = _verify_local_gate_evidence(document, root=index_path.parent)
+    eval_bundles = _verify_local_eval_bundles(document, root=index_path.parent)
     current = None
     if current_ledger is not None:
         if current_ledger_signature is None or current_ledger_key is None:
@@ -383,6 +461,7 @@ def verify_release_evidence(
         "gates": len(document["gates"]),
         "local_gate_evidence_checked": gate_evidence,
         "local_artifacts_checked": artifacts,
+        "local_eval_bundles_checked": eval_bundles,
         "mode": "current" if current_ledger is not None else "at-release",
         "current": current,
     }

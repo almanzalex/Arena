@@ -354,6 +354,7 @@ def test_signed_release_and_current_ledger_are_content_bound(tmp_path: Path) -> 
         artifacts=[artifact],
         out=evidence_path,
     )
+    assert "eval_bundles" not in json.loads(evidence_path.read_text(encoding="utf-8"))
     keys = generate_signing_keypair(
         private_key=tmp_path / "private.pem",
         public_key=tmp_path / "public.pem",
@@ -371,6 +372,7 @@ def test_signed_release_and_current_ledger_are_content_bound(tmp_path: Path) -> 
     )
     assert verified["ok"] is True
     assert verified["local_artifacts_checked"] == [str(artifact)]
+    assert verified["local_eval_bundles_checked"] == []
     assert verified["local_gate_evidence_checked"] == [
         str(gate_files[f"R-{index:02d}"]) for index in range(1, 15)
     ]
@@ -413,6 +415,93 @@ def test_signed_release_and_current_ledger_are_content_bound(tmp_path: Path) -> 
     ledger_path.write_bytes(canonical_json(ledger) + b"\n")
     gate_files["R-08"].write_text('{"ok": false}', encoding="utf-8")
     with pytest.raises(ConformanceError, match="gate evidence digest mismatch"):
+        verify_release_evidence(
+            evidence_path,
+            signature=signature,
+            public_key=keys["public_key"],
+        )
+
+
+
+def test_release_evidence_binds_eval_bundle_digests_when_present(tmp_path: Path) -> None:
+    pytest.importorskip("cryptography")
+    from arena.core.identity import digest_uri, sha256_bytes
+    from arena.core.manifests import dump_json
+
+    artifact = tmp_path / "arena-1.0.0-py3-none-any.whl"
+    artifact.write_bytes(b"release artifact")
+    gate_files = {}
+    for index in range(1, 15):
+        gate = tmp_path / f"R-{index:02d}.json"
+        gate.write_text(json.dumps({"ok": True, "gate": index}), encoding="utf-8")
+        gate_files[f"R-{index:02d}"] = gate
+
+    evaluation_digest = digest_uri(sha256_bytes(b"locked-evaluation"))
+    bundle_dir = tmp_path / "eval-bundle"
+    bundle_dir.mkdir()
+    bundle_manifest = {
+        "schema": "arena.eval-bundle/v0alpha1",
+        "evaluation_digest": evaluation_digest,
+        "artifacts": {"eval_run.json": digest_uri(sha256_bytes(b"eval-run"))},
+        "reproduce": {
+            "mode": "reaggregate_from_locked_rollouts",
+            "note": "test fixture",
+        },
+    }
+    bundle_manifest["digest"] = digest_uri(sha256_bytes(canonical_json(bundle_manifest)))
+    dump_json(bundle_manifest, bundle_dir / "bundle.json")
+
+    evidence_path = tmp_path / "evidence.json"
+    document = assemble_release_evidence(
+        release="1.0.0",
+        tag="v1.0.0",
+        commit="b" * 40,
+        gates=gate_files,
+        artifacts=[artifact],
+        out=evidence_path,
+        eval_bundles=[bundle_dir],
+    )
+    assert len(document["eval_bundles"]) == 1
+    assert document["eval_bundles"][0]["evaluation_digest"] == evaluation_digest
+    assert document["eval_bundles"][0]["path"].endswith("bundle.json")
+
+    keys = generate_signing_keypair(
+        private_key=tmp_path / "private.pem",
+        public_key=tmp_path / "public.pem",
+    )
+    signature = tmp_path / "evidence.sig.json"
+    sign_release_evidence(
+        evidence_path,
+        private_key=keys["private_key"],
+        out=signature,
+    )
+    verified = verify_release_evidence(
+        evidence_path,
+        signature=signature,
+        public_key=keys["public_key"],
+    )
+    assert verified["ok"] is True
+    assert verified["local_eval_bundles_checked"] == [document["eval_bundles"][0]["path"]]
+
+    bundle_path = Path(document["eval_bundles"][0]["path"])
+    mutated = dict(bundle_manifest)
+    mutated["evaluation_digest"] = digest_uri(sha256_bytes(b"tampered-evaluation"))
+    dump_json(mutated, bundle_path)
+    with pytest.raises(ConformanceError, match="eval bundle digest mismatch"):
+        verify_release_evidence(
+            evidence_path,
+            signature=signature,
+            public_key=keys["public_key"],
+        )
+
+    # Restore file digest, then only mutate the evaluation_digest claim in evidence.
+    dump_json(bundle_manifest, bundle_path)
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    evidence["eval_bundles"][0]["evaluation_digest"] = digest_uri(
+        sha256_bytes(b"wrong-claim")
+    )
+    evidence_path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+    with pytest.raises(ConformanceError, match="subject digest"):
         verify_release_evidence(
             evidence_path,
             signature=signature,

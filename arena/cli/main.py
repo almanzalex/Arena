@@ -429,13 +429,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Evaluation bundles and signed 1.0 release-evidence commands",
     )
     p_rel = p_release.add_subparsers(dest="release_command", required=True)
-    p_rb = p_rel.add_parser("build", help="Build an evaluation release bundle")
+    p_rb = p_rel.add_parser(
+        "build",
+        help="Build an evaluation release bundle (locked eval digests/artifacts)",
+    )
     p_rb.add_argument("--eval", required=True, dest="eval_run", help="Eval run directory")
     p_rb.add_argument("--out", required=True)
     p_rb.add_argument("--report", default=None)
     p_ra = p_rel.add_parser(
         "assemble",
-        help="Content-bind R-01..R-14 evidence and exact release artifacts",
+        help=(
+            "Assemble signed-ready release-evidence index from R-01..R-14 gates "
+            "and exact release artifacts (not eval-bundle build)"
+        ),
     )
     p_ra.add_argument("--release", required=True)
     p_ra.add_argument("--tag", required=True)
@@ -448,6 +454,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Repeat once for every mandatory release gate",
     )
     p_ra.add_argument("--artifact", action="append", default=[], required=True)
+    p_ra.add_argument(
+        "--eval-bundle",
+        action="append",
+        default=[],
+        dest="eval_bundle",
+        metavar="PATH",
+        help=(
+            "Optional eval bundle directory or bundle.json; records evaluation_digest "
+            "when present (repeatable)"
+        ),
+    )
     p_ra.add_argument("--out", required=True)
     p_rs = p_rel.add_parser("sign", help="Sign a release evidence index or current ledger")
     p_rs.add_argument("document")
@@ -569,15 +586,30 @@ def main(argv: list[str] | None = None) -> int:
     p_push = sub.add_parser("push", help="Mirror an Arena artifact without changing identity")
     p_push.add_argument("source", help="Artifact path, object digest, or local ref")
     p_push.add_argument(
-        "destination", help="file://, hf://, oci://, wandb://, or mlflow:// store URI"
+        "destination",
+        help=(
+            "file://, hf://, oci://, wandb://, or mlflow:// store URI "
+            "(push returns the same URI with #sha256:… identity fragment)"
+        ),
     )
-    p_push.add_argument("--verify", action="store_true")
+    p_push.add_argument(
+        "--verify",
+        action="store_true",
+        help="After push, re-read the store and check blob digests match the descriptor",
+    )
     p_push.add_argument("--json", action="store_true")
 
     p_pull = sub.add_parser("pull", help="Restore a mirrored Arena artifact")
-    p_pull.add_argument("source", help="Artifact URI returned by `arena push`")
+    p_pull.add_argument(
+        "source",
+        help="Artifact URI from `arena push` (must include #sha256:… identity fragment)",
+    )
     p_pull.add_argument("--out", default=None, help="Restore directory (defaults from identity)")
-    p_pull.add_argument("--verify", action="store_true")
+    p_pull.add_argument(
+        "--verify",
+        action="store_true",
+        help="After restore, recompute artifact identity and require it matches the URI",
+    )
     p_pull.add_argument("--json", action="store_true")
 
     p_store = sub.add_parser(
@@ -1665,6 +1697,7 @@ def cmd_release_assemble(args: argparse.Namespace) -> int:
         gates=gates,
         artifacts=args.artifact,
         out=args.out,
+        eval_bundles=args.eval_bundle or None,
     )
     _print(result, as_json=bool(args.json))
     return 0
