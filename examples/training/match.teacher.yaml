@@ -1,0 +1,21 @@
+# Minimal teacher match for the offline-training how-to.
+# Point assignments at compatible .arena bundles (e.g. fixture teachers or
+# examples/eval/demo/*.arena), then:
+#   arena match run examples/training/match.teacher.yaml --out runs/teacher --record
+schema: arena.match/v0alpha1
+task:
+  adapter: pettingzoo-parallel
+  env: arena/competitive_rps_v0
+  config:
+    max_cycles: 4
+assignments:
+  player_0: PLACEHOLDER_PLAYER_0_POLICY.arena
+  player_1: PLACEHOLDER_PLAYER_1_POLICY.arena
+seeds: {start: 0, count: 6}
+action_mode: deterministic
+record:
+  trajectories: all
+failure_policy:
+  timeout_seconds: 60
+  retain_incomplete: true
+  retry: 0
