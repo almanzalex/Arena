@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 import math
 import shutil
-import tempfile
 from pathlib import Path
 from typing import Any
 
 from arena.core.errors import ConformanceError, SchemaError
 from arena.core.identity import canonical_json, digest_uri, sha256_bytes, sha256_file
+from arena.core.io import publish_directory
 from arena.core.manifests import (
     DATASET_SCHEMA,
     dump_json,
@@ -172,6 +172,11 @@ def _assign_split(
     return weights[-1][0]
 
 
+def _looks_like_complete_dataset(path: Path) -> bool:
+    """True when a directory has the published dataset surface (yaml/json)."""
+    return path.is_dir() and (path / "dataset.yaml").is_file() and (path / "dataset.json").is_file()
+
+
 def materialize_dataset(
     source: Path | str,
     *,
@@ -179,7 +184,13 @@ def materialize_dataset(
     splits: dict[str, float] | None = None,
     split_seed: int = 0,
 ) -> dict[str, Any]:
-    """Copy a lineage slice into a portable, digest-verified dataset directory."""
+    """Copy a lineage slice into a portable, digest-verified dataset directory.
+
+    Publication is atomic via same-parent staging + ``publish_directory``: mid-write
+    failures (including KeyboardInterrupt / ENOSPC) never leave a valid-looking
+    final ``out_dir``. Digests and split membership are deterministic for the same
+    source episodes, split weights, and ``split_seed``.
+    """
     source_path = Path(source).resolve()
     dataset = validate_dataset_manifest(load_manifest(source_path))
     actual_parent = dataset_content_digest(dataset)
@@ -191,10 +202,13 @@ def materialize_dataset(
     out_path = Path(out_dir)
     if out_path.exists() and (not out_path.is_dir() or any(out_path.iterdir())):
         raise SchemaError(f"materialize output must be empty or absent: {out_path}")
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=".arena-dataset-", dir=str(out_path.parent)))
-    try:
-        split_weights = _normalize_split_weights(splits) if splits is not None else None
+    # Empty placeholder dirs are removed so publish can rename staging into place.
+    if out_path.exists() and out_path.is_dir() and not any(out_path.iterdir()):
+        out_path.rmdir()
+
+    split_weights = _normalize_split_weights(splits) if splits is not None else None
+
+    def build(staging: Path) -> dict[str, Any]:
         split_counts: dict[str, int] = (
             {name: 0 for name, _weight in split_weights}
             if split_weights is not None
@@ -257,10 +271,23 @@ def materialize_dataset(
         portable["digest"] = dataset_content_digest(portable)
         dump_yaml(portable, staging / "dataset.yaml")
         dump_json(portable, staging / "dataset.json")
-        if out_path.exists():
-            out_path.rmdir()
-        staging.replace(out_path)
         return portable
-    except Exception:
-        shutil.rmtree(staging, ignore_errors=True)
-        raise
+
+    def verify(staging: Path) -> None:
+        if not _looks_like_complete_dataset(staging):
+            raise ConformanceError(
+                f"materialize staging incomplete (missing dataset manifests): {staging}"
+            )
+        published = validate_dataset_manifest(load_manifest(staging / "dataset.yaml"))
+        actual = dataset_content_digest(published)
+        declared = published.get("digest")
+        if declared != actual:
+            raise ConformanceError(
+                f"materialize staging digest mismatch: declared {declared}, actual {actual}"
+            )
+        if int(published.get("lineage", {}).get("episode_count", -1)) != len(
+            published.get("episodes") or []
+        ):
+            raise ConformanceError("materialize staging episode_count mismatch")
+
+    return publish_directory(out_path, build, verify=verify, replace=False)
