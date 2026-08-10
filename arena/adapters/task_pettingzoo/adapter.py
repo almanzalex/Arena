@@ -9,7 +9,7 @@ from arena.adapters.task_pettingzoo.wrappers import (
     normalize_wrappers,
     wrappers_provenance,
 )
-from arena.core.errors import ArenaError, SchemaError
+from arena.core.errors import missing_extra,  ArenaError, SchemaError
 from arena.core.spaces import gymnasium_space_to_dict
 
 ADAPTER_NAME = "pettingzoo-parallel"
@@ -70,9 +70,10 @@ def _require_pz() -> None:
         import gymnasium  # noqa: F401
         import pettingzoo  # noqa: F401
     except ImportError as e:
-        raise ArenaError(
-            "PettingZoo and Gymnasium are required for the task adapter. "
-            "Install with: pip install 'arena[pettingzoo]'"
+        raise missing_extra(
+            "pettingzoo",
+            feature="PettingZoo task adapter",
+            capability="pettingzoo",
         ) from e
 
 

@@ -15,7 +15,7 @@ from typing import Any
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
-from arena.core.errors import ArenaError, SchemaError, TaskRuntimeError
+from arena.core.errors import missing_extra,  ArenaError, SchemaError, TaskRuntimeError
 from arena.core.identity import canonical_json, digest_uri, sha256_bytes
 from arena.core.spaces import decode_bound_value
 
@@ -41,9 +41,10 @@ def _space_from_contract(data: dict[str, Any]) -> Any:
         import gymnasium.spaces as spaces
         import numpy as np
     except ImportError as e:  # pragma: no cover - covered by optional-extra gate
-        raise ArenaError(
-            "Gymnasium is required by the OpenEnv task bridge. "
-            "Install with: pip install 'arena[openenv]'"
+        raise missing_extra(
+            "openenv",
+            feature="OpenEnv task bridge (Gymnasium)",
+            capability="openenv",
         ) from e
     kind = data.get("type")
     if kind == "Discrete":
@@ -300,8 +301,10 @@ class OpenEnvParallelEnv:
                 try:
                     from openenv.core import GenericEnvClient
                 except ImportError as e:
-                    raise ArenaError(
-                        "OpenEnv adapter is optional. Install with: pip install 'arena[openenv]'"
+                    raise missing_extra(
+                        "openenv",
+                        feature="OpenEnv task adapter",
+                        capability="openenv",
                     ) from e
                 base_url = packaging.get("base_url") or spec.get("base_url")
                 if not base_url:

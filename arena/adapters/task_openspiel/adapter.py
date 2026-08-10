@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from arena.core.errors import ArenaError, SchemaError
+from arena.core.errors import missing_extra,  ArenaError, SchemaError
 
 FROZEN_GAME = "tic_tac_toe"
 FROZEN_GAMES: dict[str, dict[str, Any]] = {
@@ -90,8 +90,10 @@ def _require_pyspiel() -> Any:
     try:
         import pyspiel
     except ImportError as e:
-        raise ArenaError(
-            "OpenSpiel adapter is optional. Install with: pip install 'arena[openspiel]'"
+        raise missing_extra(
+            "openspiel",
+            feature="OpenSpiel task adapter",
+            capability="openspiel",
         ) from e
     return pyspiel
 
