@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -26,92 +27,99 @@ from examples.byo.cartpole_mlp import (  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+def _inspect_digest(bundle: Path) -> str:
+    inspect = subprocess.run(
+        [sys.executable, "-m", "arena", "inspect", str(bundle), "--json"],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert inspect.returncode == 0, inspect.stderr
+    payload = json.loads(inspect.stdout)
+    assert payload["ok"] is True
+    assert payload["digest"] == payload["data"]["digest"]
+    return payload["digest"]
+
+
 @pytest.mark.acceptance
 @pytest.mark.requires_torch
 def test_byo_export_verify_inspect_digest_stable(tmp_path: Path) -> None:
+    """Published bundle identity is stable across load/inspect/copy.
+
+    Independent TorchScript recompiles are *not* required to share a digest:
+    ``torch.jit.save`` is not a byte-stable serializer across processes.
+    """
     checkpoint = tmp_path / "cartpole.pt"
     torch.save(build_actor().state_dict(), checkpoint)
 
-    digests: list[str] = []
-    for i in range(2):
-        bundle = export_module_from_checkpoint(
-            module_ref="examples.byo.cartpole_mlp:build_actor",
-            out_dir=tmp_path / f"byo-{i}.arena",
-            role="agent",
-            name="byo-cartpole-mlp",
-            observation=CARTPOLE_OBSERVATION,
-            action=CARTPOLE_ACTION,
-            source=checkpoint,
-            reference_cases=REFERENCE_CASES,
-            source_revision="examples/byo@cartpole-mlp",
-        )
-        verification = verify_bundle_self(bundle)
-        assert verification["ok"] is True
-        assert verification["verify_mode"] == "source-conformance"
-        assert verification["cases"] == len(REFERENCE_CASES)
+    bundle = export_module_from_checkpoint(
+        module_ref="examples.byo.cartpole_mlp:build_actor",
+        out_dir=tmp_path / "byo.arena",
+        role="agent",
+        name="byo-cartpole-mlp",
+        observation=CARTPOLE_OBSERVATION,
+        action=CARTPOLE_ACTION,
+        source=checkpoint,
+        reference_cases=REFERENCE_CASES,
+        source_revision="examples/byo@cartpole-mlp",
+    )
+    verification = verify_bundle_self(bundle)
+    assert verification["ok"] is True
+    assert verification["verify_mode"] == "source-conformance"
+    assert verification["cases"] == len(REFERENCE_CASES)
 
-        policy = Policy.load(bundle)
-        digests.append(policy.digest)
+    policy = Policy.load(bundle)
+    assert policy.digest.startswith("sha256:")
+    assert policy.manifest["lineage"]["export_path"] == "byo-torchscript"
+    assert policy.manifest["runtime"]["tier"] == "torchscript"
 
-        inspect = subprocess.run(
-            [sys.executable, "-m", "arena", "inspect", str(bundle), "--json"],
-            cwd=REPO_ROOT,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        assert inspect.returncode == 0, inspect.stderr
-        payload = json.loads(inspect.stdout)
-        assert payload["ok"] is True
-        assert payload["digest"] == policy.digest
-        assert payload["data"]["digest"] == policy.digest
-        assert payload["data"]["runtime"]["tier"] == "torchscript"
-        assert payload["data"]["lineage"]["export_path"] == "byo-torchscript"
+    digest_a = _inspect_digest(bundle)
+    digest_b = _inspect_digest(bundle)
+    assert digest_a == digest_b == policy.digest
 
-    assert digests[0] == digests[1]
-    assert digests[0].startswith("sha256:")
+    copied = tmp_path / "byo-copy.arena"
+    shutil.copytree(bundle, copied)
+    assert Policy.load(copied).digest == policy.digest
+    assert _inspect_digest(copied) == policy.digest
+    assert verify_bundle_self(copied)["ok"] is True
 
 
 @pytest.mark.acceptance
 @pytest.mark.requires_torch
-def test_byo_export_script_cli_digest_stable(tmp_path: Path) -> None:
-    # Share one checkpoint across CLI runs so digests isolate TorchScript
-    # serialization stability (not RNG re-init of demo weights).
+def test_byo_export_script_cli_verify_inspect(tmp_path: Path) -> None:
     checkpoint = tmp_path / "shared.pt"
     torch.save(build_actor().state_dict(), checkpoint)
-    out_a = tmp_path / "a.arena"
-    out_b = tmp_path / "b.arena"
-    digests: list[str] = []
-    for out in (out_a, out_b):
-        proc = subprocess.run(
-            [
-                sys.executable,
-                str(REPO_ROOT / "examples/byo/export_cartpole_mlp.py"),
-                "--out",
-                str(out),
-                "--source",
-                str(checkpoint),
-            ],
-            cwd=REPO_ROOT,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        assert proc.returncode == 0, proc.stderr
-        report = json.loads(proc.stdout)
-        assert report["ok"] is True
-        assert report["schema"] == "arena.byo-export-proof/v1"
-        digests.append(report["policy_digest"])
-        assert Policy.load(out).digest == report["policy_digest"]
-        verify = subprocess.run(
-            [sys.executable, "-m", "arena", "policy", "verify", str(out)],
-            cwd=REPO_ROOT,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        assert verify.returncode == 0, verify.stderr
-    assert digests[0] == digests[1]
+    out = tmp_path / "cli.arena"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "examples/byo/export_cartpole_mlp.py"),
+            "--out",
+            str(out),
+            "--source",
+            str(checkpoint),
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    report = json.loads(proc.stdout)
+    assert report["ok"] is True
+    assert report["schema"] == "arena.byo-export-proof/v1"
+    assert Policy.load(out).digest == report["policy_digest"]
+    assert _inspect_digest(out) == report["policy_digest"]
+
+    verify = subprocess.run(
+        [sys.executable, "-m", "arena", "policy", "verify", str(out)],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert verify.returncode == 0, verify.stderr
 
 
 @pytest.mark.acceptance
@@ -135,6 +143,7 @@ def test_byo_export_script_no_source_demo_works(tmp_path: Path) -> None:
     assert report["ok"] is True
     assert Policy.load(out).digest == report["policy_digest"]
     assert verify_bundle_self(out)["verify_mode"] == "source-conformance"
+    assert _inspect_digest(out) == report["policy_digest"]
 
 
 @pytest.mark.acceptance
