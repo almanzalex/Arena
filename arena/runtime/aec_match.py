@@ -245,6 +245,51 @@ def _run_aec_episode(
                     },
                 )
             agent = env.agent_selection
+            # PettingZoo classic AEC keeps done agents in `env.agents` until a
+            # dead-step advances them with action=None. Do not call policies.
+            if bool((getattr(env, "terminations", {}) or {}).get(agent, False)) or bool(
+                (getattr(env, "truncations", {}) or {}).get(agent, False)
+            ):
+                try:
+                    env.step(None)
+                except TaskRuntimeError as e:
+                    raise RuntimeFailure(
+                        str(e),
+                        kind=e.kind,
+                        episode_index=episode_index,
+                        agent=agent,
+                        details={**e.details, "steps": step_i},
+                    ) from e
+                if hasattr(env, "rewards"):
+                    for a, r in (env.rewards or {}).items():
+                        if a in assignments:
+                            rr = float(r)
+                            pending_rewards[a] = pending_rewards.get(a, 0.0) + rr
+                            returns[a] = returns.get(a, 0.0) + rr
+                if agents_this_tick and (
+                    agents_this_tick >= set(assignments) or not env.agents
+                ):
+                    steps.append(
+                        {
+                            "observations": dict(pending_obs),
+                            "actions": dict(pending_actions),
+                            "rewards": dict(pending_rewards),
+                            "terminations": dict(pending_terms),
+                            "truncations": dict(pending_truncs),
+                            "infos": dict(pending_infos),
+                        }
+                    )
+                    step_i += 1
+                    pending_obs.clear()
+                    pending_actions.clear()
+                    pending_rewards.clear()
+                    pending_terms.clear()
+                    pending_truncs.clear()
+                    pending_infos.clear()
+                    agents_this_tick.clear()
+                if not env.agents:
+                    break
+                continue
             if agent not in runtimes:
                 raise RuntimeFailure(
                     f"missing policy for agent {agent!r}",
