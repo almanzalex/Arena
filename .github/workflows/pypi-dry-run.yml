@@ -1,0 +1,26 @@
+name: PyPI dry-run (R-11 rehearsal)
+
+# Manual build + twine check only. Does not publish and does not use secrets.
+# Trusted Publisher OIDC uploads require a separate workflow with id-token: write;
+# that permission is intentionally omitted here so this job cannot mint a PyPI token.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Build sdist/wheel and twine check
+        run: bash scripts/pypi_dry_run.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arena-pypi-dry-run-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
