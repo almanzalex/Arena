@@ -43,6 +43,7 @@ def test_v03_unknown_cases_have_extension_recipe(
     assert axis in message
     assert "register" in message
     assert qualify in message
+    assert "Arena will not silently coerce" in message
 
 
 def test_native_provider_default_preserves_v02_evaluation_identity() -> None:

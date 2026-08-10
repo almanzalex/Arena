@@ -719,6 +719,27 @@ def validate_eval_report_manifest(data: dict[str, Any]) -> dict[str, Any]:
     for key in ("evaluation_digest", "eval_run_digest", "metrics"):
         if key not in data:
             raise SchemaError(f"eval-report missing required field: {key}")
+    if schema == EVAL_REPORT_V1_SCHEMA:
+        for key in (
+            "evaluation_intent_digest",
+            "semantic_result_digest",
+            "policy_digests",
+            "state",
+        ):
+            if key not in data:
+                raise SchemaError(f"eval-report/v1 missing required field: {key}")
+        digests = data["policy_digests"]
+        if not isinstance(digests, list) or not digests:
+            raise SchemaError("eval-report/v1 policy_digests must be a non-empty list")
+        for index, digest in enumerate(digests):
+            _require_digest(digest, field=f"policy_digests[{index}]")
+        if data["state"] not in {"complete", "incomplete", "failed", "cancelled"}:
+            raise SchemaError("eval-report/v1 state is invalid")
+        _require_digest(data["evaluation_digest"], field="evaluation_digest")
+        _require_digest(
+            data["evaluation_intent_digest"], field="evaluation_intent_digest"
+        )
+        _require_digest(data["semantic_result_digest"], field="semantic_result_digest")
     return data
 
 

@@ -32,6 +32,7 @@ from arena.core.manifests import (
     expand_seeds,
     load_manifest,
     task_content_digest,
+    validate_eval_report_manifest,
     validate_eval_run_manifest,
     validate_evaluation_manifest,
 )
@@ -257,6 +258,8 @@ def _execute_evaluation_cell(
         if not report.ok:
             raise CompatibilityError(str(report))
         assignments[role] = policy
+    # Bind immutable digests into the claim surface (never leave movable paths).
+    bound_assignments = {role: policy.digest for role, policy in assignments.items()}
     match_out = run_root / cell["cell_id"]
     result = get_interaction(suite.get("interaction", "parallel")).run_match(
         task_spec=task_spec,
@@ -287,12 +290,13 @@ def _execute_evaluation_cell(
             evidence_refs.insert(0, str(bundle.relative_to(run_root)))
     return {
         **cell,
+        "assignments": bound_assignments,
         "run": result,
         "episodes": episodes,
         "evidence_refs": evidence_refs,
         "failures": len(result.get("failures") or []),
         "lineage": {
-            "policy_digests": sorted(set(cell["assignments"].values())),
+            "policy_digests": sorted(set(bound_assignments.values())),
             "task_digest": task_digest,
             "provider": provider_lineage,
         },
@@ -315,12 +319,31 @@ def _supervised_failure_kind(exc: BaseException) -> str:
     return "executor_failure"
 
 
+def _bound_policy_assignments(
+    cell: dict[str, Any], *, policy_index: dict[str, Path]
+) -> dict[str, str]:
+    """Resolve cell assignment refs to sha256 digests for claim binding."""
+    bound: dict[str, str] = {}
+    for role, pref in (cell.get("assignments") or {}).items():
+        value = str(pref)
+        if value.startswith("sha256:"):
+            bound[role] = value
+            continue
+        try:
+            bound[role] = _policy_from_digest_or_path(value, policy_index=policy_index).digest
+        except SchemaError:
+            # Leave unresolved refs for the ledger; report building refuses them.
+            bound[role] = value
+    return bound
+
+
 def _supervised_cell_failure(
     *,
     cell: dict[str, Any],
     task_digest: str,
     provider_lineage: dict[str, Any],
     exc: BaseException,
+    policy_index: dict[str, Path] | None = None,
 ) -> dict[str, Any]:
     safe_message = str(redact(str(exc)))
     kind = _supervised_failure_kind(exc)
@@ -336,8 +359,10 @@ def _supervised_cell_failure(
         if isinstance(code, str) and code:
             entry["code"] = code
         failures.append(entry)
+    bound_assignments = _bound_policy_assignments(cell, policy_index=policy_index or {})
     return {
         **cell,
+        "assignments": bound_assignments,
         "run": {
             "failures": failures,
             "outcome": {
@@ -351,7 +376,7 @@ def _supervised_cell_failure(
         "evidence_refs": [],
         "failures": len(failures),
         "lineage": {
-            "policy_digests": sorted(set(cell["assignments"].values())),
+            "policy_digests": sorted(set(bound_assignments.values())),
             "task_digest": task_digest,
             "provider": provider_lineage,
         },
@@ -646,6 +671,7 @@ def _run_native_evaluation_impl(
                 task_digest=task_digest,
                 provider_lineage=provider_lineage,
                 exc=exc,
+                policy_index=policy_index,
             )
 
     if workers == 1 or len(cells) <= 1:
@@ -768,6 +794,22 @@ def _episode_returns(ep: dict[str, Any]) -> dict[str, float]:
     return returns
 
 
+def _collect_policy_digests(cells: list[dict[str, Any]]) -> list[str]:
+    """Bind every cell assignment digest into the report claim surface."""
+    digests: set[str] = set()
+    for cell in cells:
+        assignments = cell.get("assignments") or {}
+        if isinstance(assignments, dict):
+            for value in assignments.values():
+                if isinstance(value, str) and value.startswith("sha256:"):
+                    digests.add(value)
+        lineage = cell.get("lineage") or {}
+        for value in lineage.get("policy_digests") or []:
+            if isinstance(value, str) and value.startswith("sha256:"):
+                digests.add(value)
+    return sorted(digests)
+
+
 def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
     state = eval_run.get("state", "complete")
     suite = eval_run.get("suite") or {}
@@ -805,6 +847,21 @@ def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
     # Enrich cells from minimal eval_run if needed.
     if not cells:
         cells = list(eval_run.get("cells") or [])
+    policy_digests = _collect_policy_digests(cells)
+    if not policy_digests:
+        raise SchemaError(
+            "refusing to report an evaluation with no bound policy digests; "
+            "cells must record sha256 assignments so claims bind policy+suite identity"
+        )
+    for required in (
+        "evaluation_digest",
+        "evaluation_intent_digest",
+        "semantic_result_digest",
+    ):
+        if not eval_run.get(required):
+            raise SchemaError(
+                f"refusing to report evaluation missing suite identity field: {required}"
+            )
     computed = {}
     for kind in metric_kinds:
         name = kind if isinstance(kind, str) else kind.get("kind")
@@ -823,9 +880,11 @@ def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
     report = {
         "schema": "arena.eval-report/v1",
         "evaluation_digest": eval_run["evaluation_digest"],
-        "evaluation_intent_digest": eval_run.get("evaluation_intent_digest"),
+        "evaluation_intent_digest": eval_run["evaluation_intent_digest"],
         "execution_binding_digest": eval_run.get("execution_binding_digest"),
-        "semantic_result_digest": eval_run.get("semantic_result_digest"),
+        "semantic_result_digest": eval_run["semantic_result_digest"],
+        "policy_digests": policy_digests,
+        "evaluation_name": eval_run.get("evaluation_name") or suite.get("name"),
         "state": state,
         "denominators": eval_run.get("denominators"),
         "eval_run_digest": eval_run.get("object_digest")
@@ -840,4 +899,5 @@ def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
             "nontransitivity_warning"
         ),
     }
+    validate_eval_report_manifest(report)
     return report
