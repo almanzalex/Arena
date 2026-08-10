@@ -18,7 +18,6 @@ from arena.dataset import (
     verify_dataset_provenance,
 )
 
-
 POLICY_A = digest_uri("a" * 64)
 POLICY_B = digest_uri("b" * 64)
 TASK = {

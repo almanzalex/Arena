@@ -21,7 +21,6 @@ from arena.dataset import (
     verify_dataset_provenance,
 )
 
-
 POLICY_ROCK = digest_uri("1" * 64)
 POLICY_PAPER = digest_uri("2" * 64)
 TASK = {
