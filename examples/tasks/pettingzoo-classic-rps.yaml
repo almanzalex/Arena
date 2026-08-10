@@ -1,9 +1,5 @@
 schema: arena.task/v0alpha1
-<<<<<<< HEAD
 name: task:pettingzoo-classic-rps@1.0
-=======
-name: task:pettingzoo-classic-rps@0.3
->>>>>>> 66ede00 (Document and smoke-test PettingZoo classic multi-agent task paths.)
 adapter: pettingzoo-parallel
 env: classic/rps_v2
 interaction: parallel
@@ -12,7 +8,4 @@ packaging:
   kind: pettingzoo_wrappers
 config:
   max_cycles: 1
-<<<<<<< HEAD
-=======
 digest: sha256:29a74779322b86273704a56b617029524ea2f03d26bdd16a9e2e01592652d017
->>>>>>> 66ede00 (Document and smoke-test PettingZoo classic multi-agent task paths.)
