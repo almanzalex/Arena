@@ -17,8 +17,8 @@ from arena.core.mirror import (
     pull_artifact,
     push_artifact,
 )
-from arena.core.store_oci import OCIStoreAdapter
 from arena.core.sdk import Policy
+from arena.core.store_oci import OCIStoreAdapter
 
 
 def test_i02_file_round_trip_preserves_policy_identity(tmp_path: Path) -> None:
