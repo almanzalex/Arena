@@ -117,6 +117,12 @@ def main(argv: list[str] | None = None) -> int:
     p_dem = p_demo.add_subparsers(dest="demo_command", required=True)
     p_dh = p_dem.add_parser("handoff", help="Build, mirror, pull, and verify a policy locally")
     p_dh.add_argument("--out", default="./arena-demo")
+    p_dm = p_dem.add_parser(
+        "multiagent",
+        help="Export portable RPS policies and run PettingZoo classic/rps_v2 matches",
+    )
+    p_dm.add_argument("--out", default="./arena-ma-demo")
+    p_dm.add_argument("--json", action="store_true")
 
     p_schema = sub.add_parser("schema", help="Inspect the installed compatibility registry")
     p_sch = p_schema.add_subparsers(dest="schema_command", required=True)
@@ -423,19 +429,67 @@ def main(argv: list[str] | None = None) -> int:
     p_ec.add_argument("left", help="Left report.json, eval_run.json, or bundle directory")
     p_ec.add_argument("right", help="Right report.json, eval_run.json, or bundle directory")
     p_ec.add_argument("--json", action="store_true")
+    p_ematrix = p_e.add_parser(
+        "matrix",
+        help=(
+            "One-shot: policies → population → cross-play matrix → "
+            "non-transitivity-aware report with bound digests"
+        ),
+    )
+    p_ematrix.add_argument(
+        "--policy",
+        action="append",
+        default=[],
+        required=True,
+        help="Policy bundle path (repeat at least twice)",
+    )
+    p_ematrix.add_argument(
+        "--env",
+        default=None,
+        help="Task env id (required unless --task YAML is provided)",
+    )
+    p_ematrix.add_argument(
+        "--task",
+        default=None,
+        help="Optional task YAML; overrides --adapter/--env/--config when present",
+    )
+    p_ematrix.add_argument("--adapter", default="pettingzoo-parallel")
+    p_ematrix.add_argument(
+        "--interaction",
+        default="parallel",
+        choices=["parallel", "aec", "dynamic_aec"],
+    )
+    p_ematrix.add_argument(
+        "--config",
+        default=None,
+        help="Task config JSON/YAML object or path (e.g. max_cycles)",
+    )
+    p_ematrix.add_argument("--name", default="crossplay-matrix")
+    p_ematrix.add_argument("--seed-start", type=int, default=0)
+    p_ematrix.add_argument("--seed-count", type=int, default=1)
+    p_ematrix.add_argument("--workers", type=int, default=1)
+    p_ematrix.add_argument("--provider", default=None)
+    p_ematrix.add_argument("--out", required=True, help="Eval run + report output directory")
+    p_ematrix.add_argument("--json", action="store_true")
 
     p_release = sub.add_parser(
         "release",
         help="Evaluation bundles and signed 1.0 release-evidence commands",
     )
     p_rel = p_release.add_subparsers(dest="release_command", required=True)
-    p_rb = p_rel.add_parser("build", help="Build an evaluation release bundle")
+    p_rb = p_rel.add_parser(
+        "build",
+        help="Build an evaluation release bundle (locked eval digests/artifacts)",
+    )
     p_rb.add_argument("--eval", required=True, dest="eval_run", help="Eval run directory")
     p_rb.add_argument("--out", required=True)
     p_rb.add_argument("--report", default=None)
     p_ra = p_rel.add_parser(
         "assemble",
-        help="Content-bind R-01..R-14 evidence and exact release artifacts",
+        help=(
+            "Assemble signed-ready release-evidence index from R-01..R-14 gates "
+            "and exact release artifacts (not eval-bundle build)"
+        ),
     )
     p_ra.add_argument("--release", required=True)
     p_ra.add_argument("--tag", required=True)
@@ -448,6 +502,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Repeat once for every mandatory release gate",
     )
     p_ra.add_argument("--artifact", action="append", default=[], required=True)
+    p_ra.add_argument(
+        "--eval-bundle",
+        action="append",
+        default=[],
+        dest="eval_bundle",
+        metavar="PATH",
+        help=(
+            "Optional eval bundle directory or bundle.json; records evaluation_digest "
+            "when present (repeatable)"
+        ),
+    )
     p_ra.add_argument("--out", required=True)
     p_rs = p_rel.add_parser("sign", help="Sign a release evidence index or current ledger")
     p_rs.add_argument("document")
@@ -569,15 +634,30 @@ def main(argv: list[str] | None = None) -> int:
     p_push = sub.add_parser("push", help="Mirror an Arena artifact without changing identity")
     p_push.add_argument("source", help="Artifact path, object digest, or local ref")
     p_push.add_argument(
-        "destination", help="file://, hf://, oci://, wandb://, or mlflow:// store URI"
+        "destination",
+        help=(
+            "file://, hf://, oci://, wandb://, or mlflow:// store URI "
+            "(push returns the same URI with #sha256:… identity fragment)"
+        ),
     )
-    p_push.add_argument("--verify", action="store_true")
+    p_push.add_argument(
+        "--verify",
+        action="store_true",
+        help="After push, re-read the store and check blob digests match the descriptor",
+    )
     p_push.add_argument("--json", action="store_true")
 
     p_pull = sub.add_parser("pull", help="Restore a mirrored Arena artifact")
-    p_pull.add_argument("source", help="Artifact URI returned by `arena push`")
+    p_pull.add_argument(
+        "source",
+        help="Artifact URI from `arena push` (must include #sha256:… identity fragment)",
+    )
     p_pull.add_argument("--out", default=None, help="Restore directory (defaults from identity)")
-    p_pull.add_argument("--verify", action="store_true")
+    p_pull.add_argument(
+        "--verify",
+        action="store_true",
+        help="After restore, recompute artifact identity and require it matches the URI",
+    )
     p_pull.add_argument("--json", action="store_true")
 
     p_store = sub.add_parser(
@@ -701,6 +781,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return cmd_doctor(args)
     if args.command == "demo" and args.demo_command == "handoff":
         return cmd_demo_handoff(args)
+    if args.command == "demo" and args.demo_command == "multiagent":
+        return cmd_demo_multiagent(args)
     if args.command == "schema" and args.schema_command == "list":
         return cmd_schema_list(args)
     if args.command == "init":
@@ -746,6 +828,8 @@ def _dispatch(args: argparse.Namespace) -> int:
             return cmd_eval_bundle(args)
         if args.eval_command == "compare":
             return cmd_eval_compare(args)
+        if args.eval_command == "matrix":
+            return cmd_eval_matrix(args)
     if args.command == "release":
         if args.release_command == "build":
             return cmd_release_build(args)
@@ -913,6 +997,22 @@ def cmd_demo_handoff(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_demo_multiagent(args: argparse.Namespace) -> int:
+    """Run the packaged PettingZoo classic/rps_v2 multi-agent demo."""
+    import importlib.util
+
+    path = Path(__file__).resolve().parents[2] / "examples" / "multiagent" / "run_demo.py"
+    spec = importlib.util.spec_from_file_location("arena_multiagent_demo", path)
+    if spec is None or spec.loader is None:
+        raise ArenaError(f"cannot load multiagent demo from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    summary = module.run_multiagent_demo(out=Path(args.out))
+    _print(summary, as_json=bool(args.json))
+    return 0 if summary.get("ok") else 1
+
+
+
 def cmd_init(args: argparse.Namespace) -> int:
     from arena.core.store import LocalStore
 
@@ -923,11 +1023,26 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 
 def cmd_inspect(args: argparse.Namespace) -> int:
-    from arena.core.manifests import load_manifest, resolve_artifact_path
+    from arena.core.manifests import EVAL_BUNDLE_SCHEMA, load_manifest, resolve_artifact_path
     from arena.core.sdk import Policy
 
     artifact = Path(args.artifact)
-    if artifact.is_dir() and (artifact / "bundle.yaml").exists():
+    if artifact.is_dir() and (
+        (artifact / "bundle.yaml").exists() or (artifact / "bundle.json").exists()
+    ):
+        meta_path = (
+            artifact / "bundle.yaml"
+            if (artifact / "bundle.yaml").exists()
+            else artifact / "bundle.json"
+        )
+        meta = load_manifest(meta_path)
+        schema = str(meta.get("schema") or "")
+        if schema == EVAL_BUNDLE_SCHEMA or schema.startswith("arena.eval-bundle"):
+            from arena.core.eval_bundle import verify_eval_bundle
+
+            info = verify_eval_bundle(artifact)
+            _print(info, as_json=args.json)
+            return 0
         from arena.runtime.trajectory import inspect_trajectory
 
         info = inspect_trajectory(artifact)
@@ -1471,6 +1586,7 @@ def cmd_eval_run(args: argparse.Namespace) -> int:
                     "--policy must be digest=path or name=path "
                     f"(got {item!r}). Example: sha256:<64-hex>=./policy_bundle"
                 ),
+                code="USAGE_INVALID",
                 cause="policy binding is not digest=path or name=path",
                 repair=(
                     "Pass --policy as digest=path or name=path, e.g. "
@@ -1644,6 +1760,107 @@ def cmd_eval_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_eval_matrix(args: argparse.Namespace) -> int:
+    """Policies → population → cross-play matrix → bound non-transitivity report."""
+    import json
+
+    from arena.core.errors import IncompleteExecutionError, SchemaError
+    from arena.core.manifests import load_manifest
+    from arena.core.store import LocalStore
+    from arena.runtime.eval_matrix import run_crossplay_matrix
+
+    policies = list(args.policy or [])
+    if len(policies) < 2:
+        raise SchemaError(
+            "eval matrix requires at least two --policy paths "
+            "(policies → population → cartesian cross-play)."
+        )
+
+    task: dict[str, Any] | None = None
+    if args.task:
+        task = load_manifest(args.task)
+        if "task" in task and isinstance(task["task"], dict):
+            # Allow passing a full evaluation YAML by mistake; prefer embedded task.
+            task = dict(task["task"])
+
+    config: dict[str, Any] | None = None
+    if args.config:
+        raw = str(args.config)
+        cfg_path = Path(raw)
+        if cfg_path.exists():
+            text = cfg_path.read_text(encoding="utf-8")
+            try:
+                loaded = json.loads(text)
+            except json.JSONDecodeError:
+                import yaml
+
+                loaded = yaml.safe_load(text)
+        else:
+            try:
+                loaded = json.loads(raw)
+            except json.JSONDecodeError:
+                import yaml
+
+                loaded = yaml.safe_load(raw)
+        if not isinstance(loaded, dict):
+            raise SchemaError("--config must be a JSON/YAML object")
+        config = loaded
+
+    if task is None and not args.env:
+        raise SchemaError("eval matrix requires --env or --task")
+
+    try:
+        store = LocalStore.find()
+    except Exception:
+        store = LocalStore(Path(args.out))
+        store.init()
+
+    result = run_crossplay_matrix(
+        policies,
+        out_dir=args.out,
+        env=args.env,
+        task=task,
+        adapter=args.adapter,
+        interaction=args.interaction,
+        config=config,
+        store=store,
+        name=args.name,
+        seeds={"start": int(args.seed_start), "count": int(args.seed_count)},
+        workers=int(args.workers),
+        provider=args.provider,
+    )
+    if result.get("state", "complete") != "complete":
+        raise IncompleteExecutionError(
+            "evaluation did not complete every declared attempt",
+            code="EVALUATION_INCOMPLETE",
+            cause=str(result.get("state")),
+            repair=(
+                f"Inspect {result['run_dir']}/eval_run.json, repair the recorded "
+                "failures, and retry to a new output path."
+            ),
+            context={
+                "run_dir": result.get("run_dir"),
+                "state": result.get("state"),
+            },
+        )
+    summary = {
+        "run_id": result["run_id"],
+        "run_dir": result["run_dir"],
+        "population_digest": result["population_digest"],
+        "cells": result["cells"],
+        "evaluation_digest": result["evaluation_digest"],
+        "evaluation_intent_digest": result["evaluation_intent_digest"],
+        "execution_binding_digest": result["execution_binding_digest"],
+        "semantic_result_digest": result["semantic_result_digest"],
+        "eval_run_digest": result["eval_run_digest"],
+        "sampling_ledger_digest": result["sampling_ledger_digest"],
+        "nontransitivity_warning": result.get("nontransitivity_warning"),
+        "state": result.get("state"),
+    }
+    _print(summary, as_json=bool(args.json))
+    return 0
+
+
 def cmd_release_build(args: argparse.Namespace) -> int:
     import json
     from pathlib import Path
@@ -1691,6 +1908,7 @@ def cmd_release_assemble(args: argparse.Namespace) -> int:
         gates=gates,
         artifacts=args.artifact,
         out=args.out,
+        eval_bundles=args.eval_bundle or None,
     )
     _print(result, as_json=bool(args.json))
     return 0
