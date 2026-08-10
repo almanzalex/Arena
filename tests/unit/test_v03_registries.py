@@ -26,21 +26,23 @@ def test_v03_builtin_registry_axes() -> None:
 
 
 @pytest.mark.parametrize(
-    ("registry", "kind", "axis"),
+    ("registry", "kind", "axis", "qualify"),
     [
-        (EVAL_PROVIDERS, "lab-evaluator", "eval_provider"),
-        (EXTERNAL_STORES, "s3", "external_store"),
-        (TASK_PACKAGERS, "ray", "task_packaging"),
+        (EVAL_PROVIDERS, "lab-evaluator", "eval_provider", "arena adapter qualify"),
+        (EXTERNAL_STORES, "s3", "external_store", "arena store qualify"),
+        (TASK_PACKAGERS, "ray", "task_packaging", "arena adapter qualify"),
     ],
 )
-def test_v03_unknown_cases_have_extension_recipe(registry, kind: str, axis: str) -> None:
+def test_v03_unknown_cases_have_extension_recipe(
+    registry, kind: str, axis: str, qualify: str
+) -> None:
     ensure_plugins_loaded()
     with pytest.raises(UnknownKindError) as exc:
         registry.get(kind)
     message = str(exc.value)
     assert axis in message
     assert "register" in message
-    assert "arena adapter qualify" in message
+    assert qualify in message
 
 
 def test_native_provider_default_preserves_v02_evaluation_identity() -> None:

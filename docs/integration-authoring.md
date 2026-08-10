@@ -12,9 +12,17 @@ editing Arena core dispatch.
 4. Add a smallest frozen fixture, fail-loud unknown/incomplete tests, failure accounting,
    and a successful end-to-end path.
 5. For tasks, add a trace suite and run `arena task verify-equivalence`; declare tolerances.
-6. Run `arena adapter qualify ...` and retain its JSON report with release evidence.
+6. Qualify before claiming support:
+   - tasks / eval providers / adapters: `arena adapter qualify ...`
+   - external stores: `arena store qualify <artifact> <destination>`
+   Retain the JSON report with release evidence. Unknown store schemes fail loud with an
+   extension recipe that names `arena store qualify`.
 7. Document install, one runnable command, security/trust boundary, scope, non-goals,
    overhead, and how to uninstall/disable the optional integration.
+
+Out-of-tree store plugins use entry point group `arena.plugins.v1` named
+`external_store:<scheme>` with a zero-arg `register()`. See
+`examples/plugins/arena-example-store` for the contract fixture.
 
 Copy [integration-usability-signoff.md](integration-usability-signoff.md) for a human
 reader. The automated approximation is covered by the 0.3 task/provider/store acceptance
