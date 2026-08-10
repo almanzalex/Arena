@@ -1,10 +1,12 @@
 # Changelog
 
+
 ## Unreleased
 
-- Make `arena doctor` report platform, installed extras, preview-vs-stable
-  usability, per-preview stable gaps, and qualify commands without promoting
-  OpenEnv/HF/Gimitest to stable without release evidence.
+- Strengthen the PettingZoo `classic/rps_v2` multi-agent path with portable
+  fixed-action policies, parallel/AEC task YAMLs, a packaged
+  `arena demo multiagent` flow, and acceptance coverage that checks digests and
+  interaction parity.
 
 ## 1.0.0rc1 — 2026-07-25
 
