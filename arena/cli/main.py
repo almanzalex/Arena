@@ -429,6 +429,48 @@ def main(argv: list[str] | None = None) -> int:
     p_ec.add_argument("left", help="Left report.json, eval_run.json, or bundle directory")
     p_ec.add_argument("right", help="Right report.json, eval_run.json, or bundle directory")
     p_ec.add_argument("--json", action="store_true")
+    p_ematrix = p_e.add_parser(
+        "matrix",
+        help=(
+            "One-shot: policies → population → cross-play matrix → "
+            "non-transitivity-aware report with bound digests"
+        ),
+    )
+    p_ematrix.add_argument(
+        "--policy",
+        action="append",
+        default=[],
+        required=True,
+        help="Policy bundle path (repeat at least twice)",
+    )
+    p_ematrix.add_argument(
+        "--env",
+        default=None,
+        help="Task env id (required unless --task YAML is provided)",
+    )
+    p_ematrix.add_argument(
+        "--task",
+        default=None,
+        help="Optional task YAML; overrides --adapter/--env/--config when present",
+    )
+    p_ematrix.add_argument("--adapter", default="pettingzoo-parallel")
+    p_ematrix.add_argument(
+        "--interaction",
+        default="parallel",
+        choices=["parallel", "aec", "dynamic_aec"],
+    )
+    p_ematrix.add_argument(
+        "--config",
+        default=None,
+        help="Task config JSON/YAML object or path (e.g. max_cycles)",
+    )
+    p_ematrix.add_argument("--name", default="crossplay-matrix")
+    p_ematrix.add_argument("--seed-start", type=int, default=0)
+    p_ematrix.add_argument("--seed-count", type=int, default=1)
+    p_ematrix.add_argument("--workers", type=int, default=1)
+    p_ematrix.add_argument("--provider", default=None)
+    p_ematrix.add_argument("--out", required=True, help="Eval run + report output directory")
+    p_ematrix.add_argument("--json", action="store_true")
 
     p_release = sub.add_parser(
         "release",
@@ -786,6 +828,8 @@ def _dispatch(args: argparse.Namespace) -> int:
             return cmd_eval_bundle(args)
         if args.eval_command == "compare":
             return cmd_eval_compare(args)
+        if args.eval_command == "matrix":
+            return cmd_eval_matrix(args)
     if args.command == "release":
         if args.release_command == "build":
             return cmd_release_build(args)
@@ -1698,6 +1742,107 @@ def cmd_eval_compare(args: argparse.Namespace) -> int:
 
     result = compare_eval_claims(args.left, args.right)
     _print(result, as_json=args.json)
+    return 0
+
+
+def cmd_eval_matrix(args: argparse.Namespace) -> int:
+    """Policies → population → cross-play matrix → bound non-transitivity report."""
+    import json
+
+    from arena.core.errors import IncompleteExecutionError, SchemaError
+    from arena.core.manifests import load_manifest
+    from arena.core.store import LocalStore
+    from arena.runtime.eval_matrix import run_crossplay_matrix
+
+    policies = list(args.policy or [])
+    if len(policies) < 2:
+        raise SchemaError(
+            "eval matrix requires at least two --policy paths "
+            "(policies → population → cartesian cross-play)."
+        )
+
+    task: dict[str, Any] | None = None
+    if args.task:
+        task = load_manifest(args.task)
+        if "task" in task and isinstance(task["task"], dict):
+            # Allow passing a full evaluation YAML by mistake; prefer embedded task.
+            task = dict(task["task"])
+
+    config: dict[str, Any] | None = None
+    if args.config:
+        raw = str(args.config)
+        cfg_path = Path(raw)
+        if cfg_path.exists():
+            text = cfg_path.read_text(encoding="utf-8")
+            try:
+                loaded = json.loads(text)
+            except json.JSONDecodeError:
+                import yaml
+
+                loaded = yaml.safe_load(text)
+        else:
+            try:
+                loaded = json.loads(raw)
+            except json.JSONDecodeError:
+                import yaml
+
+                loaded = yaml.safe_load(raw)
+        if not isinstance(loaded, dict):
+            raise SchemaError("--config must be a JSON/YAML object")
+        config = loaded
+
+    if task is None and not args.env:
+        raise SchemaError("eval matrix requires --env or --task")
+
+    try:
+        store = LocalStore.find()
+    except Exception:
+        store = LocalStore(Path(args.out))
+        store.init()
+
+    result = run_crossplay_matrix(
+        policies,
+        out_dir=args.out,
+        env=args.env,
+        task=task,
+        adapter=args.adapter,
+        interaction=args.interaction,
+        config=config,
+        store=store,
+        name=args.name,
+        seeds={"start": int(args.seed_start), "count": int(args.seed_count)},
+        workers=int(args.workers),
+        provider=args.provider,
+    )
+    if result.get("state", "complete") != "complete":
+        raise IncompleteExecutionError(
+            "evaluation did not complete every declared attempt",
+            code="EVALUATION_INCOMPLETE",
+            cause=str(result.get("state")),
+            repair=(
+                f"Inspect {result['run_dir']}/eval_run.json, repair the recorded "
+                "failures, and retry to a new output path."
+            ),
+            context={
+                "run_dir": result.get("run_dir"),
+                "state": result.get("state"),
+            },
+        )
+    summary = {
+        "run_id": result["run_id"],
+        "run_dir": result["run_dir"],
+        "population_digest": result["population_digest"],
+        "cells": result["cells"],
+        "evaluation_digest": result["evaluation_digest"],
+        "evaluation_intent_digest": result["evaluation_intent_digest"],
+        "execution_binding_digest": result["execution_binding_digest"],
+        "semantic_result_digest": result["semantic_result_digest"],
+        "eval_run_digest": result["eval_run_digest"],
+        "sampling_ledger_digest": result["sampling_ledger_digest"],
+        "nontransitivity_warning": result.get("nontransitivity_warning"),
+        "state": result.get("state"),
+    }
+    _print(summary, as_json=bool(args.json))
     return 0
 
 

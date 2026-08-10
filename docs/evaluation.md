@@ -23,6 +23,26 @@ arena eval bundle ./eval-runs/crossplay --out ./bundles/crossplay
 # or: arena release build --eval ./eval-runs/crossplay --out ./bundles/crossplay
 ```
 
+### One-shot cross-play matrix (single-lab shortcut)
+
+When you already have two or more policy bundles and want a cartesian
+population → cross-play matrix → non-transitivity-aware report without
+hand-authoring YAML:
+
+```bash
+arena eval matrix \
+  --policy ./rock.arena --policy ./paper.arena --policy ./scissors.arena \
+  --env arena/competitive_rps_v0 \
+  --config '{"max_cycles": 1}' \
+  --out ./eval-runs/matrix \
+  --json
+```
+
+This synthesizes a population, expands enumerated cross-play, writes
+`eval_run.json` / `report.json`, and binds `evaluation_*`,
+`execution_binding_digest`, `sampling_ledger_digest`, and population digests
+onto the report.
+
 ## Semantics
 
 - **Cells:** fixed policy assignments, population sample, or enumerated/cartesian cross-play.

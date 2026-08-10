@@ -810,6 +810,16 @@ def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
         name = kind if isinstance(kind, str) else kind.get("kind")
         metric = metrics_plugins.METRICS.get(str(name))
         computed[str(name)] = metric.compute(cells)
+    ledger = list(eval_run.get("sampling_ledger") or [])
+    sampling_ledger_digest = digest_uri(sha256_bytes(canonical_json(ledger)))
+    population_digests: list[str] = []
+    seen_pops: set[str] = set()
+    for spec in (suite.get("assignments") or {}).values():
+        if isinstance(spec, dict) and spec.get("kind") in {"population", "crossplay"}:
+            pref = str(spec.get("population") or "")
+            if pref.startswith("sha256:") and pref not in seen_pops:
+                seen_pops.add(pref)
+                population_digests.append(pref)
     report = {
         "schema": "arena.eval-report/v1",
         "evaluation_digest": eval_run["evaluation_digest"],
@@ -820,6 +830,9 @@ def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
         "denominators": eval_run.get("denominators"),
         "eval_run_digest": eval_run.get("object_digest")
         or digest_uri(sha256_bytes(canonical_json(eval_run.get("cells")))),
+        "sampling_ledger": ledger,
+        "sampling_ledger_digest": sampling_ledger_digest,
+        "population_digests": population_digests,
         "metrics": computed,
         "provider": eval_run.get("provider") or {"kind": "native"},
         "task_digest": eval_run.get("task_digest"),

@@ -9,12 +9,28 @@ Checked-in cyclic RPS population + suite (no placeholders):
 bash examples/eval/run_demo.sh
 ```
 
+`run_demo.sh` is hermetic: it copies `demo/` into a temp work dir (or
+`ARENA_EVAL_DEMO_WORK`) and never mutates the checked-in pack.
+
 Or step-by-step from `examples/eval/demo/` following [eval-clean-room.md](../../docs/eval-clean-room.md).
 
 Regenerate bundles (overwrites `demo/`):
 
 ```bash
 python examples/eval/generate_demo.py --force
+```
+
+## One-shot matrix (no YAML authoring)
+
+```bash
+arena eval matrix \
+  --policy ./demo/rock.arena \
+  --policy ./demo/paper.arena \
+  --policy ./demo/scissors.arena \
+  --env arena/competitive_rps_v0 \
+  --config '{"max_cycles": 1}' \
+  --out ./eval-runs/matrix \
+  --json
 ```
 
 ## Skeleton YAMLs
@@ -24,7 +40,7 @@ with `REPLACE_*` digests. Prefer the `demo/` pack for a first run.
 
 ## Replacement for hand-rolled cross-play (U-02)
 
-`crossplay_script.py` is **retired**. Use `run_demo.sh` or:
+`crossplay_script.py` is **retired**. Use `run_demo.sh`, `arena eval matrix`, or:
 
 ```bash
 arena init

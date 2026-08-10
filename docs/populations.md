@@ -12,6 +12,10 @@ arena population inspect populations/rps-opp --json
 
 Member `policy` fields may be digests or local bundle paths; create resolves paths to digests. Population identity ignores the human `name` and store ref (see [RFC 003](../rfcs/003-populations.md)).
 
+For a single-lab shortcut that builds a population from bare policy paths, expands a
+cartesian cross-play matrix, and emits a bound report, see
+`arena eval matrix` in [evaluation.md](evaluation.md).
+
 ## SDK
 
 ```python

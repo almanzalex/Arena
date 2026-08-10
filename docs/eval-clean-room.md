@@ -43,8 +43,10 @@ pytest -m slow tests/acceptance/test_eval_hermetic.py \
        tests/acceptance/test_u01_hermetic.py::test_u01_hermetic_venv -q
 ```
 
-Author smoke (no wheel build):
+Author smoke (hermetic copy of `examples/eval/demo`, no wheel build):
 
 ```bash
 bash examples/eval/run_demo.sh
+# or pin the work dir:
+ARENA_EVAL_DEMO_WORK=/tmp/arena-eval-demo ARENA_EVAL_DEMO_KEEP=1 bash examples/eval/run_demo.sh
 ```
