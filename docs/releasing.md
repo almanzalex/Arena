@@ -94,3 +94,18 @@ arena release verify evidence/release-index.json \
 Records require one unique, non-empty capability and a `pass`, `stale`, or
 `failed` status. Any `stale` or `failed` record makes current verification fail.
 This repository does not contain production signing keys or credentials.
+
+## R-11 public distribution rehearsal
+
+Before any TestPyPI or PyPI upload, rehearse packaging without secrets:
+
+```bash
+bash scripts/pypi_dry_run.sh
+```
+
+That builds the sdist and wheel and runs `twine check --strict`. It never uploads
+and never reads publish credentials. The manual GitHub Actions workflow
+`pypi-dry-run.yml` runs the same check. Trusted Publisher (GitHub OIDC) setup
+steps—registration fields, environments, and what a future upload job would
+need—are documented in [pypi-trusted-publishing.md](pypi-trusted-publishing.md).
+Do not add API tokens for the dry-run path.
