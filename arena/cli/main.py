@@ -1048,7 +1048,20 @@ def cmd_policy_export(args: argparse.Namespace) -> int:
     from arena.core.manifests import load_manifest
 
     if args.adapter != "custom-pytorch":
-        raise SystemExit(f"unsupported adapter: {args.adapter}")
+        from arena.core.errors import SchemaError
+
+        raise SchemaError(
+            (
+                f"unsupported adapter kind {args.adapter!r}. Supported: ['custom-pytorch']. "
+                "Use --adapter custom-pytorch, or extend Arena with a registered policy adapter "
+                "and run `arena adapter qualify` before claiming support. Arena will not silently "
+                "coerce adapters."
+            ),
+            code="UNKNOWN_KIND",
+            cause="unsupported policy export adapter",
+            repair="Pass --adapter custom-pytorch (currently the only supported export adapter).",
+            context={"adapter": args.adapter, "known": ["custom-pytorch"]},
+        )
 
     spec: dict[str, Any] = {}
     if args.spec:
@@ -1507,7 +1520,21 @@ def cmd_eval_run(args: argparse.Namespace) -> int:
     policy_index: dict[str, Path] = {}
     for item in args.policy:
         if "=" not in item:
-            raise SystemExit("--policy must be digest=path or name=path")
+            from arena.core.errors import CliUsageError
+
+            raise CliUsageError(
+                (
+                    "--policy must be digest=path or name=path "
+                    f"(got {item!r}). Example: sha256:<64-hex>=./policy_bundle"
+                ),
+                code="USAGE_INVALID",
+                cause="policy binding is not digest=path or name=path",
+                repair=(
+                    "Pass --policy as digest=path or name=path, e.g. "
+                    "`sha256:<64-hex>=./my_policy` using the digest from policy export."
+                ),
+                context={"value": item},
+            )
         key, path = item.split("=", 1)
         policy_index[key] = Path(path)
         from arena.core.sdk import Policy

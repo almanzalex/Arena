@@ -54,7 +54,7 @@ Large payloads are referenced by digest; they are never embedded in the manifest
 
 - Deterministic mode: argmax over logits (discrete) or mean action (continuous; continuous deferred beyond pilot Discrete).
 - Stochastic mode: categorical sample from logits.
-- RNG contract: policies accept an explicit `numpy.random.Generator` or integer seed per call; match runner seeds policies from the episode seed + role salt.
+- RNG contract: policies accept an explicit `numpy.random.Generator` or integer seed per call; Parallel/AEC/dynamic AEC match runners seed policies via `arena.runtime.seed_protocol` (episode seed + role salt + step index).
 - P-02: with matched seeds, sampled actions must match exactly for Discrete categorical policies.
 
 ## Action masks

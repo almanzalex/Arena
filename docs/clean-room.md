@@ -66,6 +66,11 @@ arena data inspect ./runs/baseline-match/trajectories
 ## Reproducibility check
 
 Run the same `match.yaml` twice with different `--out` dirs and confirm episode action sequences match (M-01).
+See [seed-determinism.md](seed-determinism.md) for the native Discrete guarantee and expected nondeterminism (GPU, external services, unseeded decode).
+
+Native Discrete CPU matches are science-grade deterministic under the seed protocol
+(episode seed + role salt + step). GPU backends, external task services, and
+unseeded `rng=None` paths are expected to diverge — see [seed-determinism.md](seed-determinism.md).
 
 ## Troubleshooting
 

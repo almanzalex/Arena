@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from arena.core.errors import missing_extra
+
 
 def create_app(env_kind: str = "rps") -> Any:
     try:
@@ -17,7 +19,7 @@ def create_app(env_kind: str = "rps") -> Any:
         from openenv.core.env_server.types import Action, Observation, State
         from pydantic import Field
     except ImportError as e:  # pragma: no cover - optional dependency error path
-        raise RuntimeError("install the OpenEnv pilot with: pip install 'arena[openenv]'") from e
+        raise missing_extra("openenv", feature="OpenEnv pilot server", capability="openenv") from e
 
     if env_kind == "vector":
         from arena.adapters.task_pettingzoo.pilot_env import VectorCoordinationParallel
@@ -188,7 +190,7 @@ def main() -> None:
     try:
         import uvicorn
     except ImportError as e:  # pragma: no cover
-        raise SystemExit("install the OpenEnv pilot with: pip install 'arena[openenv]'") from e
+        raise missing_extra("openenv", feature="OpenEnv pilot uvicorn", capability="openenv") from e
     uvicorn.run(create_app(args.env), host=args.host, port=args.port)
 
 

@@ -19,6 +19,7 @@ qualification evidence, and milestone claims. Use this page as a map.
 | Doc | Purpose |
 |---|---|
 | [clean-room.md](clean-room.md) | Second-machine policy handoff |
+| [seed-determinism.md](seed-determinism.md) | Seed protocol + where nondeterminism is expected |
 | [policy-export.md](policy-export.md) | Export / verify policies |
 | [populations.md](populations.md) | Policy populations |
 | [evaluation.md](evaluation.md) | Evaluation suites |
