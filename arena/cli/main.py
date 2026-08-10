@@ -1823,9 +1823,6 @@ def cmd_eval_matrix(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_release_build(args: argparse.Namespace) -> int:    return 0
-
-
 def cmd_release_build(args: argparse.Namespace) -> int:
     import json
     from pathlib import Path

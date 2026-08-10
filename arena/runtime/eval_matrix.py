@@ -146,6 +146,9 @@ def run_crossplay_matrix(
     elif env is not None and "env" not in task:
         task = {**task, "env": env}
 
+    # Do not write YAML into ``out`` before ``run_evaluation``: native evaluation
+    # publishes via ``publish_directory(..., replace=True)``, which replaces the
+    # entire destination tree and would drop pre-written manifests.
     synthesized = synthesize_crossplay_artifacts(
         policy_paths,
         task=task,
@@ -154,7 +157,7 @@ def run_crossplay_matrix(
         population_ref=population_ref,
         roles=roles,
         seeds=seeds,
-        out_dir=out,
+        out_dir=None,
     )
     eval_run = run_evaluation(
         synthesized["suite"],
@@ -170,6 +173,8 @@ def run_crossplay_matrix(
 
     dump_json(report, out / "report.json")
     dump_yaml(report, out / "report.yaml")
+    write_population_yaml(synthesized["population"], out / "population.yaml")
+    dump_yaml(synthesized["suite"], out / "evaluation.yaml")
     return {
         "population": synthesized["population"],
         "population_digest": synthesized["population"]["digest"],

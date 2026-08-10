@@ -58,8 +58,9 @@ fi
 
 cd "${WORK}"
 "${ARENA_CLI[@]}" init
-POP_JSON="$(mktemp "${TMPDIR:-/tmp}/arena-pop.XXXXXX.json")"
-REPORT_JSON="$(mktemp "${TMPDIR:-/tmp}/arena-report.XXXXXX.json")"
+# BSD mktemp (macOS) requires the X's at the end of the template.
+POP_JSON="$(mktemp "${TMPDIR:-/tmp}/arena-pop.XXXXXX")"
+REPORT_JSON="$(mktemp "${TMPDIR:-/tmp}/arena-report.XXXXXX")"
 "${ARENA_CLI[@]}" population create ./population.yaml --ref populations/opp --json > "${POP_JSON}"
 ROCK="$("${PYTHON_BIN}" -c "from arena.core.sdk import Policy; print(Policy.load('rock.arena').digest)")"
 PAPER="$("${PYTHON_BIN}" -c "from arena.core.sdk import Policy; print(Policy.load('paper.arena').digest)")"
