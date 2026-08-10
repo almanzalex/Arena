@@ -67,11 +67,13 @@ class Registry(Generic[T]):
         interface: str,
         register_via: str,
         tests: str,
+        qualify: str | None = None,
     ) -> None:
         self.axis = axis
         self.interface = interface
         self.register_via = register_via
         self.tests = tests
+        self.qualify = qualify
         self._cases: dict[str, T] = {}
 
     def register(self, kind: str, case: T, *, replace: bool = False) -> T:
@@ -95,14 +97,17 @@ class Registry(Generic[T]):
         load_entry_points_for(self.axis, str(kind))
         if kind in self._cases:
             return self._cases[kind]
+        recipe_kwargs: dict[str, str] = {
+            "axis": self.axis,
+            "kind": str(kind),
+            "interface": self.interface,
+            "register_via": self.register_via,
+            "tests": self.tests,
+        }
+        if self.qualify is not None:
+            recipe_kwargs["qualify"] = self.qualify
         raise UnknownKindError(
-            ExtensionRecipe(
-                axis=self.axis,
-                kind=str(kind),
-                interface=self.interface,
-                register_via=self.register_via,
-                tests=self.tests,
-            ),
+            ExtensionRecipe(**recipe_kwargs),
             known=self._cases.keys(),
         )
 
@@ -183,6 +188,10 @@ EXTERNAL_STORES: Registry[Any] = Registry(
     interface="arena.plugins.stores.ExternalStoreAdapter",
     register_via="arena.plugins.stores.register_store_adapter(scheme, adapter)",
     tests="byte-identical push/pull --verify + tamper rejection + offline-core regression",
+    qualify=(
+        "arena store qualify <artifact> <destination> — required before claiming "
+        "the case is supported"
+    ),
 )
 
 TRAINERS: Registry[Any] = Registry(
