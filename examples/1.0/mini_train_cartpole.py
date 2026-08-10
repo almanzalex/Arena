@@ -1,7 +1,8 @@
 """Mini lab loop: CartPole collect → Arena BC train → verify → match/eval.
 
-CPU-only, seconds not minutes. Reuses ``arena.runtime.training`` /
-``arena.adapters.policy_custom_torch`` and the entrypoint_bundle match path.
+CPU-only, seconds not minutes. Reuses ``arena.runtime.training`` and the
+``entrypoint_bundle`` match path so a single lab can prove train → export →
+verify → seeded eval without a hosted control plane.
 
 Recipe (from a checkout with torch + gymnasium/pettingzoo)::
 
@@ -13,8 +14,8 @@ Recipe (from a checkout with torch + gymnasium/pettingzoo)::
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
-import math
 import statistics
 import sys
 from pathlib import Path
@@ -25,19 +26,36 @@ import numpy as np
 from arena.adapters.policy_custom_torch import load_runtime, verify_bundle_self
 from arena.cli.main import main as arena_main
 from arena.core.dataset import materialize_dataset, select_episodes
-from arena.core.identity import digest_uri, sha256_bytes, sha256_canonical, sha256_file
+from arena.core.identity import digest_uri, sha256_bytes, sha256_file
 from arena.core.manifests import RUN_SCHEMA, TRAJECTORY_SCHEMA, dump_json, dump_yaml
 from arena.core.sdk import Match, Policy, Task
 from arena.runtime.training import run_training_recipe
 
-from examples.1.0.cartpole_parallel import (  # noqa: E501 — package path via sys.path
-    AGENT,
-    CARTPOLE_ACTION,
-    CARTPOLE_OBS,
-)
-
 EXAMPLE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = EXAMPLE_DIR.parents[1]
+
+AGENT = "agent"
+CARTPOLE_ACTION = {
+    "type": "Discrete",
+    "n": 2,
+    "dtype": "int64",
+    "masks": "none",
+}
+
+
+def _load_cartpole_module() -> Any:
+    path = EXAMPLE_DIR / "cartpole_parallel.py"
+    spec = importlib.util.spec_from_file_location("arena_cartpole_parallel", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot import {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _cartpole_observation_contract() -> dict[str, Any]:
+    """Match-compatible Box contract derived from the Parallel wrapper space."""
+    return dict(_load_cartpole_module().CARTPOLE_OBS)
 
 
 def _require_stack() -> None:
@@ -60,7 +78,6 @@ def _require_stack() -> None:
 def _heuristic_action(obs: np.ndarray, rng: np.random.Generator, *, epsilon: float) -> int:
     if float(rng.random()) < epsilon:
         return int(rng.integers(0, 2))
-    # Classic angle + angular-velocity teacher; good enough for short BC.
     return 1 if float(obs[2] + 0.5 * obs[3]) > 0.0 else 0
 
 
@@ -87,7 +104,9 @@ def collect_teacher_run(
         done = False
         step_i = 0
         while not done:
-            action = _heuristic_action(np.asarray(obs, dtype=np.float32), rng, epsilon=epsilon)
+            action = _heuristic_action(
+                np.asarray(obs, dtype=np.float32), rng, epsilon=epsilon
+            )
             next_obs, reward, terminated, truncated, _info = env.step(action)
             reward_f = float(reward)
             total += reward_f
@@ -121,8 +140,7 @@ def collect_teacher_run(
             "steps": steps,
         }
         (traj_dir / f"episode_{index:04d}.json").write_text(
-            json.dumps(episode),
-            encoding="utf-8",
+            json.dumps(episode), encoding="utf-8"
         )
         episode_summaries.append(
             {
@@ -171,7 +189,7 @@ def _write_recipe(path: Path, dataset: Path, *, seed: int, epochs: int) -> Path:
             "epochs": epochs,
             "batch_size": 64,
             "learning_rate": 0.01,
-            "observation": CARTPOLE_OBS,
+            "observation": _cartpole_observation_contract(),
             "action": CARTPOLE_ACTION,
             "architecture": {
                 "type": "mlp_categorical",
@@ -211,7 +229,7 @@ def gymnasium_eval(
     seeds: list[int],
     action_mode: str = "deterministic",
 ) -> dict[str, Any]:
-    """Short seeded CartPole eval via Gymnasium + Arena runtime (no Match)."""
+    """Short seeded CartPole eval via Gymnasium + Arena runtime."""
     import gymnasium as gym
 
     runtime = load_runtime(bundle)
@@ -247,6 +265,17 @@ def gymnasium_eval(
     }
 
 
+def _match_mean_return(match_record: dict[str, Any]) -> float | None:
+    values = [
+        float((ep.get("returns") or {}).get(AGENT))
+        for ep in match_record.get("episodes") or []
+        if ep.get("status") == "completed" and (ep.get("returns") or {}).get(AGENT) is not None
+    ]
+    if not values:
+        return None
+    return float(statistics.fmean(values))
+
+
 def run_mini_train(
     out: Path,
     *,
@@ -272,7 +301,7 @@ def run_mini_train(
         epsilon=epsilon,
     )
     selected_dir = out / "selected"
-    select_episodes(source_runs=[teacher_run], query={"role": AGENT}, out_dir=selected_dir)
+    select_episodes(source_runs=[teacher_run], query={}, out_dir=selected_dir)
     portable_dir = out / "portable-dataset"
     portable = materialize_dataset(selected_dir / "dataset.yaml", out_dir=portable_dir)
 
@@ -286,10 +315,10 @@ def run_mini_train(
     bundle = out / "train-run" / "policy.arena"
     policy = Policy.load(bundle)
     verification = verify_bundle_self(bundle)
-    assert arena_main(["policy", "verify", str(bundle), "--json"]) == 0
+    if arena_main(["policy", "verify", str(bundle)]) != 0:
+        raise SystemExit("arena policy verify failed")
 
     gym_eval = gymnasium_eval(bundle, seeds=eval_seeds)
-    # Random policy baseline on the same seeds (sanity: trained mean should beat it).
     random_returns: list[float] = []
     import gymnasium as gym
 
@@ -319,17 +348,19 @@ def run_mini_train(
             task=Task.load(task_spec),
             assignments={AGENT: policy},
             action_mode="deterministic",
-            failure_policy={"timeout_seconds": 30, "retain_incomplete": True, "retry": 0},
+            failure_policy={
+                "timeout_seconds": 30,
+                "retain_incomplete": True,
+                "retry": 0,
+            },
         ).run(seeds=match_seeds, out=out / "match-run")
 
     lineage = {
         "schema": "arena.mini-train-cartpole/v1",
         "ok": True,
-        "dataset_digest": portable.get("digest"),
-        "recipe_digest": train.get("recipe_digest") or train.get("lineage", {}).get("recipe_digest"),
-        "training_contract_digest": train["lineage"]["training_contract_digest"]
-        if "lineage" in train
-        else train.get("training_contract_digest"),
+        "dataset_digest": train.get("dataset_digest") or portable.get("digest"),
+        "recipe_digest": train.get("recipe_digest"),
+        "training_contract_digest": train.get("training_contract_digest"),
         "policy_digest": policy.digest,
         "verification": verification,
         "train": {
@@ -348,48 +379,13 @@ def run_mini_train(
             "seeds": match_record.get("seeds"),
             "outcome": match_record.get("outcome"),
             "assignments": match_record.get("assignments"),
-            "mean_return": float(
-                statistics.fmean(
-                    [
-                        float((ep.get("returns") or {}).get(AGENT, math.nan))
-                        for ep in match_record.get("episodes") or []
-                        if ep.get("status") == "completed" and (ep.get("returns") or {}).get(AGENT) is not None
-                    ]
-                    or [math.nan]
-                )
-            )
-            if any(
-                ep.get("status") == "completed" and (ep.get("returns") or {}).get(AGENT) is not None
-                for ep in match_record.get("episodes") or []
-            )
-            else None,
+            "mean_return": _match_mean_return(match_record),
         },
     }
-    # Prefer digests from the train-run record when present.
-    train_json = out / "train-run" / "train.json"
-    if train_json.exists():
-        recorded = json.loads(train_json.read_text(encoding="utf-8"))
-        lineage["recipe_digest"] = recorded.get("recipe_digest") or lineage["recipe_digest"]
-        lineage["training_contract_digest"] = (
-            recorded.get("training_contract_digest")
-            or (recorded.get("output_policy") or {}).get("lineage", {}).get(
-                "training_contract_digest"
-            )
-            or lineage["training_contract_digest"]
-        )
-        lineage["dataset_digest"] = (
-            recorded.get("dataset_digest")
-            or (recorded.get("output_policy") or {}).get("lineage", {}).get("dataset_digest")
-            or lineage["dataset_digest"]
-        )
-
-    # Content-address the report itself (excluding mutable paths).
-    report_identity = {
-        k: v
-        for k, v in lineage.items()
-        if k not in {"verification"}
-    }
-    lineage["report_digest"] = digest_uri(sha256_bytes(json.dumps(report_identity, sort_keys=True).encode()))
+    report_identity = {k: v for k, v in lineage.items() if k != "verification"}
+    lineage["report_digest"] = digest_uri(
+        sha256_bytes(json.dumps(report_identity, sort_keys=True, default=str).encode())
+    )
     lineage["out"] = str(out.resolve())
     lineage["policy_path"] = str(bundle.resolve())
     dump_json(lineage, out / "result.json")
@@ -398,7 +394,6 @@ def run_mini_train(
 
 
 def main(argv: list[str] | None = None) -> int:
-    # Allow `python examples/1.0/mini_train_cartpole.py` imports of sibling module.
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
     parser = argparse.ArgumentParser(description=__doc__)
@@ -415,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
         seed=args.seed,
         epsilon=args.epsilon,
     )
-    print(json.dumps(result, indent=2))
+    print(json.dumps(result, indent=2, default=str))
     return 0
 
 
