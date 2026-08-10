@@ -43,7 +43,7 @@ def _terminate_tree(process: subprocess.Popen[bytes], *, grace_seconds: float) -
             os.killpg(process.pid, signal.SIGTERM)
         except ProcessLookupError:
             return
-    else:  # pragma: no cover - Windows is outside the 1.0 support matrix.
+    else:  # pragma: no cover - Windows remains experimental / non-stable.
         process.terminate()
     try:
         process.wait(timeout=grace_seconds)

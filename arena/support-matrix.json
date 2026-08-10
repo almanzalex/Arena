@@ -4,7 +4,10 @@
   "python": [">=3.12", "<3.14"],
   "platforms": [
     {"os": "linux", "arch": "x86_64", "status": "stable"},
-    {"os": "darwin", "arch": "arm64", "status": "stable"}
+    {"os": "darwin", "arch": "arm64", "status": "stable"},
+    {"os": "win32", "arch": "amd64", "status": "experimental"},
+    {"os": "linux", "arch": "aarch64", "status": "experimental"},
+    {"os": "darwin", "arch": "x86_64", "status": "experimental"}
   ],
   "capabilities": {
     "core": {

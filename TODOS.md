@@ -5,8 +5,8 @@ its own RFC and qualification owner before it enters a stable claim.
 
 | Item | Why deferred | Revisit trigger |
 |---|---|---|
-| Windows support | No maintained CI, package-handoff, or user-evidence owner | A named owner can sustain the full capability × platform matrix |
-| Linux arm64 and macOS x86_64 stable support | Current evidence does not cover them | Native runners and source-free handoff are available |
+| Windows support | Experimental CI scaffolding only (`windows-latest`, `continue-on-error`); no package-handoff or user-evidence owner; **not** a stable claim | A named owner can sustain green Windows CI, hermetic handoff, and the full capability × platform matrix without `allow-failure` |
+| Linux arm64 and macOS x86_64 stable support | Experimental optional-arch CI scaffolding only; current evidence does not cover a stable claim | Native runners stay green without `allow-failure`, plus source-free handoff evidence |
 | Hosted accounts/catalog/control plane | Changes Arena from local protocol/tooling into a service business | Repeated user demand cannot be met by user-owned stores |
 | Distributed/online RL training | Requires collection, replay, orchestration, and new failure semantics | A separate trainer/runtime RFC proves a bounded use case |
 | Arbitrary OpenSpiel catalog support | Semantic qualification is per game/family | A game has an owner and frozen trace/legality evidence |

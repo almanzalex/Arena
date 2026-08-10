@@ -106,13 +106,19 @@ def _platform_status(matrix: dict[str, Any]) -> tuple[str, dict[str, str]]:
     )
     current["os"] = os_name
     supported_python = sys.version_info[:2] in {(3, 12), (3, 13)}
-    matched = any(
-        row.get("os") == os_name
-        and str(row.get("arch", "")).lower() == current["arch"]
-        and row.get("status") == "stable"
-        for row in matrix.get("platforms", [])
-    )
-    return ("stable" if matched and supported_python else "unqualified"), current
+    if not supported_python:
+        return "unqualified", current
+    # Prefer a stable claim; experimental CI scaffolding never upgrades to stable.
+    for status in ("stable", "experimental"):
+        matched = any(
+            row.get("os") == os_name
+            and str(row.get("arch", "")).lower() == current["arch"]
+            and row.get("status") == status
+            for row in matrix.get("platforms", [])
+        )
+        if matched:
+            return status, current
+    return "unqualified", current
 
 
 def _probe_isolated_python(
@@ -279,7 +285,7 @@ def capability_report(name: str, *, matrix: dict[str, Any] | None = None) -> dic
         if platform_state != "stable":
             repair = (
                 f"Arena has no stable 1.0 claim for {current['os']}/{current['arch']} "
-                f"on Python {current['python']}."
+                f"on Python {current['python']} (platform status: {platform_state})."
             )
         elif isolated_env and not isolated_ready:
             repair = (

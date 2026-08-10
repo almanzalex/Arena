@@ -7,6 +7,7 @@ timeouts never fake success, denominators stay coherent, and ``eval report`` exi
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -70,6 +71,10 @@ def _suite(
     return suite
 
 
+@pytest.mark.skipif(
+    os.name != "posix",
+    reason="process-group kill contract is POSIX-stable",
+)
 @pytest.mark.parametrize("boundary", ["reset", "action", "step", "close"])
 def test_supervisor_kills_hang_at_boundary_with_grandchild(
     tmp_path: Path, boundary: str
@@ -98,6 +103,10 @@ def test_supervisor_kills_hang_at_boundary_with_grandchild(
     assert not marker.exists(), f"grandchild survived after {boundary} hang kill"
 
 
+@pytest.mark.skipif(
+    os.name != "posix",
+    reason="process-group kill contract is POSIX-stable",
+)
 @pytest.mark.requires_torch
 @pytest.mark.requires_pettingzoo
 @pytest.mark.parametrize("boundary", ["reset", "action", "step", "close"])

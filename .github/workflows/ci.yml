@@ -7,32 +7,79 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    # Experimental cells (Windows + optional arches) must not block required CI.
+    continue-on-error: ${{ matrix.allow-failure }}
     strategy:
       fail-fast: false
       matrix:
         include:
+          # Required / stable claim cells
           - os: ubuntu-24.04
             python-version: "3.12"
             expected-arch: x86_64
+            tier: stable
+            allow-failure: false
           - os: ubuntu-24.04
             python-version: "3.13"
             expected-arch: x86_64
+            tier: stable
+            allow-failure: false
           - os: macos-15
             python-version: "3.12"
             expected-arch: arm64
+            tier: stable
+            allow-failure: false
           - os: macos-15
             python-version: "3.13"
             expected-arch: arm64
+            tier: stable
+            allow-failure: false
+          # Experimental scaffolding — not a stable support claim
+          - os: windows-latest
+            python-version: "3.12"
+            expected-arch: amd64
+            tier: experimental
+            allow-failure: true
+          - os: windows-latest
+            python-version: "3.13"
+            expected-arch: amd64
+            tier: experimental
+            allow-failure: true
+          # Optional-arch scaffolding from TODOS (linux arm64, macOS x86_64)
+          - os: ubuntu-24.04-arm
+            python-version: "3.12"
+            expected-arch: aarch64
+            tier: experimental
+            allow-failure: true
+          - os: macos-13
+            python-version: "3.12"
+            expected-arch: x86_64
+            tier: experimental
+            allow-failure: true
+    defaults:
+      run:
+        # Keep install/assert scripts bash-compatible across Linux/macOS/Windows.
+        shell: bash
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-python@v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Matrix cell status
+        run: |
+          echo "tier=${{ matrix.tier }}"
+          echo "os=${{ matrix.os }}"
+          echo "python=${{ matrix.python-version }}"
+          echo "expected-arch=${{ matrix.expected-arch }}"
+          echo "allow-failure=${{ matrix.allow-failure }}"
+          if [ "${{ matrix.tier }}" = "experimental" ]; then
+            echo "::notice title=Experimental CI cell::${{ matrix.os }} / Python ${{ matrix.python-version }} is scaffolding only (continue-on-error). Not a stable Arena support claim."
+          fi
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          # CPU-only torch keeps Linux runners small/fast (no CUDA wheels).
-          if [ "${{ runner.os }}" = "Linux" ]; then
+          # CPU-only torch keeps Linux x86_64 runners small/fast (no CUDA wheels).
+          if [ "${{ runner.os }}" = "Linux" ] && [ "${{ matrix.expected-arch }}" = "x86_64" ]; then
             pip install torch --index-url https://download.pytorch.org/whl/cpu
           fi
           pip install -e '.[dev]'
@@ -51,6 +98,11 @@ jobs:
         run: python scripts/check_release_truth.py
       - name: Pytest (fast default selection)
         run: pytest -q
+      - name: Publish experimental outcome
+        if: always() && matrix.tier == 'experimental'
+        run: |
+          echo "Experimental cell finished (allow-failure=${{ matrix.allow-failure }})."
+          echo "A red experimental cell does not revoke Linux x86_64 / macOS arm64 stable claims."
 
   hermetic:
     # Full "never-trained machine" U-01 gate: build a wheel, install it into a
