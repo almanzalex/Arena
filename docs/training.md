@@ -69,7 +69,10 @@ fixtures. Online/distributed RL and large sharded datasets remain outside the
 built-in cases. A library spike for stream-read and sharded materialize lives
 under `arena.dataset` and is documented in
 `rfcs/012-streaming-sharded-datasets.md`; it does not change the default
-atomic flat `data materialize` path.
+atomic flat `data materialize` path. A **bounded** single-process collect →
+dataset-binding → offline train wedge is proposed in
+[RFC 011](../rfcs/011-online-collection-dataset-binding.md) with a CPU spike at
+`examples/training/online_collect_loop.py` (not a product claim for Ray/PPO).
 
 ## Mini lab loop (CartPole)
 
