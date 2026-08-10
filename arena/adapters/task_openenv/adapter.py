@@ -15,7 +15,7 @@ from typing import Any
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
-from arena.core.errors import missing_extra,  ArenaError, SchemaError, TaskRuntimeError
+from arena.core.errors import ArenaError, SchemaError, TaskRuntimeError, missing_extra
 from arena.core.identity import canonical_json, digest_uri, sha256_bytes
 from arena.core.spaces import decode_bound_value
 

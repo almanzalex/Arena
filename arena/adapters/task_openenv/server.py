@@ -5,10 +5,11 @@ uses OpenEnv's own FastAPI/WebSocket transport and wraps Arena's existing frozen
 PettingZoo RPS environment; it does not implement a competing container layer.
 """
 
-from arena.core.errors import missing_extra
 from __future__ import annotations
 
 from typing import Any
+
+from arena.core.errors import missing_extra
 
 
 def create_app(env_kind: str = "rps") -> Any:

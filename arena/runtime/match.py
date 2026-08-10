@@ -27,9 +27,9 @@ from arena.core.errors import (
     TaskRuntimeError,
 )
 from arena.core.identity import sha256_canonical
-from arena.runtime.seed_protocol import policy_rng
 from arena.core.manifests import RUN_SCHEMA, TRAJECTORY_SCHEMA, dump_json, dump_yaml
 from arena.core.sdk import Policy
+from arena.runtime.seed_protocol import policy_rng
 from arena.runtime.trajectory import TrajectoryWriter
 
 

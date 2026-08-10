@@ -29,8 +29,8 @@ from arena.core.errors import (
 from arena.core.identity import sha256_canonical
 from arena.core.manifests import RUN_SCHEMA, TRAJECTORY_SCHEMA, dump_json, dump_yaml
 from arena.core.sdk import Policy
-from arena.runtime.trajectory import TrajectoryWriter
 from arena.runtime.seed_protocol import policy_rng
+from arena.runtime.trajectory import TrajectoryWriter
 
 
 def run_aec_match(

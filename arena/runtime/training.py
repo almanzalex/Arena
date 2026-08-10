@@ -14,7 +14,7 @@ import numpy as np
 
 from arena.adapters.policy_custom_torch import build_module, export_policy
 from arena.core.dataset import dataset_content_digest
-from arena.core.errors import missing_extra,  ArenaError, ConformanceError, SchemaError
+from arena.core.errors import ConformanceError, SchemaError, missing_extra
 from arena.core.identity import canonical_json, digest_uri, sha256_bytes, sha256_file
 from arena.core.manifests import dump_json, dump_yaml, load_manifest, validate_dataset_manifest
 from arena.core.sdk import Policy
