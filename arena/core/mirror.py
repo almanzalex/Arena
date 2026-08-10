@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urldefrag, urlencode, urlparse
 
-from arena.core.errors import StoreError
+from arena.core.errors import StoreError, missing_digest
 from arena.core.identity import (
     canonical_json,
     digest_uri,
@@ -197,7 +197,11 @@ def _artifact_uri(destination: str, identity: str) -> str:
 def _identity_from_uri(uri: str) -> tuple[str, str]:
     base, fragment = urldefrag(uri)
     if not fragment.startswith("sha256:"):
-        raise StoreError("artifact URI must include #sha256:… identity returned by `arena push`")
+        raise missing_digest(
+            field="artifact URI #fragment",
+            value=fragment or None,
+            require_sha256_prefix=True,
+        )
     parse_digest(fragment)
     return base, fragment
 
@@ -454,7 +458,15 @@ class HuggingFaceStoreAdapter:
             from huggingface_hub import HfApi
         except ImportError as e:
             raise StoreError(
-                "Hugging Face store adapter is optional. Install with: pip install 'arena[hf]'"
+                "Hugging Face store requires optional extra 'hf'. "
+                "Install with: python -m pip install 'arena[hf]'",
+                code="CAPABILITY_MISSING",
+                cause="optional extra 'hf' is not installed",
+                repair=(
+                    "Install the missing extra, then retry: python -m pip install 'arena[hf]'. "
+                    "Confirm with `arena doctor --capability hf`."
+                ),
+                context={"extra": "hf", "capability": "hf"},
             ) from e
         return HfApi()
 
@@ -551,7 +563,17 @@ class HuggingFaceStoreAdapter:
         try:
             from huggingface_hub import hf_hub_download
         except ImportError as e:
-            raise StoreError("install the HF adapter with: pip install 'arena[hf]'") from e
+            raise StoreError(
+                "Hugging Face store requires optional extra 'hf'. "
+                "Install with: python -m pip install 'arena[hf]'",
+                code="CAPABILITY_MISSING",
+                cause="optional extra 'hf' is not installed",
+                repair=(
+                    "Install the missing extra, then retry: python -m pip install 'arena[hf]'. "
+                    "Confirm with `arena doctor --capability hf`."
+                ),
+                context={"extra": "hf", "capability": "hf"},
+            ) from e
         base, identity = _identity_from_uri(source)
         repo_id, repo_type, prefix, revision = _parse_hf_uri(base)
         filename = "/".join(
@@ -572,7 +594,17 @@ class HuggingFaceStoreAdapter:
         try:
             from huggingface_hub import hf_hub_download
         except ImportError as e:
-            raise StoreError("install the HF adapter with: pip install 'arena[hf]'") from e
+            raise StoreError(
+                "Hugging Face store requires optional extra 'hf'. "
+                "Install with: python -m pip install 'arena[hf]'",
+                code="CAPABILITY_MISSING",
+                cause="optional extra 'hf' is not installed",
+                repair=(
+                    "Install the missing extra, then retry: python -m pip install 'arena[hf]'. "
+                    "Confirm with `arena doctor --capability hf`."
+                ),
+                context={"extra": "hf", "capability": "hf"},
+            ) from e
         base, _identity = _identity_from_uri(source)
         repo_id, repo_type, prefix, revision = _parse_hf_uri(base)
         digest_hex = parse_digest(digest)
@@ -781,8 +813,15 @@ class WandBStoreAdapter:
             import wandb
         except ImportError as exc:
             raise StoreError(
-                "W&B store is optional. Install with `pip install 'arena[wandb]'`, "
-                "run `wandb login`, or append ?simulate=/absolute/path."
+                "W&B store requires optional extra 'wandb'. "
+                "Install with: python -m pip install 'arena[wandb]'",
+                code="CAPABILITY_MISSING",
+                cause="optional extra 'wandb' is not installed",
+                repair=(
+                    "Install with: python -m pip install 'arena[wandb]', then `wandb login`, "
+                    "or append ?simulate=/absolute/path. Confirm with `arena doctor --capability wandb`."
+                ),
+                context={"extra": "wandb", "capability": "wandb"},
             ) from exc
         return wandb
 
@@ -846,8 +885,15 @@ class MLflowStoreAdapter:
             import mlflow
         except ImportError as exc:
             raise StoreError(
-                "MLflow store is optional. Install with `pip install 'arena[mlflow]'` "
-                "or append ?simulate=/absolute/path."
+                "MLflow store requires optional extra 'mlflow'. "
+                "Install with: python -m pip install 'arena[mlflow]'",
+                code="CAPABILITY_MISSING",
+                cause="optional extra 'mlflow' is not installed",
+                repair=(
+                    "Install with: python -m pip install 'arena[mlflow]', "
+                    "or append ?simulate=/absolute/path. Confirm with `arena doctor --capability mlflow`."
+                ),
+                context={"extra": "mlflow", "capability": "mlflow"},
             ) from exc
         return mlflow
 

@@ -13,7 +13,7 @@ import numpy as np
 
 from arena.adapters.task_openenv.adapter import PILOT_CONTRACT, PILOT_ENV
 from arena.adapters.task_pettingzoo.adapter import make_env
-from arena.core.errors import ConformanceError, SchemaError
+from arena.core.errors import ConformanceError, SchemaError, bad_uri
 from arena.core.identity import canonical_json, digest_uri, sha256_bytes
 from arena.core.manifests import (
     TASK_SCHEMA,
@@ -60,23 +60,49 @@ def import_openenv_task(
     """Pin an OpenEnv endpoint plus the Arena role-space contract it cannot infer."""
     parsed = urlparse(source)
     if parsed.scheme != "openenv":
-        raise SchemaError("task import currently supports openenv:// sources")
+        raise bad_uri(
+            "task import currently supports openenv:// sources",
+            scheme="openenv",
+            example="openenv://127.0.0.1:8000/arena/competitive_rps_v0?transport=http",
+            repair=(
+                "Use an openenv:// URI with host/path and optional ?transport=http|https. "
+                "Run `arena doctor --capability openenv` for adapter availability."
+            ),
+        )
     query = parse_qs(parsed.query)
     transport = str(query.get("transport", ["http"])[0])
     if transport not in {"http", "https"}:
-        raise SchemaError("OpenEnv URI transport must be http|https")
+        raise bad_uri(
+            "OpenEnv URI transport must be http|https",
+            scheme="openenv",
+            example="openenv://127.0.0.1:8000/arena/competitive_rps_v0?transport=https",
+        )
     if not parsed.netloc:
-        raise SchemaError(
-            "OpenEnv URI must include a server, e.g. "
-            "openenv://127.0.0.1:8000/arena/competitive_rps_v0"
+        raise bad_uri(
+            "OpenEnv URI must include a server",
+            scheme="openenv",
+            example="openenv://127.0.0.1:8000/arena/competitive_rps_v0",
+            repair=(
+                "Include host[:port] in the openenv:// URI, then retry `arena task import`."
+            ),
         )
     if parsed.username is not None or parsed.password is not None:
-        raise SchemaError(
+        raise bad_uri(
             "OpenEnv URI must not embed credentials; configure transport "
-            "authentication outside the task identity"
+            "authentication outside the task identity",
+            scheme="openenv",
+            example="openenv://127.0.0.1:8000/arena/competitive_rps_v0?transport=https",
+            repair=(
+                "Remove username/password from the URI and configure auth outside task identity."
+            ),
         )
     if parsed.fragment:
-        raise SchemaError("OpenEnv URI must not contain a fragment")
+        raise bad_uri(
+            "OpenEnv URI must not contain a fragment",
+            scheme="openenv",
+            example="openenv://127.0.0.1:8000/arena/competitive_rps_v0",
+            repair="Remove the #fragment from the OpenEnv URI and retry.",
+        )
     base_url = f"{transport}://{parsed.netloc}"
     env_path = unquote(parsed.path.lstrip("/"))
     env_uri = f"openenv://{env_path}" if env_path else source.split("?", 1)[0]

@@ -299,11 +299,12 @@ def test_cli_json_grammar_help_and_secret_redaction(capsys) -> None:
         ]
     )
     output = capsys.readouterr().out
-    assert code == 5
+    assert code == 3
     assert secret not in output
     failure = json.loads(output)
     assert failure["schema"] == "arena.diagnostic/v1"
     assert failure["command"] == "pull"
+    assert failure["code"] == "DIGEST_MISSING"
 
 
 def test_supervisor_kills_process_group_on_timeout(tmp_path: Path) -> None:
@@ -420,7 +421,6 @@ def test_signed_release_and_current_ledger_are_content_bound(tmp_path: Path) -> 
             signature=signature,
             public_key=keys["public_key"],
         )
-
 
 
 def test_release_evidence_binds_eval_bundle_digests_when_present(tmp_path: Path) -> None:

@@ -15,7 +15,9 @@ equivalent on stderr otherwise. JSON stdout contains no progress text.
 Stable high-level codes include `SCHEMA_INVALID`, `COMPATIBILITY_FAILED`,
 `INTEGRITY_FAILED`, `CONFORMANCE_FAILED`, `EXTERNAL_UNAVAILABLE`,
 `EXECUTION_INCOMPLETE`, `PLUGIN_LOAD_FAILED`, `EVALUATION_INCOMPLETE`, and
-`MATCH_INCOMPLETE`. More specific additive codes may be introduced within the
+`MATCH_INCOMPLETE`. Additive lab-mistake codes include `CAPABILITY_MISSING`,
+`SCHEMA_VERSION_UNSUPPORTED`, `UNKNOWN_KIND`, `DIGEST_MISSING`, `DIGEST_INVALID`,
+and `URI_INVALID`. More specific additive codes may be introduced within the
 same category.
 
 Messages and context redact credential-shaped keys, bearer/token text, and
