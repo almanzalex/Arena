@@ -299,12 +299,13 @@ def test_cli_json_grammar_help_and_secret_redaction(capsys) -> None:
         ]
     )
     output = capsys.readouterr().out
-    assert code == 3
+    # Fail-closed: missing HF env credentials precede digest checks (exit 5).
+    assert code == 5
     assert secret not in output
     failure = json.loads(output)
     assert failure["schema"] == "arena.diagnostic/v1"
     assert failure["command"] == "pull"
-    assert failure["code"] == "DIGEST_MISSING"
+    assert failure["code"] == "HF_CREDENTIALS_MISSING"
 
 
 @pytest.mark.skipif(os.name != "posix", reason="process-group kill contract is POSIX-stable")
