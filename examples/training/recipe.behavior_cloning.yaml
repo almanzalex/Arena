@@ -1,0 +1,23 @@
+# Behavior cloning over a portable Arena trajectory dataset.
+# Replace PLACEHOLDER_PORTABLE_DATASET with the path to a materialized dataset.yaml
+# (absolute, or relative to this recipe file). See README.md in this directory.
+schema: arena.train/v1
+name: imitate-teacher-bc
+algorithm: behavior_cloning
+algorithm_config: {}
+dataset: PLACEHOLDER_PORTABLE_DATASET
+role: player_0
+roles: [player_0, player_1]
+seed: 23
+epochs: 24
+batch_size: 8
+learning_rate: 0.05
+observation: {type: Discrete, n: 4, dtype: int64}
+action: {type: Discrete, n: 3, dtype: int64, masks: none}
+architecture:
+  type: mlp_categorical
+  observation_dim: 4
+  # Empty hidden layers keep CPU smoke trains fast; use [32, 32] for real work.
+  hidden_dims: []
+  action_n: 3
+preprocessing: {id: normalize_v0, mean: 0.0, std: 1.0}
