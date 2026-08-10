@@ -495,21 +495,76 @@ def main(argv: list[str] | None = None) -> int:
 
     p_attest = sub.add_parser(
         "attest",
-        help="Create and verify detached artifact authenticity attestations",
+        help=(
+            "Detached lab attestations with user-owned Ed25519 keys "
+            "(no CA, no publisher account)"
+        ),
     )
     p_at = p_attest.add_subparsers(dest="attest_command", required=True)
-    p_ak = p_at.add_parser("keygen", help="Generate a user-owned Ed25519 keypair")
-    p_ak.add_argument("--private", required=True)
-    p_ak.add_argument("--public", required=True)
-    p_as = p_at.add_parser("sign", help="Sign an Arena artifact identity")
-    p_as.add_argument("source")
-    p_as.add_argument("--key", required=True, help="Ed25519 private key PEM")
-    p_as.add_argument("--issuer", required=True)
-    p_as.add_argument("--out", required=True)
-    p_av = p_at.add_parser("verify", help="Verify artifact identity and detached signature")
-    p_av.add_argument("source")
-    p_av.add_argument("attestation")
-    p_av.add_argument("--key", required=True, help="Trusted Ed25519 public key PEM")
+    p_ak = p_at.add_parser(
+        "keygen",
+        help="Generate a user-owned Ed25519 keypair (private 0600, public 0644)",
+    )
+    p_ak.add_argument(
+        "--private",
+        required=True,
+        metavar="PATH",
+        help="Write PKCS8 private key PEM here (refuses overwrite)",
+    )
+    p_ak.add_argument(
+        "--public",
+        required=True,
+        metavar="PATH",
+        help="Write SPKI public key PEM here (refuses overwrite)",
+    )
+    p_ak.add_argument("--json", action="store_true")
+    p_as = p_at.add_parser(
+        "sign",
+        help="Sign an artifact identity into a detached attestation JSON",
+    )
+    p_as.add_argument(
+        "source",
+        help="Local artifact path (file or directory) whose identity is signed",
+    )
+    p_as.add_argument(
+        "--key",
+        required=True,
+        metavar="PRIVATE.pem",
+        help="Ed25519 private key PEM (lab-supplied; unencrypted PKCS8)",
+    )
+    p_as.add_argument(
+        "--issuer",
+        required=True,
+        metavar="NAME",
+        help="Non-empty issuer label recorded in the attestation predicate",
+    )
+    p_as.add_argument(
+        "--out",
+        required=True,
+        metavar="ATTEST.json",
+        help="Detached attestation output path (refuses overwrite)",
+    )
+    p_as.add_argument("--json", action="store_true")
+    p_av = p_at.add_parser(
+        "verify",
+        help="Rehash artifact identity and verify the detached Ed25519 attestation",
+    )
+    p_av.add_argument(
+        "source",
+        help="Local artifact path to rehash and compare against the attestation subject",
+    )
+    p_av.add_argument(
+        "attestation",
+        metavar="ATTEST.json",
+        help="Detached attestation JSON produced by `arena attest sign`",
+    )
+    p_av.add_argument(
+        "--key",
+        required=True,
+        metavar="PUBLIC.pem",
+        help="Trusted Ed25519 public key PEM (independently supplied; not a CA)",
+    )
+    p_av.add_argument("--json", action="store_true")
 
     p_push = sub.add_parser("push", help="Mirror an Arena artifact without changing identity")
     p_push.add_argument("source", help="Artifact path, object digest, or local ref")
@@ -1710,13 +1765,15 @@ def cmd_attest(args: argparse.Namespace) -> int:
             out=args.out,
             issuer=args.issuer,
         )
-    else:
+    elif args.attest_command == "verify":
         result = verify_artifact_attestation(
             args.source,
             attestation=args.attestation,
             public_key=args.key,
         )
-    print(json.dumps(result, indent=2))
+    else:
+        raise ArenaError(f"unknown attest command: {args.attest_command}")
+    _print(result, as_json=bool(args.json))
     return 0
 
 
