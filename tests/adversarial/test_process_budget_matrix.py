@@ -316,6 +316,7 @@ def test_missingness_fail_default_blocks_partial_metrics(tmp_path: Path) -> None
 
 def test_build_eval_report_allow_keeps_denominators() -> None:
     """Missingness allow never invents completed episodes."""
+    policy = "sha256:" + ("f" * 64)
     eval_run = {
         "evaluation_digest": "sha256:" + ("a" * 64),
         "evaluation_intent_digest": "sha256:" + ("b" * 64),
@@ -324,7 +325,13 @@ def test_build_eval_report_allow_keeps_denominators() -> None:
         "state": "incomplete",
         "denominators": {"attempted": 10, "completed": 9, "failed": 1},
         "cells": [],
-        "cell_results": [],
+        "cell_results": [
+            {
+                "assignments": {"player_0": policy, "player_1": policy},
+                "episodes": [],
+                "lineage": {"policy_digests": [policy]},
+            }
+        ],
         "suite": {
             "metrics": ["mean_return"],
             "failure_policy": {"missingness": "allow", "max_failed_episodes": 1},
@@ -335,3 +342,4 @@ def test_build_eval_report_allow_keeps_denominators() -> None:
     report = build_eval_report(eval_run)
     assert report["state"] == "incomplete"
     assert report["denominators"] == {"attempted": 10, "completed": 9, "failed": 1}
+    assert report["policy_digests"] == [policy]
