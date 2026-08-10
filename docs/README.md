@@ -61,5 +61,6 @@ RFCs live in [`../rfcs/`](../rfcs/).
 | `examples/eval/demo/` | Cyclic RPS population + eval pack |
 | `examples/eval/run_demo.sh` | One-command 0.2-style eval journey |
 | `examples/1.0/` | Local 1.0 boundary / CleanRL producer scripts |
+| `examples/byo/` | Self-contained BYO TorchScript export (no CleanRL checkout) |
 | `examples/boundaries/run_demo.sh` | Composed lifecycle / store / attest journey |
 | `examples/plugins/` | Out-of-tree plugin wheel example |
