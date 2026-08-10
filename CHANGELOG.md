@@ -9,7 +9,7 @@
   name-collision note with deferred rename candidates; do not rename the
   distribution yet.
 - Document deferred hosted accounts/catalog/control plane in
-  [RFC 012](rfcs/012-hosted-control-plane.md) and add a local-only
+  [RFC 013](rfcs/013-hosted-control-plane.md) and add a local-only
   `arena catalog local` stub that lists `file://` mirror descriptors
   (not a hosted SaaS product).
 - Strengthen the PettingZoo `classic/rps_v2` multi-agent path with portable

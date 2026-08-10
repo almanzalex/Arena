@@ -1,4 +1,4 @@
-# RFC 012 — Hosted accounts / catalog / control plane (deferred)
+# RFC 013 — Hosted accounts / catalog / control plane (deferred)
 
 **Status:** Deferred (not a product; local foreshadowing stub only)
 **Date:** 2026-08-10

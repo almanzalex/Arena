@@ -36,7 +36,7 @@ def _root_from_source(source: str | Path) -> Path:
                 "(no hosted or remote catalog backends)",
                 repair=(
                     "Use a local directory or file:// URI. Hosted accounts/catalog/"
-                    "control plane are deferred; see rfcs/012-hosted-control-plane.md."
+                    "control plane are deferred; see rfcs/013-hosted-control-plane.md."
                 ),
                 context={"source": text, "scheme": parsed.scheme or None},
             )
@@ -117,7 +117,7 @@ def list_local_catalog(source: str | Path) -> dict[str, Any]:
         "warnings": warnings,
         "note": (
             "Local file:// stub only — not a hosted Arena catalog, account service, "
-            "or control plane. See rfcs/012-hosted-control-plane.md."
+            "or control plane. See rfcs/013-hosted-control-plane.md."
         ),
     }
 
