@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Make `arena doctor` report platform, installed extras, preview-vs-stable
+  usability, per-preview stable gaps, and qualify commands without promoting
+  OpenEnv/HF/Gimitest to stable without release evidence.
+
 ## 1.0.0rc1 — 2026-07-25
 
 - Rename the product, Python package, CLI, artifact suffix, schema namespace,

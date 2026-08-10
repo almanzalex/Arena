@@ -704,10 +704,13 @@ def _dispatch(args: argparse.Namespace) -> int:
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
-    from arena.core.support import doctor_report
+    from arena.core.support import doctor_report, format_doctor_human
 
     report = doctor_report(args.capability)
-    _print(report, as_json=bool(args.json))
+    if args.json:
+        _print(report, as_json=True)
+    else:
+        print(format_doctor_human(report), end="")
     return 0
 
 
