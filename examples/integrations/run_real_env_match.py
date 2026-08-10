@@ -224,16 +224,23 @@ def probe_optional_capabilities(required: set[str]) -> dict[str, Any]:
         ready = report["local_status"] == "ready"
         # Credential-backed capabilities must never count as authenticated smoke.
         authenticated = bool(report.get("authentication_attempted"))
-        ok = ready and not authenticated
+        credentials_required = bool(report.get("credentials_required"))
+        # Local package readiness ≠ live credential success.
+        ok = ready and not authenticated and not credentials_required
         probes[name] = {
             "ok": ok,
             "local_status": report["local_status"],
             "release_status": report["release_status"],
-            "credentials_required": report.get("credentials_required"),
+            "credentials_required": credentials_required,
             "authentication_attempted": authenticated,
             "repair": report.get("repair"),
             "isolated_python_env": report.get("isolated_python_env"),
             "isolated_probe": report.get("isolated_probe"),
+            "note": (
+                "credentials required; doctor never authenticates — not a live success"
+                if credentials_required
+                else None
+            ),
         }
         if name in required and not ok:
             raise SystemExit(

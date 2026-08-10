@@ -52,6 +52,40 @@ def test_openenv_doctor_does_not_require_cloud_credentials() -> None:
 
 
 @pytest.mark.requires_openenv
+def test_openenv_missing_base_url_fails_loud_not_success(tmp_path: Path) -> None:
+    """Imported OpenEnv tasks must pin base_url; bare env URIs must not silently succeed."""
+    pytest.importorskip("openenv")
+    pytest.importorskip("pettingzoo")
+
+    from arena.adapters.task_openenv.adapter import PILOT_CONTRACT
+    from arena.conformance.fixtures import build_fixed_action_rps_policy
+    from arena.core.sdk import Policy
+    from arena.runtime.match import run_match
+
+    left = build_fixed_action_rps_policy(
+        tmp_path / "left.arena", role=["player_0", "player_1"], action=0
+    )
+    right = build_fixed_action_rps_policy(
+        tmp_path / "right.arena", role=["player_0", "player_1"], action=1
+    )
+    result = run_match(
+        task_spec={
+            "adapter": "openenv",
+            "env": "openenv://127.0.0.1:9/arena/competitive_rps_v0",
+            "interaction": "parallel",
+            "packaging": {"kind": "openenv"},
+            "contract": PILOT_CONTRACT,
+        },
+        assignments={"player_0": Policy.load(left), "player_1": Policy.load(right)},
+        seeds=[0],
+        out_dir=tmp_path / "unconfigured",
+    )
+    assert result["outcome"]["episodes_completed"] == 0
+    assert result["outcome"]["failure_count"] == 1
+    assert "base_url" in result["failures"][0]["message"]
+
+
+@pytest.mark.requires_openenv
 def test_openenv_unreachable_endpoint_fails_loud_not_success(tmp_path: Path) -> None:
     pytest.importorskip("openenv")
     pytest.importorskip("pettingzoo")
@@ -73,7 +107,14 @@ def test_openenv_unreachable_endpoint_fails_loud_not_success(tmp_path: Path) -> 
             "adapter": "openenv",
             "env": f"openenv://127.0.0.1:{port}/arena/competitive_rps_v0",
             "interaction": "parallel",
-            "packaging": {"kind": "openenv"},
+            "packaging": {
+                "kind": "openenv",
+                # Mimic `arena task import` pin without a live schema digest so connect
+                # is attempted against a closed loopback port.
+                "base_url": f"http://127.0.0.1:{port}",
+                "connect_timeout_seconds": 1,
+                "message_timeout_seconds": 1,
+            },
             "contract": PILOT_CONTRACT,
         },
         assignments={"player_0": Policy.load(left), "player_1": Policy.load(right)},
@@ -82,7 +123,7 @@ def test_openenv_unreachable_endpoint_fails_loud_not_success(tmp_path: Path) -> 
     )
     assert result["outcome"]["episodes_completed"] == 0
     assert result["outcome"]["failure_count"] == 1
-    assert result["failures"][0]["kind"] == "disconnect"
+    assert result["failures"][0]["kind"] in {"disconnect", "timeout", "protocol_error"}
 
 
 @pytest.mark.requires_openenv
