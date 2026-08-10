@@ -32,6 +32,7 @@ from arena.core.manifests import (
     expand_seeds,
     load_manifest,
     task_content_digest,
+    validate_eval_report_manifest,
     validate_eval_run_manifest,
     validate_evaluation_manifest,
 )
@@ -768,6 +769,22 @@ def _episode_returns(ep: dict[str, Any]) -> dict[str, float]:
     return returns
 
 
+def _collect_policy_digests(cells: list[dict[str, Any]]) -> list[str]:
+    """Bind every cell assignment digest into the report claim surface."""
+    digests: set[str] = set()
+    for cell in cells:
+        assignments = cell.get("assignments") or {}
+        if isinstance(assignments, dict):
+            for value in assignments.values():
+                if isinstance(value, str) and value.startswith("sha256:"):
+                    digests.add(value)
+        lineage = cell.get("lineage") or {}
+        for value in lineage.get("policy_digests") or []:
+            if isinstance(value, str) and value.startswith("sha256:"):
+                digests.add(value)
+    return sorted(digests)
+
+
 def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
     state = eval_run.get("state", "complete")
     suite = eval_run.get("suite") or {}
@@ -805,6 +822,21 @@ def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
     # Enrich cells from minimal eval_run if needed.
     if not cells:
         cells = list(eval_run.get("cells") or [])
+    policy_digests = _collect_policy_digests(cells)
+    if not policy_digests:
+        raise SchemaError(
+            "refusing to report an evaluation with no bound policy digests; "
+            "cells must record sha256 assignments so claims bind policy+suite identity"
+        )
+    for required in (
+        "evaluation_digest",
+        "evaluation_intent_digest",
+        "semantic_result_digest",
+    ):
+        if not eval_run.get(required):
+            raise SchemaError(
+                f"refusing to report evaluation missing suite identity field: {required}"
+            )
     computed = {}
     for kind in metric_kinds:
         name = kind if isinstance(kind, str) else kind.get("kind")
@@ -813,9 +845,11 @@ def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
     report = {
         "schema": "arena.eval-report/v1",
         "evaluation_digest": eval_run["evaluation_digest"],
-        "evaluation_intent_digest": eval_run.get("evaluation_intent_digest"),
+        "evaluation_intent_digest": eval_run["evaluation_intent_digest"],
         "execution_binding_digest": eval_run.get("execution_binding_digest"),
-        "semantic_result_digest": eval_run.get("semantic_result_digest"),
+        "semantic_result_digest": eval_run["semantic_result_digest"],
+        "policy_digests": policy_digests,
+        "evaluation_name": eval_run.get("evaluation_name") or suite.get("name"),
         "state": state,
         "denominators": eval_run.get("denominators"),
         "eval_run_digest": eval_run.get("object_digest")
@@ -827,4 +861,5 @@ def build_eval_report(eval_run: dict[str, Any]) -> dict[str, Any]:
             "nontransitivity_warning"
         ),
     }
+    validate_eval_report_manifest(report)
     return report
