@@ -67,3 +67,22 @@ A new trainer implements `TrainingCase`, registers in `TRAINERS`, and supplies
 distinct-objective, reproducibility, interruption, mutation, and policy-conformance
 fixtures. Online/distributed RL and large sharded datasets remain outside the
 built-in cases.
+
+## Mini lab loop (CartPole)
+
+For a single-machine usefulness check that does not need an external trainer
+checkout, run the CartPole collect → behavior-cloning → verify → match path:
+
+```bash
+python -m pip install -e '.[torch,pettingzoo]'
+python examples/1.0/mini_train_cartpole.py --out ./arena-mini-train
+arena policy verify ./arena-mini-train/train-run/policy.arena
+```
+
+The script rolls out a heuristic(+ε) teacher on Gymnasium `CartPole-v1`,
+materializes an Arena trajectory dataset, trains with the built-in
+`behavior_cloning` case, verifies the portable policy, runs a short seeded
+Gymnasium eval, and (when PettingZoo is installed) a Match through the digest-
+pinned `entrypoint_bundle` wrapper in `examples/1.0/cartpole_parallel.py`.
+Digests and lineage land in `arena-mini-train/result.json`.
+
