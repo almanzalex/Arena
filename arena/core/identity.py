@@ -56,8 +56,24 @@ def parse_digest(value: str) -> str:
                 ),
                 context={"algorithm": algorithm, "value": value},
             )
-    if not _SHA256_RE.fullmatch(text):
+    if not text:
         raise missing_digest(field="digest", value=value, require_sha256_prefix=False)
+    if not _SHA256_RE.fullmatch(text):
+        raise SchemaError(
+            (
+                "digest must be exactly 64 lowercase hexadecimal characters "
+                f"(optionally prefixed by 'sha256:'), got {value!r}. "
+                "Compute with `sha256sum <file>` or use the digest returned by "
+                "`arena push` / policy export. Arena will not invent or skip digests."
+            ),
+            code="DIGEST_INVALID",
+            cause="digest is not a valid sha256 hex digest",
+            repair=(
+                "Use sha256:<64-lowercase-hex> (or a raw 64-character lowercase hex digest). "
+                "Arena will not reinterpret malformed digests as content identity."
+            ),
+            context={"value": value},
+        )
     return text
 
 
