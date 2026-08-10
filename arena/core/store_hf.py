@@ -379,6 +379,8 @@ class HuggingFaceStoreAdapter:
         simulated = mirror_mod._simulate_pull(source, out, verify=verify)
         if simulated is not None:
             return simulated
+        # Digest fragment must fail closed before credential checks (DIGEST_MISSING).
+        mirror_mod._identity_from_uri(source)
         if not hf_live_credentials_present():
             raise StoreError(
                 "Hugging Face live pull requires HF_TOKEN or HUGGING_FACE_HUB_TOKEN",
@@ -387,7 +389,6 @@ class HuggingFaceStoreAdapter:
                 repair=HF_LIVE_RECIPE,
                 context={"env_vars": list(HF_TOKEN_ENV_VARS), "mode": "credential-missing"},
             )
-        mirror_mod._identity_from_uri(source)
         pinned_source = self._pin_revision(source)
         descriptor = self._download_descriptor(pinned_source)
 
