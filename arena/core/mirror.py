@@ -452,6 +452,8 @@ def __getattr__(name: str) -> Any:
 
         return MLflowStoreAdapter
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 def push_artifact(source: Path | str, destination: str, *, verify: bool = False) -> dict[str, Any]:
     from arena.core.registry import EXTERNAL_STORES, ensure_plugins_loaded
 
