@@ -24,6 +24,7 @@ from arena.core.identity import sha256_canonical
 from arena.core.manifests import RUN_SCHEMA, TRAJECTORY_SCHEMA, dump_json, dump_yaml
 from arena.core.sdk import Policy
 from arena.runtime.trajectory import TrajectoryWriter
+from arena.runtime.seed_protocol import policy_rng
 
 
 def _check_agent(
@@ -292,7 +293,7 @@ def _run_episode(
                     obs,
                     mode=action_mode,
                     action_mask=mask,
-                    rng=np.random.default_rng(seed + len(steps)),
+                    rng=policy_rng(seed, agent, len(steps)),
                     agent_id=agent,
                 )
                 validate_runtime_action(

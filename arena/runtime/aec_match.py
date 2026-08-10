@@ -30,6 +30,7 @@ from arena.core.identity import sha256_canonical
 from arena.core.manifests import RUN_SCHEMA, TRAJECTORY_SCHEMA, dump_json, dump_yaml
 from arena.core.sdk import Policy
 from arena.runtime.trajectory import TrajectoryWriter
+from arena.runtime.seed_protocol import policy_rng
 
 
 def run_aec_match(
@@ -266,7 +267,7 @@ def _run_aec_episode(
                     obs,
                     mode="deterministic" if action_mode == "deterministic" else "stochastic",
                     action_mask=mask,
-                    rng=np.random.default_rng(seed + step_i),
+                    rng=policy_rng(seed, agent, step_i),
                     agent_id=agent,
                 )
             except ConformanceError as e:

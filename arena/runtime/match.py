@@ -27,13 +27,10 @@ from arena.core.errors import (
     TaskRuntimeError,
 )
 from arena.core.identity import sha256_canonical
+from arena.runtime.seed_protocol import policy_rng
 from arena.core.manifests import RUN_SCHEMA, TRAJECTORY_SCHEMA, dump_json, dump_yaml
 from arena.core.sdk import Policy
 from arena.runtime.trajectory import TrajectoryWriter
-
-
-def _role_salt(role: str) -> int:
-    return int(sha256_canonical({"role": role})[:8], 16) % (2**31 - 1)
 
 
 def _validate_action(
@@ -279,7 +276,7 @@ def _run_episode(
                 mask = extract_action_mask(raw)
                 if mask is not None:
                     masks[agent] = np.asarray(mask).tolist()
-                rng = np.random.default_rng(seed + _role_salt(agent) + step_i)
+                rng = policy_rng(seed, agent, step_i)
                 try:
                     action = runtimes[agent].act(
                         o,
