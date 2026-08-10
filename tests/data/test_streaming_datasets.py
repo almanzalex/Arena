@@ -1,4 +1,4 @@
-"""Spike coverage for streaming reads and sharded materialize (RFC 011)."""
+"""Spike coverage for streaming reads and sharded materialize (RFC 012)."""
 
 from __future__ import annotations
 

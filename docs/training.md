@@ -68,7 +68,7 @@ distinct-objective, reproducibility, interruption, mutation, and policy-conforma
 fixtures. Online/distributed RL and large sharded datasets remain outside the
 built-in cases. A library spike for stream-read and sharded materialize lives
 under `arena.dataset` and is documented in
-`rfcs/011-streaming-sharded-datasets.md`; it does not change the default
+`rfcs/012-streaming-sharded-datasets.md`; it does not change the default
 atomic flat `data materialize` path.
 
 ## Mini lab loop (CartPole)

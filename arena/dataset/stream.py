@@ -1,6 +1,6 @@
 """Stream-read verified episodes without copying into a portable tree.
 
-Spike companion to RFC 011. Prefer ``materialize_dataset`` when the producer
+Spike companion to RFC 012. Prefer ``materialize_dataset`` when the producer
 run may disappear; use this iterator when sources remain available and a full
 copy is unnecessary.
 """
@@ -52,7 +52,7 @@ def iter_verified_episodes(
     Does not copy episode bytes. Relative paths require ``dataset_path`` (or a
     path-form ``source``) so files resolve under the dataset root.
 
-    Non-goals (RFC 011): object-store readers, replacing atomic materialize,
+    Non-goals (RFC 012): object-store readers, replacing atomic materialize,
     and recomputing the dataset content digest during iteration.
     """
     dataset, loaded_path = _load_dataset(source)

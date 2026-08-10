@@ -1,4 +1,4 @@
-# RFC 011 — Streaming / sharded dataset materialization (spike)
+# RFC 012 — Streaming / sharded dataset materialization (spike)
 
 **Status:** Spike (exploratory; not a 1.0 commitment)
 **Date:** 2026-08-10
@@ -107,7 +107,7 @@ must not leave a valid-looking final `out_dir` (same guarantee as `#4`).
 - Unit tests: sharded materialize digest/shard determinism across two runs.
 - Unit tests: atomic materialize (`materialize_dataset`) still publishes a flat
   tree with `lineage.materialized` and without shard fields (regression guard).
-- This RFC checked in under `rfcs/011-streaming-sharded-datasets.md`.
+- This RFC checked in under `rfcs/012-streaming-sharded-datasets.md`.
 
 ## Follow-ups (out of spike)
 

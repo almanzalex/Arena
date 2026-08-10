@@ -1,4 +1,4 @@
-"""Sharded portable dataset materialization (RFC 011 spike).
+"""Sharded portable dataset materialization (RFC 012 spike).
 
 Preserves the atomic publish contract from ``materialize_dataset`` (#4) while
 placing episode files under ``episodes/shard_XXXX/``. Flat materialize remains
@@ -57,7 +57,7 @@ def materialize_dataset_sharded(
     Same atomic staging guarantees as ``materialize_dataset``. Episode content
     digests are unchanged; relative paths include the shard directory, so the
     dataset content digest differs from a flat materialization of the same
-    source (explicit non-goal in RFC 011).
+    source (explicit non-goal in RFC 012).
     """
     if not isinstance(shard_count, int) or isinstance(shard_count, bool) or shard_count < 1:
         raise SchemaError("shard_count must be a positive integer")
