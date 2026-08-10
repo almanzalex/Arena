@@ -17,7 +17,7 @@ from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 from arena.adapters.policy_custom_torch import (
     load_runtime,
@@ -39,15 +39,19 @@ def qualify_store(
     report_path: Path | str | None = None,
     restored_out: Path | str | None = None,
 ) -> dict[str, Any]:
-    """Produce identity-preserving push/pull evidence for any registered store."""
+    """Produce identity-preserving push/pull evidence for any registered store.
+
+    ``mode`` is ``simulation`` when ``?simulate=`` is present. Simulation never
+    sets ``counts_as_live_evidence`` and must not be treated as a stable claim.
+    """
     from arena.core.mirror import build_mirror_artifact, pull_artifact, push_artifact
+    from arena.core.store_preview import mode_and_live_claim
 
     started = _utc_now()
     source_path = Path(source).resolve()
     source_artifact = build_mirror_artifact(source_path)
     expected = source_artifact.identity
     parsed = urlparse(destination)
-    mode = "simulation" if "simulate" in parse_qs(parsed.query) else "live"
     temporary = (
         tempfile.TemporaryDirectory(prefix="arena-store-qualify-")
         if restored_out is None
@@ -62,6 +66,7 @@ def qualify_store(
         pushed = push_artifact(source_path, destination, verify=True)
         pulled = pull_artifact(pushed["uri"], restored, verify=True)
         restored_identity = pulled["identity"]
+    mode, counts_as_live = mode_and_live_claim(destination, pushed["uri"])
     checks = {
         "push_verified": {"ok": bool(pushed.get("verified"))},
         "pull_verified": {"ok": bool(pulled.get("verified"))},
@@ -75,11 +80,17 @@ def qualify_store(
             "restored": restored_identity,
             "kind": source_artifact.kind,
         },
+        "simulation_never_live": {
+            "ok": not (mode == "simulation" and counts_as_live),
+            "mode": mode,
+            "counts_as_live_evidence": counts_as_live,
+        },
     }
     report = {
         "schema": "arena.store-qualification/v1",
         "backend": parsed.scheme,
         "mode": mode,
+        "counts_as_live_evidence": counts_as_live,
         "source": str(source_path),
         "destination": destination,
         "immutable_uri": pushed["uri"],

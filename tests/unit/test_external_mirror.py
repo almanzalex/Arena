@@ -12,12 +12,12 @@ from arena.core.errors import StoreError
 from arena.core.mirror import (
     FileStoreAdapter,
     HuggingFaceStoreAdapter,
-    OCIStoreAdapter,
     _validate_descriptor,
     build_mirror_artifact,
     pull_artifact,
     push_artifact,
 )
+from arena.core.store_oci import OCIStoreAdapter
 from arena.core.sdk import Policy
 
 
@@ -276,7 +276,7 @@ def test_mirror_rejects_portable_case_and_unicode_path_collisions() -> None:
 def test_oci_extraction_rejects_expansion_budget_and_links(
     tmp_path: Path, monkeypatch
 ) -> None:
-    monkeypatch.setattr("arena.core.mirror.MAX_MIRROR_BYTES", 10)
+    monkeypatch.setattr("arena.core.store_oci.MAX_MIRROR_BYTES", 10)
     oversized = tmp_path / "oversized.tar"
     with tarfile.open(oversized, "w") as archive:
         info = tarfile.TarInfo("mirror/blob")

@@ -68,6 +68,7 @@ def test_store_qualification_labels_simulation_and_cli(
     )
     assert report["schema"] == "arena.store-qualification/v1"
     assert report["mode"] == "simulation"
+    assert report["counts_as_live_evidence"] is False
     assert report["ok"] is True
     assert report["checks"]["identity_preserved"]["ok"] is True
     assert report_path.exists()

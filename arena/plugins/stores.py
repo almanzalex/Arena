@@ -26,13 +26,10 @@ def register_store_adapter(
 
 
 def register_builtins() -> None:
-    from arena.core.mirror import (
-        FileStoreAdapter,
-        HuggingFaceStoreAdapter,
-        MLflowStoreAdapter,
-        OCIStoreAdapter,
-        WandBStoreAdapter,
-    )
+    from arena.core.mirror import FileStoreAdapter, HuggingFaceStoreAdapter
+    from arena.core.store_mlflow import MLflowStoreAdapter
+    from arena.core.store_oci import OCIStoreAdapter
+    from arena.core.store_wandb import WandBStoreAdapter
 
     register_store_adapter("file", FileStoreAdapter(), replace=True)
     register_store_adapter("hf", HuggingFaceStoreAdapter(), replace=True)
