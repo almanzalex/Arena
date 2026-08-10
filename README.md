@@ -15,7 +15,7 @@ environment servers, or artifact hosts.
 That is useful inside one lab (train → eval → claim on a clean machine) and when
 sharing artifacts with another party.
 
-Current distribution: **`1.0.0rc1`**. The final `v1.0.0` tag stays blocked until
+Current distribution: **Arena 1.0.0rc1**. The final `v1.0.0` tag stays blocked until
 the release-commit evidence gates in [docs/1.0-readiness.md](docs/1.0-readiness.md)
 are attached to that exact commit.
 
