@@ -716,6 +716,7 @@ def validate_eval_run_manifest(data: dict[str, Any]) -> dict[str, Any]:
 
 def validate_eval_report_manifest(data: dict[str, Any]) -> dict[str, Any]:
     require_schema(data, {EVAL_REPORT_SCHEMA, EVAL_REPORT_V1_SCHEMA}, kind="eval-report")
+    schema = data.get("schema")
     for key in ("evaluation_digest", "eval_run_digest", "metrics"):
         if key not in data:
             raise SchemaError(f"eval-report missing required field: {key}")
