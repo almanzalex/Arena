@@ -422,7 +422,6 @@ def test_signed_release_and_current_ledger_are_content_bound(tmp_path: Path) -> 
         )
 
 
-
 def test_release_evidence_binds_eval_bundle_digests_when_present(tmp_path: Path) -> None:
     pytest.importorskip("cryptography")
     from arena.core.identity import digest_uri, sha256_bytes

@@ -54,7 +54,16 @@ class UnknownKindError(SchemaError):
     def __init__(self, recipe: ExtensionRecipe, *, known: Iterable[str]) -> None:
         self.recipe = recipe
         self.known = frozenset(known)
-        super().__init__(recipe.format(known=self.known))
+        super().__init__(
+            recipe.format(known=self.known),
+            code="UNKNOWN_KIND",
+            cause=f"unregistered {recipe.axis} kind",
+            repair=(
+                f"Use a registered {recipe.axis} kind, or extend Arena: implement {recipe.interface}, "
+                f"register via {recipe.register_via}, add tests covering {recipe.tests}, then run `{recipe.qualify}`."
+            ),
+            context={"axis": recipe.axis, "kind": recipe.kind, "known": sorted(self.known)},
+        )
 
 
 class Registry(Generic[T]):

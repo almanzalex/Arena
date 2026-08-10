@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 from yaml.events import AliasEvent
 
-from arena.core.errors import SchemaError
+from arena.core.errors import SchemaError, missing_digest, wrong_schema
 from arena.core.identity import canonical_json, digest_uri, parse_digest, sha256_bytes
 from arena.core.io import DEFAULT_MAX_BYTES, atomic_write_bytes, read_text_bounded
 
@@ -31,6 +31,22 @@ EVAL_BUNDLE_SCHEMA = "arena.eval-bundle/v0alpha1"
 TASK_SCHEMA = "arena.task/v0alpha1"
 TRACE_SUITE_SCHEMA = "arena.trace-suite/v1"
 MAX_MANIFEST_DEPTH = 128
+
+
+def require_schema(data: dict, expected: str | set[str], *, kind: str | None = None) -> None:
+    schema = data.get("schema")
+    if isinstance(expected, str):
+        ok = schema == expected
+        exp: str | set[str] = expected
+    else:
+        ok = schema in expected
+        exp = expected
+    if not ok:
+        raise wrong_schema(
+            expected=exp if isinstance(exp, str) else set(exp),
+            got=schema,
+            kind=kind,
+        )
 
 
 class _StrictSafeLoader(yaml.SafeLoader):
@@ -139,8 +155,7 @@ def dump_json(data: dict[str, Any], path: Path | str) -> None:
 
 
 def validate_policy_manifest(data: dict[str, Any]) -> dict[str, Any]:
-    if data.get("schema") != POLICY_SCHEMA:
-        raise SchemaError(f"expected schema {POLICY_SCHEMA}, got {data.get('schema')!r}")
+    require_schema(data, POLICY_SCHEMA, kind="policy")
     required = [
         "name",
         "roles",
@@ -199,8 +214,7 @@ def validate_policy_manifest(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_task_manifest(data: dict[str, Any]) -> dict[str, Any]:
-    if data.get("schema") != TASK_SCHEMA:
-        raise SchemaError(f"expected schema {TASK_SCHEMA}, got {data.get('schema')!r}")
+    require_schema(data, TASK_SCHEMA, kind="task")
     for key in ("name", "adapter", "env", "interaction"):
         if not data.get(key):
             raise SchemaError(f"task manifest missing required field: {key}")
@@ -237,10 +251,7 @@ def task_content_digest(data: dict[str, Any]) -> str:
 
 
 def validate_trace_suite(data: dict[str, Any]) -> dict[str, Any]:
-    if data.get("schema") != TRACE_SUITE_SCHEMA:
-        raise SchemaError(
-            f"expected schema {TRACE_SUITE_SCHEMA}, got {data.get('schema')!r}"
-        )
+    require_schema(data, TRACE_SUITE_SCHEMA, kind="trace-suite")
     episodes = data.get("episodes")
     if not isinstance(episodes, list) or not episodes:
         raise SchemaError("trace suite requires a non-empty episodes list")
@@ -251,8 +262,7 @@ def validate_trace_suite(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_match_manifest(data: dict[str, Any]) -> dict[str, Any]:
-    if data.get("schema") != MATCH_SCHEMA:
-        raise SchemaError(f"expected schema {MATCH_SCHEMA}, got {data.get('schema')!r}")
+    require_schema(data, MATCH_SCHEMA, kind="match")
     for key in ("task", "assignments", "seeds", "action_mode"):
         if key not in data:
             raise SchemaError(f"match manifest missing required field: {key}")
@@ -323,14 +333,13 @@ def resolve_artifact_path(path: Path | str) -> Path:
 def _require_digest(value: str, *, field: str) -> str:
     text = str(value).strip()
     if not text.startswith("sha256:"):
-        raise SchemaError(f"{field} must be a sha256: digest, got {value!r}")
+        raise missing_digest(field=field, value=value, require_sha256_prefix=True)
     parse_digest(text)
     return text
 
 
 def validate_population_manifest(data: dict[str, Any]) -> dict[str, Any]:
-    if data.get("schema") != POPULATION_SCHEMA:
-        raise SchemaError(f"expected schema {POPULATION_SCHEMA}, got {data.get('schema')!r}")
+    require_schema(data, POPULATION_SCHEMA, kind="population")
     if "name" not in data:
         raise SchemaError("population manifest missing required field: name")
     members = data.get("members")
@@ -381,8 +390,7 @@ def population_content_digest(data: dict[str, Any]) -> str:
 
 
 def validate_evaluation_manifest(data: dict[str, Any]) -> dict[str, Any]:
-    if data.get("schema") != EVALUATION_SCHEMA:
-        raise SchemaError(f"expected schema {EVALUATION_SCHEMA}, got {data.get('schema')!r}")
+    require_schema(data, EVALUATION_SCHEMA, kind="evaluation")
     for key in ("name", "task", "assignments", "seeds", "action_mode", "metrics"):
         if key not in data:
             raise SchemaError(f"evaluation manifest missing required field: {key}")
@@ -686,11 +694,8 @@ def evaluation_binding_digest(
 
 
 def validate_eval_run_manifest(data: dict[str, Any]) -> dict[str, Any]:
+    require_schema(data, {EVAL_RUN_SCHEMA, EVAL_RUN_V1_SCHEMA}, kind="eval-run")
     schema = data.get("schema")
-    if schema not in {EVAL_RUN_SCHEMA, EVAL_RUN_V1_SCHEMA}:
-        raise SchemaError(
-            f"expected schema {EVAL_RUN_SCHEMA} or {EVAL_RUN_V1_SCHEMA}, got {schema!r}"
-        )
     for key in ("evaluation_digest", "sampling_ledger", "cells"):
         if key not in data:
             raise SchemaError(f"eval-run missing required field: {key}")
@@ -710,12 +715,8 @@ def validate_eval_run_manifest(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_eval_report_manifest(data: dict[str, Any]) -> dict[str, Any]:
+    require_schema(data, {EVAL_REPORT_SCHEMA, EVAL_REPORT_V1_SCHEMA}, kind="eval-report")
     schema = data.get("schema")
-    if schema not in {EVAL_REPORT_SCHEMA, EVAL_REPORT_V1_SCHEMA}:
-        raise SchemaError(
-            f"expected schema {EVAL_REPORT_SCHEMA} or {EVAL_REPORT_V1_SCHEMA}, "
-            f"got {schema!r}"
-        )
     for key in ("evaluation_digest", "eval_run_digest", "metrics"):
         if key not in data:
             raise SchemaError(f"eval-report missing required field: {key}")
@@ -744,8 +745,7 @@ def validate_eval_report_manifest(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_dataset_manifest(data: dict[str, Any]) -> dict[str, Any]:
-    if data.get("schema") != DATASET_SCHEMA:
-        raise SchemaError(f"expected schema {DATASET_SCHEMA}, got {data.get('schema')!r}")
+    require_schema(data, DATASET_SCHEMA, kind="dataset")
     for key in ("name", "source_runs", "episodes", "query"):
         if key not in data:
             raise SchemaError(f"dataset missing required field: {key}")
@@ -779,8 +779,7 @@ def validate_dataset_manifest(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_eval_bundle_manifest(data: dict[str, Any]) -> dict[str, Any]:
-    if data.get("schema") != EVAL_BUNDLE_SCHEMA:
-        raise SchemaError(f"expected schema {EVAL_BUNDLE_SCHEMA}, got {data.get('schema')!r}")
+    require_schema(data, EVAL_BUNDLE_SCHEMA, kind="eval-bundle")
     for key in ("evaluation_digest", "artifacts"):
         if key not in data:
             raise SchemaError(f"eval-bundle missing required field: {key}")
