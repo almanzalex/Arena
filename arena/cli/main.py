@@ -979,11 +979,26 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 
 def cmd_inspect(args: argparse.Namespace) -> int:
-    from arena.core.manifests import load_manifest, resolve_artifact_path
+    from arena.core.manifests import EVAL_BUNDLE_SCHEMA, load_manifest, resolve_artifact_path
     from arena.core.sdk import Policy
 
     artifact = Path(args.artifact)
-    if artifact.is_dir() and (artifact / "bundle.yaml").exists():
+    if artifact.is_dir() and (
+        (artifact / "bundle.yaml").exists() or (artifact / "bundle.json").exists()
+    ):
+        meta_path = (
+            artifact / "bundle.yaml"
+            if (artifact / "bundle.yaml").exists()
+            else artifact / "bundle.json"
+        )
+        meta = load_manifest(meta_path)
+        schema = str(meta.get("schema") or "")
+        if schema == EVAL_BUNDLE_SCHEMA or schema.startswith("arena.eval-bundle"):
+            from arena.core.eval_bundle import verify_eval_bundle
+
+            info = verify_eval_bundle(artifact)
+            _print(info, as_json=args.json)
+            return 0
         from arena.runtime.trajectory import inspect_trajectory
 
         info = inspect_trajectory(artifact)
