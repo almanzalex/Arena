@@ -38,6 +38,63 @@ def test_i02_file_round_trip_preserves_policy_identity(tmp_path: Path) -> None:
             assert (restored / original.relative_to(source)).read_bytes() == original.read_bytes()
 
 
+def test_file_store_interrupted_publish_leaves_no_pullable_descriptor(
+    tmp_path: Path, monkeypatch
+) -> None:
+    source = Path("examples/eval/demo/rock.arena").resolve()
+    artifact = build_mirror_artifact(source)
+    mirror = tmp_path / "mirror"
+    import arena.core.mirror as mirror_mod
+
+    real_atomic_create = mirror_mod.atomic_create_bytes
+
+    def fail_descriptor(path, data, **kwargs):
+        destination = Path(path)
+        if destination.parent.name == "artifacts" and destination.suffix == ".json":
+            raise OSError("simulated interrupt before descriptor publish")
+        return real_atomic_create(path, data, **kwargs)
+
+    monkeypatch.setattr(mirror_mod, "atomic_create_bytes", fail_descriptor)
+    with pytest.raises(StoreError, match="conflicting mirror descriptor|simulated interrupt"):
+        FileStoreAdapter().push(artifact, mirror.as_uri(), verify=False)
+
+    artifacts_dir = mirror / "artifacts"
+    assert not artifacts_dir.exists() or not any(artifacts_dir.glob("*.json"))
+    identity_hex = artifact.identity.removeprefix("sha256:")
+    assert not (mirror / "artifacts" / f"{identity_hex}.json").exists()
+    uri = f"{mirror.as_uri()}#{artifact.identity}"
+    with pytest.raises(StoreError, match="mirror descriptor not found"):
+        FileStoreAdapter().pull(uri, tmp_path / "should-not-exist", verify=True)
+
+
+def test_file_round_trip_preserves_object_and_directory_digests(tmp_path: Path) -> None:
+    from arena.core.identity import digest_uri, sha256_bytes
+
+    obj = tmp_path / "blob.bin"
+    obj.write_bytes(b"digest-stable-object")
+    obj_artifact = build_mirror_artifact(obj)
+    obj_mirror = tmp_path / "obj-mirror"
+    obj_uri = FileStoreAdapter().push(obj_artifact, obj_mirror.as_uri(), verify=True)
+    obj_out = tmp_path / "obj-out"
+    obj_restored = pull_artifact(obj_uri, obj_out, verify=True)
+    assert obj_restored["identity"] == obj_artifact.identity
+    assert digest_uri(sha256_bytes((obj_out / "blob.bin").read_bytes())) == obj_artifact.identity
+
+    directory = tmp_path / "tree"
+    directory.mkdir()
+    (directory / "a.txt").write_text("alpha", encoding="utf-8")
+    (directory / "nested").mkdir()
+    (directory / "nested" / "b.txt").write_text("beta", encoding="utf-8")
+    dir_artifact = build_mirror_artifact(directory)
+    assert dir_artifact.kind == "directory"
+    dir_mirror = tmp_path / "dir-mirror"
+    dir_uri = FileStoreAdapter().push(dir_artifact, dir_mirror.as_uri(), verify=True)
+    dir_out = tmp_path / "dir-out"
+    dir_restored = pull_artifact(dir_uri, dir_out, verify=True)
+    assert dir_restored["identity"] == dir_artifact.identity
+    assert dir_restored["identity"] == build_mirror_artifact(dir_out).identity
+
+
 def test_file_pull_verify_rejects_mutated_blob(tmp_path: Path) -> None:
     source = Path("examples/eval/demo/rock.arena").resolve()
     artifact = build_mirror_artifact(source)
