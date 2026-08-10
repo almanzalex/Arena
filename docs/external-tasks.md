@@ -33,6 +33,30 @@ T-01 compares seeded observations, actions, rewards, terminations, truncations, 
 and agent selection. T-02 crosses the actual WebSocket JSON boundary. T-03 records
 `disconnect`, `container_crash`, `timeout`, and `protocol_error` distinctly.
 
+
+## PettingZoo classic RPS
+
+Arena's `pettingzoo-parallel` adapter already loads PettingZoo's upstream
+`classic/rps_v2` environment for both `parallel` and `aec` interactions (in
+addition to the packaged pilot RPS envs). Checked-in task YAMLs and a demo make
+that path usable without rewriting OpenSpiel fixtures:
+
+```bash
+pip install 'arena[pettingzoo,torch]'
+arena demo multiagent --out /tmp/arena-ma-demo --json
+# or
+python examples/multiagent/run_demo.py --out /tmp/arena-ma-demo
+```
+
+Task manifests:
+
+- `examples/tasks/pettingzoo-classic-rps.yaml` — simultaneous `parallel` play
+- `examples/tasks/pettingzoo-classic-rps-aec.yaml` — turn-based `aec` twin
+
+Both export portable Discrete(4)/Discrete(3) policies, record trajectories, and
+emit stable policy/outcome digests. Acceptance coverage lives in
+`tests/acceptance/test_pettingzoo_classic_multiagent.py`.
+
 ## OpenSpiel
 
 The qualified catalog is organized by OpenSpiel semantics rather than one generic

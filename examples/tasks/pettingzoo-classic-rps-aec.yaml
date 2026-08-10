@@ -8,3 +8,4 @@ packaging:
   kind: pettingzoo_wrappers
 config:
   max_cycles: 1
+digest: sha256:fe3cf58096db529cd7fccaab4eb6430cf50aa54cde261bca4460158d37ee2294

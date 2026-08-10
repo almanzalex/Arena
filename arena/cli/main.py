@@ -117,6 +117,12 @@ def main(argv: list[str] | None = None) -> int:
     p_dem = p_demo.add_subparsers(dest="demo_command", required=True)
     p_dh = p_dem.add_parser("handoff", help="Build, mirror, pull, and verify a policy locally")
     p_dh.add_argument("--out", default="./arena-demo")
+    p_dm = p_dem.add_parser(
+        "multiagent",
+        help="Export portable RPS policies and run PettingZoo classic/rps_v2 matches",
+    )
+    p_dm.add_argument("--out", default="./arena-ma-demo")
+    p_dm.add_argument("--json", action="store_true")
 
     p_schema = sub.add_parser("schema", help="Inspect the installed compatibility registry")
     p_sch = p_schema.add_subparsers(dest="schema_command", required=True)
@@ -733,6 +739,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return cmd_doctor(args)
     if args.command == "demo" and args.demo_command == "handoff":
         return cmd_demo_handoff(args)
+    if args.command == "demo" and args.demo_command == "multiagent":
+        return cmd_demo_multiagent(args)
     if args.command == "schema" and args.schema_command == "list":
         return cmd_schema_list(args)
     if args.command == "init":
@@ -943,6 +951,22 @@ def cmd_demo_handoff(args: argparse.Namespace) -> int:
     rendered = {**result, "out": str(destination)}
     _print(rendered, as_json=bool(args.json))
     return 0
+
+
+def cmd_demo_multiagent(args: argparse.Namespace) -> int:
+    """Run the packaged PettingZoo classic/rps_v2 multi-agent demo."""
+    import importlib.util
+
+    path = Path(__file__).resolve().parents[2] / "examples" / "multiagent" / "run_demo.py"
+    spec = importlib.util.spec_from_file_location("arena_multiagent_demo", path)
+    if spec is None or spec.loader is None:
+        raise ArenaError(f"cannot load multiagent demo from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    summary = module.run_multiagent_demo(out=Path(args.out))
+    _print(summary, as_json=bool(args.json))
+    return 0 if summary.get("ok") else 1
+
 
 
 def cmd_init(args: argparse.Namespace) -> int:
