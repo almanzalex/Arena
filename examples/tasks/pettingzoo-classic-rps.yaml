@@ -1,0 +1,10 @@
+schema: arena.task/v0alpha1
+name: task:pettingzoo-classic-rps@1.0
+adapter: pettingzoo-parallel
+env: classic/rps_v2
+interaction: parallel
+version: pettingzoo
+packaging:
+  kind: pettingzoo_wrappers
+config:
+  max_cycles: 1
