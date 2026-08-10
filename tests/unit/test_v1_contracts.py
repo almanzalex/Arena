@@ -307,6 +307,7 @@ def test_cli_json_grammar_help_and_secret_redaction(capsys) -> None:
     assert failure["code"] == "DIGEST_MISSING"
 
 
+@pytest.mark.skipif(os.name != "posix", reason="process-group kill contract is POSIX-stable")
 def test_supervisor_kills_process_group_on_timeout(tmp_path: Path) -> None:
     marker = tmp_path / "grandchild-survived"
     child = (

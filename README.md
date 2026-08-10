@@ -76,6 +76,11 @@ arena schema list --json
 Support truth (what is stable vs preview) lives in
 [`arena/support-matrix.json`](arena/support-matrix.json) and is summarized below.
 
+| Platform | Status |
+|---|---|
+| Linux x86_64, macOS arm64 (Python 3.12–3.13) | **stable** — required release CI |
+| Windows (amd64), Linux arm64, macOS x86_64 | **experimental** — CI scaffolding with `continue-on-error` only; not a compatibility promise |
+
 | Capability | RC status | Final 1.0 condition |
 |---|---|---|
 | Core identity/inspect, native runtime, `file://`, quickstart | stable | Claimed-platform release CI |

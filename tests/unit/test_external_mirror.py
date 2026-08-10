@@ -246,7 +246,10 @@ def test_policy_mirror_rejects_undeclared_files_and_symlinks(tmp_path: Path) -> 
         build_mirror_artifact(source)
 
     (source / "undeclared.txt").unlink()
-    (source / "link").symlink_to(source / "policy.yaml")
+    try:
+        (source / "link").symlink_to(source / "policy.yaml")
+    except OSError as exc:  # Windows may lack symlink privilege.
+        pytest.skip(f"symlink creation not permitted: {exc}")
     with pytest.raises(StoreError, match="refusing symlink"):
         build_mirror_artifact(source)
 

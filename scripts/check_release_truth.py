@@ -39,6 +39,35 @@ def main() -> int:
         ("macos-15", "3.13", "arm64"),
     }
     assert required <= actual
+    # Experimental scaffolding must stay present and marked allow-failure so it
+    # cannot silently become a required stable claim.
+    experimental = {
+        (row["os"], str(row["python-version"]), row["expected-arch"])
+        for row in rows
+        if row.get("tier") == "experimental"
+    }
+    required_experimental = {
+        ("windows-latest", "3.12", "amd64"),
+        ("windows-latest", "3.13", "amd64"),
+        ("ubuntu-24.04-arm", "3.12", "aarch64"),
+        ("macos-13", "3.12", "x86_64"),
+    }
+    assert required_experimental <= experimental
+    for row in rows:
+        if row.get("tier") == "experimental":
+            assert row.get("allow-failure") is True
+        if (row["os"], str(row["python-version"]), row["expected-arch"]) in required:
+            assert row.get("tier", "stable") == "stable"
+            assert row.get("allow-failure") is False
+    platforms = {
+        (str(row["os"]), str(row["arch"]), str(row["status"]))
+        for row in support.get("platforms", [])
+    }
+    assert ("linux", "x86_64", "stable") in platforms
+    assert ("darwin", "arm64", "stable") in platforms
+    assert ("win32", "amd64", "experimental") in platforms
+    assert ("linux", "aarch64", "experimental") in platforms
+    assert ("darwin", "x86_64", "experimental") in platforms
     release_workflow = (
         ROOT / ".github" / "workflows" / "release-candidate.yml"
     ).read_text(encoding="utf-8")
