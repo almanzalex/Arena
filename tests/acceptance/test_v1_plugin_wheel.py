@@ -55,12 +55,30 @@ def test_out_of_tree_v1_plugin_installs_loads_lazily_and_removes_cleanly(
             if value
         ),
     }
-    probe = """
-from arena.core.registry import EXTERNAL_STORES, ensure_plugins_loaded
+    source = Path("examples/eval/demo/rock.arena").resolve()
+    destination = (tmp_path / "example-mirror").resolve().as_uri().replace(
+        "file:", "example:", 1
+    )
+    probe = f"""
+from arena.core.registry import EXTERNAL_STORES, ensure_plugins_loaded, UnknownKindError
+from arena.conformance.qualification import qualify_store
+
 ensure_plugins_loaded()
 assert "example" not in EXTERNAL_STORES.known()
 assert EXTERNAL_STORES.get("example").scheme == "example"
 assert "example" in EXTERNAL_STORES.known()
+
+try:
+    EXTERNAL_STORES.get("s3")
+except UnknownKindError as exc:
+    assert "arena store qualify" in str(exc)
+else:
+    raise AssertionError("expected UnknownKindError for unknown store kind")
+
+report = qualify_store({str(source)!r}, destination={destination!r})
+assert report["ok"] is True
+assert report["backend"] == "example"
+assert report["schema"] == "arena.store-qualification/v1"
 """
     subprocess.run(
         [sys.executable, "-c", probe],
