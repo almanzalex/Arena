@@ -24,7 +24,7 @@ from arena.core.contracts import (
     validate_architecture_spaces,
     validate_reference_case_action,
 )
-from arena.core.errors import missing_extra, ArenaError, ConformanceError, SchemaError
+from arena.core.errors import ConformanceError, SchemaError, missing_extra
 from arena.core.identity import digest_uri, sha256_file
 from arena.core.manifests import (
     POLICY_SCHEMA,

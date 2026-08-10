@@ -8,7 +8,6 @@ from arena.core.errors import (
     SchemaError,
     bad_uri,
     diagnostic_from_exception,
-    missing_digest,
     missing_extra,
 )
 from arena.core.identity import parse_digest

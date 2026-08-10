@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from arena.core.errors import missing_extra, ArenaError, SchemaError
+from arena.core.errors import ArenaError, SchemaError, missing_extra
 
 FROZEN_GAME = "tic_tac_toe"
 FROZEN_GAMES: dict[str, dict[str, Any]] = {
