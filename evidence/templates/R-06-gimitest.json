@@ -1,0 +1,16 @@
+{
+  "schema": "arena.adapter-qualification/v1",
+  "gate": "R-06",
+  "capability": "gimitest",
+  "mode": "live",
+  "simulation": false,
+  "isolated_python": "/path/to/separate/venv/bin/python",
+  "worker_versions": {
+    "arena": "REPLACE",
+    "gimitest": "1.0"
+  },
+  "non_noop": true,
+  "evaluation_intent_digest": "sha256:REPLACE",
+  "provider_native_assertions": null,
+  "notes": "Must use a genuinely separate interpreter; in-process lineage is not enough."
+}

@@ -11,8 +11,9 @@ qualification evidence, and milestone claims. Use this page as a map.
 | [1.0-readiness.md](1.0-readiness.md) | Release program; what blocks `v1.0.0` |
 | [1.0-rc-local-evidence.md](1.0-rc-local-evidence.md) | Latest local RC proof |
 | [1.0-test-plan.md](1.0-test-plan.md) | Test plan for 1.0 gates |
-| [releasing.md](releasing.md) | Signed release procedure |
+| [releasing.md](releasing.md) | Signed release procedure + local R-gate collector |
 | [pypi-trusted-publishing.md](pypi-trusted-publishing.md) | R-11 TestPyPI dry-run + GitHub OIDC Trusted Publisher setup |
+| [qualifications/README.md](qualifications/README.md) | Where live HF/OpenEnv/Gimitest JSON is dropped |
 | [errors.md](errors.md) | Stable diagnostics / exit classes |
 
 ## Everyday guides

@@ -1,0 +1,39 @@
+{
+  "schema": "arena.release-gate-evidence/v1",
+  "gate": "R-01",
+  "title": "Claimed platform CI",
+  "status": "pass",
+  "commit": "REPLACE_WITH_40_CHAR_LOWERCASE_SHA",
+  "platforms": [
+    {
+      "os": "linux",
+      "arch": "x86_64",
+      "python": "3.12",
+      "result": "pass",
+      "run_url": "https://..."
+    },
+    {
+      "os": "linux",
+      "arch": "x86_64",
+      "python": "3.13",
+      "result": "pass",
+      "run_url": "https://..."
+    },
+    {
+      "os": "darwin",
+      "arch": "arm64",
+      "python": "3.12",
+      "result": "pass",
+      "run_url": "https://..."
+    },
+    {
+      "os": "darwin",
+      "arch": "arm64",
+      "python": "3.13",
+      "result": "pass",
+      "run_url": "https://..."
+    }
+  ],
+  "workflow": ".github/workflows/ci.yml",
+  "notes": "Clean-checkout CI for the exact release commit only."
+}

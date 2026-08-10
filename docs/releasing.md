@@ -4,6 +4,61 @@ The release is not “green because CI said so.” Each mandatory gate produces 
 durable file, and the exact wheel/sdist plus those files are content-bound into
 one signed index.
 
+## Local collector (skeleton only)
+
+Automate as much **local** R-01…R-14 inventory as possible without inventing
+live HF / separately deployed OpenEnv / release-CI Gimitest:
+
+```bash
+python scripts/collect_release_evidence.py
+```
+
+This writes:
+
+- `evidence/local/` — doctor, schema-registry snapshot, golden fixture digests,
+  hermetic-capable inventory, perf-smoke baselines, release-truth, and related
+  inventories;
+- `evidence/release-index.json` — an `arena.release-evidence-skeleton/v1`
+  document with every R-01…R-14 slot marked `filled`, `local-partial`, or
+  `missing`.
+
+The skeleton is **not** `arena.release-evidence/v1` and must not be signed as a
+release. External-floor gates stay `missing` until real files are attached.
+
+### Attach CI / HF / OpenEnv / Gimitest evidence
+
+Copy a template from `evidence/templates/`, fill it with real results (or drop
+qualification JSON under `docs/qualifications/` — see
+[qualifications/README.md](qualifications/README.md)), then:
+
+```bash
+python scripts/collect_release_evidence.py \
+  --attach R-01=/path/to/ci-summary.json \
+  --attach R-04=docs/qualifications/hf-live.json \
+  --attach R-05=docs/qualifications/openenv/R-05-openenv-separate-service.json \
+  --attach R-06=docs/qualifications/gimitest/R-06-gimitest-isolated.json
+```
+
+The collector refuses simulated store reports (`mode=simulation` / `?simulate=`)
+and loopback OpenEnv attachments that lack `separately_deployed: true`.
+
+| Gate | What to attach |
+|---|---|
+| R-01 | Clean-checkout CI summary for the exact commit (Linux/macOS × 3.12/3.13) |
+| R-02 | Exact-wheel hermetic + Docker network-none report |
+| R-03 | Two non-author handoff transcripts (content-digested) |
+| R-04 | Live HF `arena.store-qualification/v1` (+ optional other stores or preview labels) |
+| R-05 | Separately deployed OpenEnv qualification + failure drills |
+| R-06 | Isolated-interpreter non-no-op Gimitest qualification |
+| R-07…R-13 | Soak, SBOM/attestations, golden verify, perf baselines, recovery, docs truth |
+| R-14 | Result of signed `arena release verify` after assemble |
+
+Stream D owns `scripts/r_gates/**`, `evidence/templates/`, and this collector.
+Only stream D may later propose `support-matrix.json` `evidence` field updates
+after other streams emit qualification JSON.
+
+## Signed assemble (final release asset)
+
 The release-candidate workflow builds the distributions once, installs the
 exact wheel, emits SHA-256 checksums, a reproducible CycloneDX SBOM, dependency,
 Bandit, and secret-scan reports, and GitHub/Sigstore provenance plus SBOM

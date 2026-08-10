@@ -1,0 +1,18 @@
+{
+  "schema": "arena.adapter-qualification/v1",
+  "gate": "R-05",
+  "capability": "openenv",
+  "separately_deployed": true,
+  "deployment": "operated-service",
+  "endpoint": "https://openenv.example.invalid/REPLACE",
+  "mode": "live",
+  "task_intent_digest": "sha256:REPLACE",
+  "equivalence": "pass",
+  "failure_drills": {
+    "disconnect": "pass",
+    "timeout": "pass",
+    "crash": "pass",
+    "schema_drift": "pass"
+  },
+  "notes": "Local loopback alone is not R-05. separately_deployed must be true."
+}

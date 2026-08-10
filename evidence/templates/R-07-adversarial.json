@@ -1,0 +1,12 @@
+{
+  "schema": "arena.release-gate-evidence/v1",
+  "gate": "R-07",
+  "title": "Adversarial / soak",
+  "status": "pass",
+  "commit": "REPLACE_WITH_40_CHAR_LOWERCASE_SHA",
+  "report_digest": "sha256:REPLACE",
+  "soak_episodes": 50000,
+  "worker_stress": 32,
+  "resource_envelope": "pass",
+  "notes": "Unit adversarial inventory from the collector is not this gate."
+}
