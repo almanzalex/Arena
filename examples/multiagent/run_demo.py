@@ -35,8 +35,8 @@ def _stable_outcome_digest(run: dict[str, Any]) -> str:
 
 def run_multiagent_demo(*, out: Path, seeds: list[int] | None = None) -> dict[str, Any]:
     from arena.conformance.fixtures import build_fixed_action_rps_policy
-    from arena.core.sdk import Match, Policy, Task
     from arena.core.manifests import load_manifest
+    from arena.core.sdk import Match, Policy, Task
 
     out = out.resolve()
     out.mkdir(parents=True, exist_ok=True)
