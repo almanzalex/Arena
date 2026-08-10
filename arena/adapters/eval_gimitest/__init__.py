@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 import sys
 import tempfile
 import uuid
@@ -15,6 +16,8 @@ from arena.core.identity import canonical_json, digest_uri, sha256_bytes
 from arena.core.io import atomic_write_bytes
 from arena.core.manifests import load_manifest
 from arena.core.supervisor import run_supervised
+
+ISOLATED_PYTHON_ENV = "ARENA_GIMITEST_PYTHON"
 
 
 def _resolve_test_class(ref: str, *, allow_external: bool) -> type[Any]:
@@ -36,6 +39,22 @@ def _resolve_test_class(ref: str, *, allow_external: bool) -> type[Any]:
     if not isinstance(cls, type):
         raise SchemaError(f"Gimitest test class {ref!r} did not resolve to a class")
     return cls
+
+
+def resolve_isolation(config: dict[str, Any]) -> dict[str, Any]:
+    """Normalize isolation config; fill python from ARENA_GIMITEST_PYTHON when omitted."""
+    isolation = dict(config.get("isolation") or {})
+    mode = isolation.get("mode", "in_process")
+    if mode == "subprocess" and not isolation.get("python"):
+        env_python = os.environ.get(ISOLATED_PYTHON_ENV, "").strip()
+        if not env_python:
+            raise SchemaError(
+                "gimitest isolation.mode=subprocess requires isolation.python or "
+                f"{ISOLATED_PYTHON_ENV} pointing at an absolute worker interpreter. "
+                "Run scripts/bootstrap_gimitest_worker.sh first."
+            )
+        isolation["python"] = env_python
+    return isolation
 
 
 def decorate_env(env: Any, config: dict[str, Any]) -> Any:
@@ -72,7 +91,7 @@ class GimitestEvalProvider:
         config = suite.get("provider_config") or {}
         if not isinstance(config, dict):
             raise SchemaError("provider_config must be a mapping")
-        isolation = dict(config.get("isolation") or {})
+        isolation = resolve_isolation(config)
         if isolation.get("mode", "in_process") == "subprocess":
             return self._run_subprocess(suite, isolation=isolation, **kwargs)
         if isolation.get("mode", "in_process") != "in_process":

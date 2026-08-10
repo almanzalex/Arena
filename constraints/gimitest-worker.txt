@@ -1,0 +1,12 @@
+# Resolver-isolated Gimitest worker pins.
+# Gimitest 1.0 publishes an obsolete Gymnasium 0.29.1 pin; install the provider
+# with `pip install --no-deps` after Arena's torch/pettingzoo/gimitest extras.
+#
+# Used by scripts/bootstrap_gimitest_worker.sh.
+torch==2.13.0
+pettingzoo==1.26.1
+gymnasium==1.3.0
+mpe2==1.1.0
+numpy==2.5.1
+pillow==12.3.0
+gimitest==1.0

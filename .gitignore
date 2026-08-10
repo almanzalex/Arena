@@ -12,6 +12,7 @@ dist/
 build/
 *.egg-info/
 .venv/
+.venv-gimitest/
 venv/
 runs/
 artifacts/
