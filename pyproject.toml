@@ -28,6 +28,8 @@ mlflow = ["mlflow>=2.14,<4"]
 signing = ["cryptography>=43"]
 quickstart = ["arena[torch]"]
 gimitest = ["pillow>=10,<13"]
+# Optional richer tab completion via argcomplete (static `arena completion` works without it).
+completion = ["argcomplete>=3.0,<4"]
 # OCI uses the standard ORAS CLI so it shares the user's registry auth/config.
 oci = []
 # Gimitest 1.0 pins Gymnasium 0.29.1 while current PettingZoo requires >=1.0.
@@ -41,7 +43,7 @@ dev = [
   "ruff>=0.4",
   "build>=1.2",
   "hatchling>=1.21",
-  "arena[all,integrations]",
+  "arena[all,integrations,completion]",
 ]
 
 [project.scripts]

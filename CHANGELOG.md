@@ -3,6 +3,11 @@
 
 ## Unreleased
 
+- Add static shell completion (`arena completion bash|zsh|fish`), optional
+  `arena[completion]` argcomplete wiring, and short `arena help` topics
+  (overview / install / handoff / completion / naming). Strengthen the PyPI
+  name-collision note with deferred rename candidates; do not rename the
+  distribution yet.
 - Strengthen the PettingZoo `classic/rps_v2` multi-agent path with portable
   fixed-action policies, parallel/AEC task YAMLs, a packaged
   `arena demo multiagent` flow, and acceptance coverage that checks digests and

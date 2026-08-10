@@ -50,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     clean_argv, global_json, debug, show_version = _global_options(raw_argv)
     nested_commands = {
+        "adapter",
         "attest",
         "data",
         "demo",
@@ -673,6 +674,31 @@ def main(argv: list[str] | None = None) -> int:
     p_sq.add_argument("destination", help="Registered store URI")
     p_sq.add_argument("--out", required=True, help="Qualification report JSON")
 
+    p_help = sub.add_parser(
+        "help",
+        help="Show short topic help (overview, install, handoff, completion, naming)",
+    )
+    p_help.add_argument(
+        "topic",
+        nargs="?",
+        default="overview",
+        help="Topic name, or 'topics' to list (default: overview)",
+    )
+
+    p_completion = sub.add_parser(
+        "completion",
+        help="Print a shell completion script (eval into bash/zsh; source for fish)",
+    )
+    p_completion.add_argument(
+        "shell",
+        choices=["bash", "zsh", "fish"],
+        help="Target shell",
+    )
+
+    from arena.cli.dx import enable_argcomplete
+
+    enable_argcomplete(parser)
+
     parse_output = io.StringIO()
     try:
         if global_json:
@@ -851,7 +877,39 @@ def _dispatch(args: argparse.Namespace) -> int:
         return cmd_pull(args)
     if args.command == "store" and args.store_command == "qualify":
         return cmd_store_qualify(args)
+    if args.command == "help":
+        return cmd_help(args)
+    if args.command == "completion":
+        return cmd_completion(args)
     raise CliUsageError(f"unknown command {args.command!r}")
+
+
+def cmd_help(args: argparse.Namespace) -> int:
+    from arena.cli.dx import render_help
+
+    try:
+        text = render_help(getattr(args, "topic", None))
+    except ValueError as exc:
+        raise CliUsageError(str(exc), repair="Run `arena help topics` for valid topics.") from exc
+    if args.json:
+        _print({"topic": getattr(args, "topic", "overview"), "text": text}, as_json=True)
+    else:
+        print(text, end="")
+    return 0
+
+
+def cmd_completion(args: argparse.Namespace) -> int:
+    from arena.cli.dx import render_completion
+
+    try:
+        script = render_completion(args.shell)
+    except ValueError as exc:
+        raise CliUsageError(str(exc), repair="Choose bash, zsh, or fish.") from exc
+    if args.json:
+        _print({"shell": args.shell, "script": script}, as_json=True)
+    else:
+        print(script, end="")
+    return 0
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:

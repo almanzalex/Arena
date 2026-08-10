@@ -103,14 +103,23 @@ python -m pip install 'arena[gimitest]'    # worker deps; install gimitest separ
 python -m pip install 'arena[hf]'          # Hugging Face mirrors
 python -m pip install 'arena[wandb]'
 python -m pip install 'arena[mlflow]'
+python -m pip install 'arena[completion]'  # optional richer argcomplete tab completion
 # OCI uses the ORAS CLI and its normal login credentials.
 ```
 
 Core stays small (`pyyaml`, `numpy`). Heavy dependencies are extras.
+Static completion needs no extra: `eval "$(arena completion bash)"` (or zsh/fish).
+`arena help` covers install, handoff, completion, and naming topics.
 
-> **Name note:** This project’s PyPI distribution is `arena`. Unrelated packages
-> such as `diambra-arena` (game envs) and `rl-arena` (competitive envs) solve
-> different problems. Prefer the pinned version above when installing.
+> **Name note (PyPI collision risk):** This project’s PyPI distribution is
+> currently `arena`. That short name is easy to confuse with unrelated packages
+> such as `diambra-arena` (fighting-game envs) and `rl-arena` (competitive RL
+> envs)—different products, different APIs. Prefer a pinned install
+> (`arena[quickstart]==1.0.0rc1`) and confirm with `arena --version` /
+> `arena doctor`. If collisions cause real install harm, deferred rename
+> candidates (CLI would stay `arena` unless a coordinated break is planned):
+> `arena-rl`, `arena-interop`, `rlx-arena`, `portable-arena`. See
+> [TODOS.md](TODOS.md) and `arena help naming`.
 
 ---
 
