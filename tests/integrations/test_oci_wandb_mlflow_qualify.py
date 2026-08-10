@@ -18,7 +18,6 @@ from arena.core.store_oci import OCIStoreAdapter
 from arena.core.store_preview import PREVIEW_STORES, mode_and_live_claim
 from arena.core.store_wandb import WandBStoreAdapter
 
-
 SOURCE = Path("examples/eval/demo/rock.arena").resolve()
 
 
