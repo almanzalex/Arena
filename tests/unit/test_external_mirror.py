@@ -11,13 +11,13 @@ from arena.cli.main import main
 from arena.core.errors import StoreError
 from arena.core.mirror import (
     FileStoreAdapter,
-    HuggingFaceStoreAdapter,
     _validate_descriptor,
     build_mirror_artifact,
     pull_artifact,
     push_artifact,
 )
 from arena.core.sdk import Policy
+from arena.core.store_hf import HuggingFaceStoreAdapter
 from arena.core.store_oci import OCIStoreAdapter
 
 
@@ -111,6 +111,7 @@ def test_file_pull_verify_rejects_mutated_blob(tmp_path: Path) -> None:
 def test_hf_adapter_uses_backend_credentials_and_preserves_bytes(
     tmp_path: Path, monkeypatch
 ) -> None:
+    monkeypatch.setenv("HF_TOKEN", "canary-unit-test-token")
     remote: dict[str, bytes] = {}
 
     class FakeApi:
@@ -154,6 +155,7 @@ def test_hf_adapter_uses_backend_credentials_and_preserves_bytes(
 def test_hf_pull_resolves_movable_revision_once_before_any_download(
     tmp_path: Path, monkeypatch
 ) -> None:
+    monkeypatch.setenv("HF_TOKEN", "canary-unit-test-token")
     remote: dict[str, bytes] = {}
     repo_info_calls = 0
 
@@ -200,6 +202,7 @@ def test_hf_pull_resolves_movable_revision_once_before_any_download(
 
 
 def test_hf_push_verify_rejects_remote_blob_mutation(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("HF_TOKEN", "canary-unit-test-token")
     remote: dict[str, bytes] = {}
 
     class FakeApi:

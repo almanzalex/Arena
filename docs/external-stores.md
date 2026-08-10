@@ -19,17 +19,23 @@ omitted, pull uses `pulled-<digest-prefix>.arena`. Existing non-empty outputs ar
 
 ```bash
 pip install 'arena[hf]'
-hf auth login                         # normal backend credential flow
-arena push policy.arena hf://models/org/repo/arena --verify
-arena pull 'hf://models/org/repo/arena#sha256:…' --verify
+export HF_TOKEN=<write-token>          # or HUGGING_FACE_HUB_TOKEN
+python scripts/qualify_hf_live.py policy.arena \
+  'hf://models/org/repo/arena' \
+  --out /tmp/hf-restored.arena \
+  --report /tmp/hf-qualification.json
 ```
+
+Without those env vars the script exits non-zero and writes
+`mode=credential-missing` — never a live pass. Full HF 1.0 floor notes and the
+R-04 checklist live under [qualifications/hf/](qualifications/hf/README.md).
 
 Use `datasets` or `spaces` instead of `models` for another repo type, and
 `?revision=branch` when needed. Arena resolves a movable ref exactly once, fetches
 the descriptor and all blobs from that immutable 40-hex commit, and returns the
 pinned revision in the artifact URI. Arena never stores tokens or remaps digests. The HF API
 boundary is covered with deterministic simulation; a live authenticated smoke is
-user/account-specific.
+user/account-specific and requires credentials.
 
 ```bash
 # OCI uses the ORAS CLI and `oras login`.
@@ -49,8 +55,9 @@ arena push policy.arena \
 ```
 
 The returned URI retains `simulate=`, so it cannot be mistaken for remote evidence.
-Use `examples/boundaries/live_store_smoke.py` after authenticating for an actual
-push/pull verification; that script intentionally refuses simulation URIs.
+Use `scripts/qualify_hf_live.py` for Hugging Face live evidence (fail-closed without
+tokens). For other backends, `examples/boundaries/live_store_smoke.py` after
+authenticating; that script intentionally refuses simulation URIs.
 
 OCI extraction rejects absolute/parent paths, links, special files, case and
 Unicode-normalization collisions, excessive members, and expanded-byte bombs.
