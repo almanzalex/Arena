@@ -9,81 +9,121 @@
   "capabilities": {
     "core": {
       "status": "stable",
+      "extra": null,
       "distributions": [],
       "executables": [],
       "install": "python -m pip install 'arena==1.0.0rc1'",
-      "credentials": false
+      "credentials": false,
+      "evidence": "claimed-platform-release-ci",
+      "stable_requires": null,
+      "qualify": null
     },
     "quickstart": {
       "status": "stable",
+      "extra": "quickstart",
       "distributions": ["torch"],
       "executables": [],
       "install": "python -m pip install 'arena[quickstart]==1.0.0rc1'",
-      "credentials": false
+      "credentials": false,
+      "evidence": "claimed-platform-release-ci",
+      "stable_requires": null,
+      "qualify": null
     },
     "file": {
       "status": "stable",
+      "extra": null,
       "distributions": [],
       "executables": [],
       "install": "python -m pip install 'arena==1.0.0rc1'",
-      "credentials": false
+      "credentials": false,
+      "evidence": "claimed-platform-release-ci",
+      "stable_requires": null,
+      "qualify": null
     },
     "openenv": {
       "status": "preview",
       "target_status": "stable",
       "required_for_1_0": true,
+      "extra": "openenv",
       "distributions": ["openenv", "pettingzoo", "gymnasium"],
       "executables": [],
       "install": "python -m pip install 'arena[openenv]==1.0.0rc1'",
-      "credentials": false
+      "credentials": false,
+      "evidence": "none-attached",
+      "stable_requires": "Fresh qualification against a separately deployed/operated OpenEnv service; local loopback alone is not a 1.0 stable claim.",
+      "qualify": "arena adapter qualify <openenv-task.yaml> --peer <native-peer.yaml> --trace-suite <suite.yaml> --out openenv-qualification.json"
     },
     "openspiel": {
       "status": "stable",
+      "extra": "openspiel",
       "distributions": ["open_spiel", "gymnasium"],
       "executables": [],
       "install": "python -m pip install 'arena[openspiel]==1.0.0rc1'",
-      "credentials": false
+      "credentials": false,
+      "evidence": "claimed-platform-release-ci",
+      "stable_requires": null,
+      "qualify": null
     },
     "gimitest": {
       "status": "preview",
       "target_status": "stable",
       "required_for_1_0": true,
+      "extra": "gimitest",
       "distributions": [],
       "executables": [],
       "isolated_python_env": "ARENA_GIMITEST_PYTHON",
       "isolated_distributions": ["arena", "gimitest", "torch", "pettingzoo", "pillow"],
       "install": "python -m venv .venv-gimitest && .venv-gimitest/bin/python -m pip install 'arena[torch,pettingzoo,gimitest]==1.0.0rc1' && .venv-gimitest/bin/python -m pip install --no-deps gimitest==1.0",
-      "credentials": false
+      "credentials": false,
+      "evidence": "none-attached",
+      "stable_requires": "Non-no-op qualification from a genuinely separate interpreter, repeated in claimed-platform release CI and bound to the release evidence index.",
+      "qualify": "export ARENA_GIMITEST_PYTHON=<isolated-python> && arena adapter qualify examples/eval/robustness.yaml --out gimitest-qualification.json"
     },
     "hf": {
       "status": "preview",
       "target_status": "stable",
       "required_for_1_0": true,
+      "extra": "hf",
       "distributions": ["huggingface_hub"],
       "executables": [],
       "install": "python -m pip install 'arena[hf]==1.0.0rc1'",
-      "credentials": true
+      "credentials": true,
+      "evidence": "none-attached",
+      "stable_requires": "Fresh credentialed immutable-revision push/pull with release evidence; ?simulate= never satisfies the live gate.",
+      "qualify": "arena store qualify policy.arena 'hf://models/ORG/REPO/arena?revision=<immutable>' --out hf-qualification.json"
     },
     "oci": {
       "status": "preview",
+      "extra": null,
       "distributions": [],
       "executables": ["oras"],
       "install": "Install Arena and the ORAS CLI",
-      "credentials": true
+      "credentials": true,
+      "evidence": "none-attached",
+      "stable_requires": "Live ORAS qualification evidence; simulation never satisfies a live claim.",
+      "qualify": "arena store qualify policy.arena 'oci://REGISTRY/REPO:tag' --out oci-qualification.json"
     },
     "wandb": {
       "status": "preview",
+      "extra": "wandb",
       "distributions": ["wandb"],
       "executables": [],
       "install": "python -m pip install 'arena[wandb]==1.0.0rc1'",
-      "credentials": true
+      "credentials": true,
+      "evidence": "none-attached",
+      "stable_requires": "Live W&B qualification evidence; ?simulate= never satisfies a live claim.",
+      "qualify": "arena store qualify policy.arena 'wandb://entity/project/artifact' --out wandb-qualification.json"
     },
     "mlflow": {
       "status": "preview",
+      "extra": "mlflow",
       "distributions": ["mlflow"],
       "executables": [],
       "install": "python -m pip install 'arena[mlflow]==1.0.0rc1'",
-      "credentials": true
+      "credentials": true,
+      "evidence": "none-attached",
+      "stable_requires": "Live MLflow qualification evidence; simulation never satisfies a live claim.",
+      "qualify": "arena store qualify policy.arena 'mlflow://...' --out mlflow-qualification.json"
     }
   }
 }

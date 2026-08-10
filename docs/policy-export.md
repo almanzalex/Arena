@@ -83,6 +83,22 @@ arena policy export \
 scripting. Optional lineage fields (`source_revision`, checkpoint digest, wrapper
 identity) are recorded on the manifest and excluded from the content digest.
 
+## Self-contained BYO rehearsal (no CleanRL)
+
+Rehearse export → verify → inspect without cloning CleanRL:
+
+```bash
+python examples/byo/export_cartpole_mlp.py --out ./byo-cartpole.arena
+arena policy verify ./byo-cartpole.arena
+arena inspect ./byo-cartpole.arena --json
+```
+
+The actor in `examples/byo/cartpole_mlp.py` mirrors CleanRL's pinned CartPole DQN
+layer layout so the producer contract matches the public CleanRL rehearsal
+(`examples/1.0/export_cleanrl_cartpole.py`), which still requires a checkout at
+commit `fe8d8a03c41a7ef5b523e2e354bd01c363e786bb`. When that checkout is missing,
+the CleanRL script exits 2 and points at the BYO example.
+
 ## Task wrappers (PettingZoo / SuperSuit)
 
 Image / stacked-observation stacks that were applied in training must be declared on

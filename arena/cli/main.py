@@ -413,6 +413,16 @@ def main(argv: list[str] | None = None) -> int:
     p_eb.add_argument("run_dir")
     p_eb.add_argument("--out", required=True)
     p_eb.add_argument("--report", default=None, help="Optional report.json to include")
+    p_ec = p_e.add_parser(
+        "compare",
+        help=(
+            "Compare two eval reports/bundles and fail if suite digests, "
+            "policy digests, or seed protocols differ"
+        ),
+    )
+    p_ec.add_argument("left", help="Left report.json, eval_run.json, or bundle directory")
+    p_ec.add_argument("right", help="Right report.json, eval_run.json, or bundle directory")
+    p_ec.add_argument("--json", action="store_true")
 
     p_release = sub.add_parser(
         "release",
@@ -679,6 +689,8 @@ def _dispatch(args: argparse.Namespace) -> int:
             return cmd_eval_report(args)
         if args.eval_command == "bundle":
             return cmd_eval_bundle(args)
+        if args.eval_command == "compare":
+            return cmd_eval_compare(args)
     if args.command == "release":
         if args.release_command == "build":
             return cmd_release_build(args)
@@ -704,10 +716,13 @@ def _dispatch(args: argparse.Namespace) -> int:
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
-    from arena.core.support import doctor_report
+    from arena.core.support import doctor_report, format_doctor_human
 
     report = doctor_report(args.capability)
-    _print(report, as_json=bool(args.json))
+    if args.json:
+        _print(report, as_json=True)
+    else:
+        print(format_doctor_human(report), end="")
     return 0
 
 
@@ -1537,6 +1552,14 @@ def cmd_eval_bundle(args: argparse.Namespace) -> int:
         report = json.loads(Path(args.report).read_text(encoding="utf-8"))
     bundle = build_eval_bundle(eval_run_dir=args.run_dir, report=report, out_dir=args.out)
     print(json.dumps({"digest": bundle["digest"], "out": args.out}, indent=2))
+    return 0
+
+
+def cmd_eval_compare(args: argparse.Namespace) -> int:
+    from arena.core.eval_compare import compare_eval_claims
+
+    result = compare_eval_claims(args.left, args.right)
+    _print(result, as_json=args.json)
     return 0
 
 
