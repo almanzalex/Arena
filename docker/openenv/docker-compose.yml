@@ -1,0 +1,37 @@
+# Separately operated OpenEnv service for Arena client qualification.
+#
+# Usage (from repository root):
+#   docker compose -f docker/openenv/docker-compose.yml up --build -d
+#   export ARENA_OPENENV_BASE_URL=http://127.0.0.1:8000
+#   .venv/bin/python scripts/qualify_openenv_separate_service.py \
+#     --out docs/qualifications/openenv
+#
+# Tear down:
+#   docker compose -f docker/openenv/docker-compose.yml down
+
+services:
+  openenv:
+    build:
+      context: ../..
+      dockerfile: docker/openenv/Dockerfile
+    image: arena-openenv-pilot:local
+    container_name: arena-openenv-pilot
+    ports:
+      - "${ARENA_OPENENV_PORT:-8000}:8000"
+    environment:
+      OPENENV_HOST: "0.0.0.0"
+      OPENENV_PORT: "8000"
+      OPENENV_ENV: "${OPENENV_ENV:-rps}"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=2)",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    restart: "no"
