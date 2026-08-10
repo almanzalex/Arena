@@ -1,0 +1,16 @@
+{
+  "schema": "arena.store-qualification/v1",
+  "gate": "R-04",
+  "capability": "hf",
+  "mode": "live",
+  "simulation": false,
+  "uri": "hf://models/ORG/REPO/arena?revision=REPLACE_IMMUTABLE",
+  "expected_digest": "sha256:REPLACE",
+  "restored_digest": "sha256:REPLACE",
+  "checks": {
+    "push": "pass",
+    "pull": "pass",
+    "verify": "pass"
+  },
+  "notes": "mode must be live. ?simulate= reports are rejected by the collector."
+}

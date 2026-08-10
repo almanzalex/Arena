@@ -1,0 +1,19 @@
+{
+  "schema": "arena.release-gate-evidence/v1",
+  "gate": "R-10",
+  "title": "Performance",
+  "status": "pass",
+  "commit": "REPLACE_WITH_40_CHAR_LOWERCASE_SHA",
+  "platforms": [
+    "linux/x86_64",
+    "darwin/arm64"
+  ],
+  "repeats": 5,
+  "summary": "median",
+  "relative_budget": {
+    "median_max_regression": 0.15,
+    "p95_max_regression": 0.2
+  },
+  "report_digest": "sha256:REPLACE",
+  "notes": "Perf-smoke baselines are not R-10."
+}

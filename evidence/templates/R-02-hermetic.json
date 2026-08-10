@@ -1,0 +1,19 @@
+{
+  "schema": "arena.release-gate-evidence/v1",
+  "gate": "R-02",
+  "title": "Hermetic package handoff",
+  "status": "pass",
+  "commit": "REPLACE_WITH_40_CHAR_LOWERCASE_SHA",
+  "wheel": "dist/arena-REPLACE-py3-none-any.whl",
+  "wheel_digest": "sha256:REPLACE",
+  "commands": [
+    "pytest -m slow -q",
+    "pytest -m docker -q"
+  ],
+  "results": {
+    "venv_hermetic": "pass",
+    "docker_network_none": "pass",
+    "composed_journey": "pass"
+  },
+  "notes": "Must use the exact release wheel/sdist, not an editable checkout."
+}

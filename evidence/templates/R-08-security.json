@@ -1,0 +1,16 @@
+{
+  "schema": "arena.release-gate-evidence/v1",
+  "gate": "R-08",
+  "title": "Security / supply chain",
+  "status": "pass",
+  "commit": "REPLACE_WITH_40_CHAR_LOWERCASE_SHA",
+  "artifacts": {
+    "sbom": "dist/sbom.cdx.json",
+    "pip_audit": "dist/pip-audit.json",
+    "bandit": "dist/bandit.json",
+    "secrets": "dist/secrets-scan.json",
+    "sha256sums": "dist/SHA256SUMS"
+  },
+  "provenance_attestation": "github-attestations/REPLACE",
+  "notes": "Local script inventory is not a substitute for release-workflow attestations."
+}

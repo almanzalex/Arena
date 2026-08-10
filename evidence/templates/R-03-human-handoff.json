@@ -1,0 +1,24 @@
+{
+  "schema": "arena.release-gate-evidence/v1",
+  "gate": "R-03",
+  "title": "Independent user handoff",
+  "status": "pass",
+  "commit": "REPLACE_WITH_40_CHAR_LOWERCASE_SHA",
+  "participants": [
+    {
+      "role": "producer",
+      "platform": "linux/x86_64",
+      "author": false,
+      "transcript_digest": "sha256:REPLACE",
+      "first_verified_artifact_seconds": null
+    },
+    {
+      "role": "consumer",
+      "platform": "darwin/arm64",
+      "author": false,
+      "transcript_digest": "sha256:REPLACE",
+      "first_verified_artifact_seconds": null
+    }
+  ],
+  "notes": "Two non-author machines/accounts; no verbal help or repo access."
+}

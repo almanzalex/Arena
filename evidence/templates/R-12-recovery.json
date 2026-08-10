@@ -1,0 +1,12 @@
+{
+  "schema": "arena.release-gate-evidence/v1",
+  "gate": "R-12",
+  "title": "Failure recovery",
+  "status": "pass",
+  "commit": "REPLACE_WITH_40_CHAR_LOWERCASE_SHA",
+  "transaction_fault_matrix": "pass",
+  "cancellation_leak_checks": "pass",
+  "rollback_rehearsal": "pass",
+  "report_digest": "sha256:REPLACE",
+  "notes": "Collector recovery inventory is not the full gate."
+}

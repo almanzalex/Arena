@@ -1,0 +1,29 @@
+{
+  "schema": "arena.release-gate-evidence/v1",
+  "gate": "R-09",
+  "title": "Compatibility",
+  "status": "pass",
+  "commit": "REPLACE_WITH_40_CHAR_LOWERCASE_SHA",
+  "schema_registry_digest": "sha256:REPLACE",
+  "golden_fixtures": [
+    {
+      "milestone": "0.2",
+      "path": "REPLACE",
+      "digest": "sha256:REPLACE",
+      "verify": "pass"
+    },
+    {
+      "milestone": "0.3",
+      "path": "REPLACE",
+      "digest": "sha256:REPLACE",
+      "verify": "pass"
+    },
+    {
+      "milestone": "0.5",
+      "path": "REPLACE",
+      "digest": "sha256:REPLACE",
+      "verify": "pass"
+    }
+  ],
+  "notes": "Collector golden digests are a partial inventory only."
+}

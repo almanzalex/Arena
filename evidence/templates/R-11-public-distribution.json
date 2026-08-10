@@ -1,0 +1,21 @@
+{
+  "schema": "arena.release-gate-evidence/v1",
+  "gate": "R-11",
+  "title": "Public distribution",
+  "status": "pass",
+  "commit": "REPLACE_WITH_40_CHAR_LOWERCASE_SHA",
+  "testpypi": {
+    "upload": "pass",
+    "clean_install": "pass"
+  },
+  "pypi": {
+    "upload": "pass",
+    "clean_install": "pass",
+    "trusted_publishing": true
+  },
+  "artifacts": {
+    "wheel_digest": "sha256:REPLACE",
+    "sdist_digest": "sha256:REPLACE"
+  },
+  "notes": "Never invent this from a local wheel install alone."
+}

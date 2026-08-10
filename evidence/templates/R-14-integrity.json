@@ -1,0 +1,15 @@
+{
+  "schema": "arena.release-gate-evidence/v1",
+  "gate": "R-14",
+  "title": "Evidence integrity",
+  "status": "pass",
+  "commit": "REPLACE_WITH_40_CHAR_LOWERCASE_SHA",
+  "tag": "v1.0.0",
+  "evidence_index": "evidence/release-index.json",
+  "signature": "evidence/release-index.sig.json",
+  "verify": {
+    "command": "arena release verify evidence/release-index.json --signature evidence/release-index.sig.json --key arena-release.pub --at-release",
+    "result": "pass"
+  },
+  "notes": "Assemble+sign only after every other gate file exists. Skeleton \u2260 signed index."
+}

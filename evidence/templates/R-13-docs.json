@@ -1,0 +1,13 @@
+{
+  "schema": "arena.release-gate-evidence/v1",
+  "gate": "R-13",
+  "title": "Documentation truth",
+  "status": "pass",
+  "commit": "REPLACE_WITH_40_CHAR_LOWERCASE_SHA",
+  "commands": [
+    "python scripts/check_release_truth.py"
+  ],
+  "support_matrix_release": "REPLACE",
+  "readme_version_snippet": "pass",
+  "notes": "Re-run on the final tag; collector local truth is partial."
+}
