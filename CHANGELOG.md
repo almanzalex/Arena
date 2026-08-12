@@ -3,6 +3,11 @@
 
 ## Unreleased
 
+- Add a manual `workflow_dispatch` GitHub Action for Hugging Face R-04 live
+  store qualification (`scripts/qualify_hf_live.py`) that fail-closes when
+  `secrets.HF_TOKEN` is missing and uploads the qualification artifact; document
+  the one-command local recipe and required secret name. Does not flip
+  `support-matrix` `hf` → `stable` without `mode=live` evidence.
 - Refresh OpenEnv R-05 separate-service qualification evidence against the
   Docker pilot on `http://127.0.0.1:8000` (real digests; support matrix remains
   `preview`).

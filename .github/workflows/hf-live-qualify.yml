@@ -1,0 +1,91 @@
+name: HF live qualify (R-04)
+
+# Manual credentialed HF push/pull qualification. Fail-closed when secrets.HF_TOKEN
+# is unset — never treats missing credentials or simulation as a live pass.
+# Does not flip arena/support-matrix.json; attach a mode=live report before claiming stable.
+
+on:
+  workflow_dispatch:
+    inputs:
+      destination:
+        description: "hf:// destination URI (write access required; no ?simulate=)"
+        required: true
+        type: string
+        default: "hf://models/ORG/REPO/arena"
+      source:
+        description: "Local Arena artifact path relative to repo root"
+        required: true
+        type: string
+        default: "examples/eval/demo/rock.arena"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Require HF_TOKEN (fail-closed)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "${HF_TOKEN}" ]; then
+            echo "::error title=HF_TOKEN missing::Repository secret HF_TOKEN is unset. Add a Hugging Face write token, then re-run. Missing credentials are not live evidence (mode=credential-missing)."
+            exit 1
+          fi
+          if [[ "${{ inputs.destination }}" == *"simulate="* ]]; then
+            echo "::error title=simulate refused::Destination must not include ?simulate=. Simulation is never R-04 live evidence."
+            exit 1
+          fi
+
+      - name: Install Arena with HF extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[hf,dev]'
+
+      - name: Run qualify_hf_live
+        id: qualify
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          ARENA_HF_LIVE_DEST: ${{ inputs.destination }}
+        run: |
+          mkdir -p artifacts/hf-qualify
+          set +e
+          python scripts/qualify_hf_live.py \
+            "${{ inputs.source }}" \
+            "${ARENA_HF_LIVE_DEST}" \
+            --out artifacts/hf-qualify/restored.arena \
+            --report artifacts/hf-qualify/hf-qualification.json
+          status=$?
+          set -e
+          if [ ! -f artifacts/hf-qualify/hf-qualification.json ]; then
+            echo "::error::qualify_hf_live did not write a report"
+            exit 1
+          fi
+          python - <<'PY'
+          import json, pathlib, sys
+          report = json.loads(pathlib.Path("artifacts/hf-qualify/hf-qualification.json").read_text(encoding="utf-8"))
+          mode = report.get("mode")
+          ok = report.get("ok")
+          print(f"mode={mode!r} ok={ok!r} stable_claim_allowed={report.get('stable_claim_allowed')!r}")
+          if mode != "live" or not ok:
+              print(
+                  "::error title=HF live qualify failed::"
+                  f"Expected mode=live ok=true; got mode={mode!r} ok={ok!r}. "
+                  "Do not flip support-matrix hf→stable."
+              )
+              sys.exit(1)
+          PY
+          exit "$status"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arena-hf-live-qualify-${{ github.sha }}
+          path: artifacts/hf-qualify/
+          if-no-files-found: ignore
