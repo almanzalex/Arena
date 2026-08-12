@@ -116,6 +116,7 @@ def test_openenv_separate_service_evidence_artifact_shape(tmp_path: Path) -> Non
     assert payload["gate"] == "R-05"
     assert payload["ok"] is True
     assert payload["mode"] == "separate-service"
+    assert payload["separately_deployed"] is True
     assert payload["client"]["does_not_spawn_service"] is True
     assert payload["qualification"]["ok"] is True
     assert payload["stable_claim"]["support_matrix_flipped"] is False

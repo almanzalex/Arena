@@ -143,6 +143,10 @@ def main(argv: list[str] | None = None) -> int:
         "gate": "R-05",
         "ok": True,
         "mode": "separate-service",
+        # Collector accepts loopback endpoints only when this flag is true.
+        # This script never starts the service; the operator must already be
+        # running a separately deployed/operated OpenEnv process or container.
+        "separately_deployed": True,
         "started_at": started,
         "finished_at": _utc_now(),
         "service": {

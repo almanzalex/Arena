@@ -43,8 +43,8 @@ def test_collector_emits_skeleton_with_all_gates(tmp_path: Path) -> None:
     assert slots["R-09"] == "local-partial"
     assert slots["R-10"] == "local-partial"
     assert slots["R-13"] == "local-partial"
+    assert slots["R-11"] == "local-partial"
     assert slots["R-01"] == "missing"
-    assert slots["R-11"] == "missing"
     assert slots["R-14"] == "missing"
 
     assert (out / "local" / "schema-registry.snapshot.json").is_file()
@@ -52,6 +52,12 @@ def test_collector_emits_skeleton_with_all_gates(tmp_path: Path) -> None:
     assert (out / "local" / "perf-smoke-baselines.json").is_file()
     assert (out / "local" / "hermetic-capable.json").is_file()
     assert (out / "local" / "doctor.json").is_file()
+    assert (out / "local" / "pypi-dry-run-inventory.json").is_file()
+    pypi_inv = json.loads(
+        (out / "local" / "pypi-dry-run-inventory.json").read_text(encoding="utf-8")
+    )
+    assert pypi_inv["uploaded_to_testpypi"] is False
+    assert pypi_inv["uploaded_to_pypi"] is False
 
     summary = document["summary"]
     assert "R-04" in summary["external_floor_missing"]
