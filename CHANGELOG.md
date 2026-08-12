@@ -3,6 +3,9 @@
 
 ## Unreleased
 
+- Refresh local isolated-worker R-06 Gimitest qualification evidence
+  (`docs/qualifications/gimitest/R-06-gimitest.json`); `stable_claim` remains
+  false and the support matrix stays preview.
 - Add static shell completion (`arena completion bash|zsh|fish`), optional
   `arena[completion]` argcomplete wiring, and short `arena help` topics
   (overview / install / handoff / completion / naming). Strengthen the PyPI
