@@ -152,11 +152,13 @@ GATE_SPECS: tuple[dict[str, Any], ...] = (
         "id": "R-11",
         "title": "Public distribution",
         "owner": "release-engineering",
-        "local_collectable": False,
+        "local_collectable": True,
+        "local_kind": "pypi-dry-run-inventory",
         "evidence_filename": "R-11-public-distribution.json",
         "how_to_attach": (
             "Attach TestPyPI → PyPI Trusted Publishing and clean post-publish "
-            "install evidence. Do not invent this locally."
+            "install evidence. Local dry-run (build + twine) is rehearsal only "
+            "and never counts as a TestPyPI/PyPI upload. Do not invent uploads."
         ),
     },
     {

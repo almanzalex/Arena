@@ -1,1 +1,62 @@
-{"client":{"connects_via":"packaging.base_url","does_not_spawn_service":true,"env_var":"ARENA_OPENENV_BASE_URL"},"equivalence_ok":true,"finished_at":"2026-08-10T13:23:51.294611+00:00","gate":"R-05","imported_task":"/Users/alexanderalmanza/Arena-worktrees/openenv-separate-qual/docs/qualifications/openenv/task-rps-openenv-separate.yaml","mode":"separate-service","ok":true,"qualification":{"adapter":"openenv","digest":"sha256:3032f881fe5627761370d702b3dc26ed9d9e6c0f0674db0b72d7ef3aad1b623e","kind":"task","ok":true,"path":"/Users/alexanderalmanza/Arena-worktrees/openenv-separate-qual/docs/qualifications/openenv/openenv-separate-qualification.json"},"recipe":["OpenEnv separate-service qualification requires a live service.","","Recipe:","  # Docker (preferred for R-05):","  docker compose -f docker/openenv/docker-compose.yml up --build -d","  export ARENA_OPENENV_BASE_URL=http://127.0.0.1:8000","","  # Or process (still separate from the Arena client):","  ./examples/openenv/separate_service/run_service.sh --daemon","  export ARENA_OPENENV_BASE_URL=http://127.0.0.1:8000","","  # Then qualify / test:","  .venv/bin/python scripts/qualify_openenv_separate_service.py \\","    --out docs/qualifications/openenv","  .venv/bin/pytest -m docker tests/integrations/test_openenv_separate_service.py -q","","Never treat an unset/unhealthy endpoint as success, and never flip support-matrix","to stable without recorded evidence under docs/qualifications/openenv/."],"schema":"arena.openenv-separate-qualification/v1","schema_digest":"sha256:d7b2dda8ba2d7a8529d9854d0d045a4a36d4e7805ce14c0834899fb0b0ea1fa8","service":{"base_url":"http://127.0.0.1:18000","env_path":"arena/competitive_rps_v0","host":"127.0.0.1","operator_hostname":"mac.lan","platform":{"arch":"arm64","os":"darwin","python":"3.13.1"},"port":18000,"source_uri":"openenv://127.0.0.1:18000/arena/competitive_rps_v0?transport=http"},"shared_task_intent_digest":"sha256:25054b2b9518766d6a29ad896fd010e1bc7aac2bb02f1db9d7d13588f51b31d9","stable_claim":{"note":"Evidence only. support-matrix.json remains preview until release owners attach this report and promote the capability.","support_matrix_flipped":false},"started_at":"2026-08-10T13:23:48.843886+00:00"}
+{
+  "client": {
+    "connects_via": "packaging.base_url",
+    "does_not_spawn_service": true,
+    "env_var": "ARENA_OPENENV_BASE_URL"
+  },
+  "equivalence_ok": true,
+  "finished_at": "2026-08-10T13:23:51.294611+00:00",
+  "gate": "R-05",
+  "imported_task": "/Users/alexanderalmanza/Arena-worktrees/openenv-separate-qual/docs/qualifications/openenv/task-rps-openenv-separate.yaml",
+  "mode": "separate-service",
+  "ok": true,
+  "qualification": {
+    "adapter": "openenv",
+    "digest": "sha256:3032f881fe5627761370d702b3dc26ed9d9e6c0f0674db0b72d7ef3aad1b623e",
+    "kind": "task",
+    "ok": true,
+    "path": "/Users/alexanderalmanza/Arena-worktrees/openenv-separate-qual/docs/qualifications/openenv/openenv-separate-qualification.json"
+  },
+  "recipe": [
+    "OpenEnv separate-service qualification requires a live service.",
+    "",
+    "Recipe:",
+    "  # Docker (preferred for R-05):",
+    "  docker compose -f docker/openenv/docker-compose.yml up --build -d",
+    "  export ARENA_OPENENV_BASE_URL=http://127.0.0.1:8000",
+    "",
+    "  # Or process (still separate from the Arena client):",
+    "  ./examples/openenv/separate_service/run_service.sh --daemon",
+    "  export ARENA_OPENENV_BASE_URL=http://127.0.0.1:8000",
+    "",
+    "  # Then qualify / test:",
+    "  .venv/bin/python scripts/qualify_openenv_separate_service.py \\",
+    "    --out docs/qualifications/openenv",
+    "  .venv/bin/pytest -m docker tests/integrations/test_openenv_separate_service.py -q",
+    "",
+    "Never treat an unset/unhealthy endpoint as success, and never flip support-matrix",
+    "to stable without recorded evidence under docs/qualifications/openenv/."
+  ],
+  "schema": "arena.openenv-separate-qualification/v1",
+  "schema_digest": "sha256:d7b2dda8ba2d7a8529d9854d0d045a4a36d4e7805ce14c0834899fb0b0ea1fa8",
+  "separately_deployed": true,
+  "service": {
+    "base_url": "http://127.0.0.1:18000",
+    "env_path": "arena/competitive_rps_v0",
+    "host": "127.0.0.1",
+    "operator_hostname": "mac.lan",
+    "platform": {
+      "arch": "arm64",
+      "os": "darwin",
+      "python": "3.13.1"
+    },
+    "port": 18000,
+    "source_uri": "openenv://127.0.0.1:18000/arena/competitive_rps_v0?transport=http"
+  },
+  "shared_task_intent_digest": "sha256:25054b2b9518766d6a29ad896fd010e1bc7aac2bb02f1db9d7d13588f51b31d9",
+  "stable_claim": {
+    "note": "Evidence only. support-matrix.json remains preview until release owners attach this report and promote the capability.",
+    "support_matrix_flipped": false
+  },
+  "started_at": "2026-08-10T13:23:48.843886+00:00"
+}

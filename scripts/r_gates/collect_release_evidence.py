@@ -325,6 +325,47 @@ def collect_release_truth(repo: Path, out_dir: Path) -> dict[str, Any]:
     }
 
 
+def collect_pypi_dry_run_inventory(repo: Path, out_dir: Path) -> dict[str, Any]:
+    """Inventory R-11 rehearsal tooling without claiming TestPyPI/PyPI upload."""
+    script = repo / "scripts" / "pypi_dry_run.sh"
+    workflow = repo / ".github" / "workflows" / "pypi-dry-run.yml"
+    docs = repo / "docs" / "pypi-trusted-publishing.md"
+    dist = repo / "dist"
+    built = sorted(
+        str(path.relative_to(repo))
+        for path in dist.glob("*")
+        if path.is_file() and path.suffix in {".whl", ".gz"}
+    ) if dist.is_dir() else []
+    document = {
+        "schema": "arena.pypi-dry-run-inventory/v1",
+        "script": str(script.relative_to(repo)) if script.is_file() else None,
+        "workflow": str(workflow.relative_to(repo)) if workflow.is_file() else None,
+        "docs": str(docs.relative_to(repo)) if docs.is_file() else None,
+        "local_dist_artifacts": built,
+        "twine_check_possible": script.is_file(),
+        "uploaded_to_testpypi": False,
+        "uploaded_to_pypi": False,
+        "trusted_publisher_configured": None,
+        "note": (
+            "Dry-run tooling inventory only. Build + twine check (local or "
+            "workflow_dispatch PyPI dry-run) is rehearsal, not R-11. TestPyPI/"
+            "PyPI Trusted Publishing + clean post-publish install must be "
+            "attached separately; never invent uploads."
+        ),
+    }
+    path = out_dir / "pypi-dry-run-inventory.json"
+    digest = _write_json(path, document)
+    return {
+        "ok": script.is_file() and workflow.is_file() and docs.is_file(),
+        "path": str(path),
+        "digest": digest,
+        "local_dist_artifacts": built,
+        "uploaded_to_testpypi": False,
+        "uploaded_to_pypi": False,
+        "note": document["note"],
+    }
+
+
 def collect_adversarial_inventory(repo: Path, out_dir: Path) -> dict[str, Any]:
     adv_dir = repo / "tests" / "adversarial"
     files = sorted(
@@ -522,6 +563,9 @@ def collect_release_evidence(
     local_checks["recovery_inventory"] = collect_recovery_inventory(
         repo_root, local_dir
     )
+    local_checks["pypi_dry_run_inventory"] = collect_pypi_dry_run_inventory(
+        repo_root, local_dir
+    )
 
     local_by_gate: dict[str, dict[str, Any] | None] = {
         "R-01": None,
@@ -550,7 +594,7 @@ def collect_release_evidence(
             "note": local_checks["golden_fixture_digests"].get("note"),
         },
         "R-10": local_checks["perf_smoke_baselines"],
-        "R-11": None,
+        "R-11": local_checks["pypi_dry_run_inventory"],
         "R-12": local_checks["recovery_inventory"],
         "R-13": {
             "ok": bool(local_checks["release_truth"].get("ok"))

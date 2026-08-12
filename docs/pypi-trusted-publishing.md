@@ -53,6 +53,28 @@ Trusted Publishing replaces long-lived PyPI API tokens with a short-lived OIDC
 identity bound to a specific GitHub repository, workflow file, and environment.
 Configure this **before** any real upload workflow is enabled.
 
+### Operator status check (before registering)
+
+Confirm GitHub Environments exist for the publisher binding (they start empty):
+
+```bash
+gh api repos/almanzalex/Arena/environments --jq '.environments[].name'
+```
+
+An empty list means Environments `testpypi` / `pypi` still need to be created in
+repository settings (step 4 below). PyPI/TestPyPI Trusted Publisher rows are
+configured on the package index UI (not via GitHub API); this dry-run path never
+uploads and cannot prove those registrations exist.
+
+Remaining operator steps until R-11 can pass:
+
+1. Create/claim the TestPyPI project and register the GitHub OIDC publisher.
+2. Create matching GitHub Environments (`testpypi`, later `pypi`).
+3. Add and intentionally run an upload workflow with `id-token: write` (not the
+   dry-run workflow).
+4. Clean-install from TestPyPI, then promote the same bytes to PyPI.
+5. Attach the resulting evidence as `evidence/R-11-public-distribution.json`.
+
 ### 1. Decide the publisher targets
 
 | Index | Project | Purpose |
