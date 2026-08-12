@@ -53,9 +53,42 @@ run — flip only when live evidence exists and is bound to the release index.
 
 ## CI
 
-Default CI has no Hugging Face secrets. The fail-closed path is always
+Default push/PR CI has no Hugging Face secrets. The fail-closed path is always
 exercised; optional live tests use `@pytest.mark.requires_hf` and skip with this
 recipe when tokens are absent. Skipping is not a live pass.
+
+### Manual Actions workflow (credentialed R-04)
+
+One-command local live run (after installing `arena[hf]`):
+
+```bash
+HF_TOKEN=<write-token> ARENA_HF_LIVE_DEST='hf://models/ORG/REPO/arena' \
+  python scripts/qualify_hf_live.py examples/eval/demo/rock.arena \
+  "$ARENA_HF_LIVE_DEST" --out /tmp/hf-restored.arena \
+  --report docs/qualifications/hf/hf-qualification.json
+```
+
+GitHub Actions (manual only — `workflow_dispatch`):
+
+1. Add repository secret **`HF_TOKEN`** (Hugging Face write token). Optional alias
+   name **`HUGGING_FACE_HUB_TOKEN`** is accepted by the Python qualifier locally;
+   the Actions workflow reads **`secrets.HF_TOKEN` only**.
+2. Dispatch:
+
+```bash
+gh workflow run "HF live qualify (R-04)" \
+  -f destination='hf://models/ORG/REPO/arena' \
+  -f source='examples/eval/demo/rock.arena'
+```
+
+Or: Actions tab → **HF live qualify (R-04)** → **Run workflow**.
+
+3. Download the `arena-hf-live-qualify-<sha>` artifact (`hf-qualification.json`).
+   Only `mode=live` / `ok=true` / immutable revision evidence may unlock a
+   support-matrix `hf` → `stable` flip.
+
+If `secrets.HF_TOKEN` is unset, the workflow exits non-zero immediately (no fake
+green). Workflow file: [`.github/workflows/hf-live-qualify.yml`](../../../.github/workflows/hf-live-qualify.yml).
 
 ## Related
 
