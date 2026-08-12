@@ -3,6 +3,9 @@
 
 ## Unreleased
 
+- Refresh OpenEnv R-05 separate-service qualification evidence against the
+  Docker pilot on `http://127.0.0.1:8000` (real digests; support matrix remains
+  `preview`).
 - Refresh local isolated-worker R-06 Gimitest qualification evidence
   (`docs/qualifications/gimitest/R-06-gimitest.json`); `stable_claim` remains
   false and the support matrix stays preview.

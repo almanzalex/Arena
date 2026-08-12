@@ -6,7 +6,7 @@ interaction: parallel
 version: openenv-0.4.1
 packaging:
   kind: openenv
-  base_url: http://127.0.0.1:18000
+  base_url: http://127.0.0.1:8000
   source_revision: openenv-0.4.1
   schema_digest: sha256:d7b2dda8ba2d7a8529d9854d0d045a4a36d4e7805ce14c0834899fb0b0ea1fa8
   connect_timeout_seconds: 10.0
@@ -49,4 +49,4 @@ contract:
         dtype: int64
   provides_masks: false
   dynamic_agents: false
-digest: sha256:9800e52a95130869257117123fae0272f23feb188a201bbefd1c3e3f662edc09
+digest: sha256:9364386ffb18931c133a676dc2aa668645d647e5308bb661aaf4d33e13aeb1d1
