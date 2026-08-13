@@ -52,13 +52,7 @@ def test_rehearse_release_sign_lists_missing_gates(tmp_path: Path) -> None:
 def test_rehearse_release_sign_rejects_unsafe_key_dir(tmp_path: Path) -> None:
     # pytest's tmp_path is often under /tmp on Linux CI, which is an *allowed*
     # KEY_DIR. Force a path outside /tmp and outside evidence/local/.
-    unsafe = tmp_path / "outside" / "unsafe-keys"
-    # Walk up until we leave /tmp if needed.
-    candidate = Path("/var/empty/arena-rehearse-unsafe-keys")
-    if candidate.exists() or candidate.parent.exists():
-        unsafe_keys = candidate
-    else:
-        unsafe_keys = Path.home() / ".cache" / "arena-rehearse-unsafe-keys-test"
+    unsafe_keys = Path.home() / ".cache" / f"arena-rehearse-unsafe-keys-{os.getpid()}"
     unsafe_keys.mkdir(parents=True, exist_ok=True)
     env = {
         **os.environ,
