@@ -1,0 +1,45 @@
+{
+  "schema": "arena.release-gate-evidence/v1",
+  "gate": "R-01",
+  "title": "Claimed platform CI",
+  "status": "pass",
+  "commit": "ba3a86ebd0fc29afb3951421036afd103552e54b",
+  "platforms": [
+    {
+      "os": "linux",
+      "arch": "x86_64",
+      "python": "3.12",
+      "result": "pass",
+      "run_url": "https://github.com/almanzalex/Arena/actions/runs/31663179708/job/94332157166"
+    },
+    {
+      "os": "linux",
+      "arch": "x86_64",
+      "python": "3.13",
+      "result": "pass",
+      "run_url": "https://github.com/almanzalex/Arena/actions/runs/31663179708/job/94332157241"
+    },
+    {
+      "os": "darwin",
+      "arch": "arm64",
+      "python": "3.12",
+      "result": "pass",
+      "run_url": "https://github.com/almanzalex/Arena/actions/runs/31663179708/job/94332157237"
+    },
+    {
+      "os": "darwin",
+      "arch": "arm64",
+      "python": "3.13",
+      "result": "pass",
+      "run_url": "https://github.com/almanzalex/Arena/actions/runs/31663179708/job/94332157206"
+    }
+  ],
+  "hermetic": {
+    "python": "3.12",
+    "result": "pass",
+    "run_url": "https://github.com/almanzalex/Arena/actions/runs/31663179708/job/94332157120"
+  },
+  "workflow": ".github/workflows/ci.yml",
+  "workflow_run_url": "https://github.com/almanzalex/Arena/actions/runs/31663179708",
+  "notes": "Claimed-platform cells (Linux x86_64 + macOS arm64 × Python 3.12/3.13) and hermetic succeeded on tip ba3a86e. Experimental Windows/optional-arch cells are scaffolding only (continue-on-error) and do not revoke this claim. Overall workflow may remain queued on scarce experimental runners."
+}
