@@ -50,20 +50,35 @@ def test_rehearse_release_sign_lists_missing_gates(tmp_path: Path) -> None:
 
 
 def test_rehearse_release_sign_rejects_unsafe_key_dir(tmp_path: Path) -> None:
+    # pytest's tmp_path is often under /tmp on Linux CI, which is an *allowed*
+    # KEY_DIR. Force a path outside /tmp and outside evidence/local/.
+    unsafe = tmp_path / "outside" / "unsafe-keys"
+    # Walk up until we leave /tmp if needed.
+    candidate = Path("/var/empty/arena-rehearse-unsafe-keys")
+    if candidate.exists() or candidate.parent.exists():
+        unsafe_keys = candidate
+    else:
+        unsafe_keys = Path.home() / ".cache" / "arena-rehearse-unsafe-keys-test"
+    unsafe_keys.mkdir(parents=True, exist_ok=True)
     env = {
         **os.environ,
-        "KEY_DIR": str(tmp_path / "unsafe-keys"),
+        "KEY_DIR": str(unsafe_keys),
         "EVIDENCE_DIR": str(tmp_path / "evidence"),
     }
     (tmp_path / "evidence").mkdir()
-    (tmp_path / "unsafe-keys").mkdir()
-    proc = subprocess.run(
-        ["bash", str(SCRIPT)],
-        cwd=REPO,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        proc = subprocess.run(
+            ["bash", str(SCRIPT)],
+            cwd=REPO,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    finally:
+        try:
+            unsafe_keys.rmdir()
+        except OSError:
+            pass
     assert proc.returncode == 1, proc.stdout + proc.stderr
     assert "KEY_DIR must be under /tmp" in (proc.stdout + proc.stderr)
