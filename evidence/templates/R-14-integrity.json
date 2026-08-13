@@ -11,5 +11,5 @@
     "command": "arena release verify evidence/release-index.json --signature evidence/release-index.sig.json --key arena-release.pub --at-release",
     "result": "pass"
   },
-  "notes": "Assemble+sign only after every other gate file exists. Skeleton \u2260 signed index."
+  "notes": "Assemble+sign only after every other gate file exists. Use scripts/rehearse_release_sign.sh for ephemeral-key rehearsal; it refuses missing/template gates. Skeleton \u2260 signed index."
 }

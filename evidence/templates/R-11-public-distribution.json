@@ -17,5 +17,5 @@
     "wheel_digest": "sha256:REPLACE",
     "sdist_digest": "sha256:REPLACE"
   },
-  "notes": "Never invent this from a local wheel install alone."
+  "notes": "Never invent this from a local wheel install or scripts/pypi_dry_run.sh alone. Dry-run (build + twine) is R-11 rehearsal only until TestPyPI/PyPI Trusted Publishing + clean install evidence exists."
 }

@@ -12,5 +12,5 @@
     "sha256sums": "dist/SHA256SUMS"
   },
   "provenance_attestation": "github-attestations/REPLACE",
-  "notes": "Local script inventory is not a substitute for release-workflow attestations."
+  "notes": "Local bandit/secret-scan/pip-audit rehearsal under evidence/local/ is not a substitute for release-candidate SBOM, GitHub attestations, and exact-commit artifacts."
 }

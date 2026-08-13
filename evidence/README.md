@@ -36,4 +36,15 @@ See [docs/releasing.md](../docs/releasing.md) and
 
 Starter JSON shapes live in [`templates/`](templates/). Copy, fill with real
 results, then `--attach` them. Simulation / loopback-only reports are rejected
-for the external floor gates.
+for the external floor gates. Leave every `REPLACE_*` field unsubstituted until
+the measurement exists — `scripts/rehearse_release_sign.sh` treats placeholders
+as blockers, not passes.
+
+## Signing rehearsal
+
+```bash
+bash scripts/rehearse_release_sign.sh
+```
+
+Fails loudly listing missing gates until all fourteen filled evidence files exist.
+Ephemeral keys stay under `/tmp` or gitignored `evidence/local/` only.

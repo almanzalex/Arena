@@ -9,5 +9,5 @@
   ],
   "support_matrix_release": "REPLACE",
   "readme_version_snippet": "pass",
-  "notes": "Re-run on the final tag; collector local truth is partial."
+  "notes": "Re-run python scripts/check_release_truth.py on the final tag and attach here; collector local truth is partial until that tag binding."
 }
