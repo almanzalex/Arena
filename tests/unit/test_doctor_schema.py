@@ -71,6 +71,10 @@ def test_doctor_human_output_separates_preview_and_stable() -> None:
     assert "Platform:" in text
     assert "how to qualify:" in text
     assert "Doctor never authenticates." in text
+    assert "local evidence on disk:" in text
+    assert PREVIEW_EVIDENCE["openenv"] in text
+    assert PREVIEW_EVIDENCE["gimitest"] in text
+    assert "none-attached" in text  # HF (and other credentialed previews)
 
 
 def test_doctor_cli_json_preserves_schema(capsys) -> None:

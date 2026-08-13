@@ -97,7 +97,7 @@ GATE_SPECS: tuple[dict[str, Any], ...] = (
             "Attach non-no-op qualification from a genuinely separate interpreter, "
             "repeated on claimed-platform release CI. "
             "Example: --attach R-06=docs/qualifications/gimitest/"
-            "R-06-gimitest-isolated.json"
+            "R-06-gimitest.json"
         ),
     },
     {

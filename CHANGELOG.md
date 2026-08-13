@@ -3,6 +3,11 @@
 
 ## Unreleased
 
+- Align the shipped product surface with on-disk OpenEnv/Gimitest qualification
+  evidence: teach `arena doctor` to surface those paths, refresh the README
+  capability table + “What Arena is today”, and make
+  `docs/qualifications/README.md` a one-screen status/run index. HF remains
+  `none-attached` until a credentialed live round-trip exists.
 - Point support-matrix `evidence` for OpenEnv/Gimitest at on-disk R-05/R-06
   qualification JSON while status stays `preview`; add CI `workflow_dispatch`
   so tip evidence can be re-run without a push thrash; refresh the
