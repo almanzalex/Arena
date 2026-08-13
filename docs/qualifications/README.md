@@ -30,7 +30,7 @@ preview.
    |---|---|
    | Hugging Face live round-trip | `docs/qualifications/hf/live-qualification.json` |
    | Separately deployed OpenEnv | `docs/qualifications/openenv/R-05-openenv-separate-service.json` |
-   | Isolated-interpreter Gimitest | `docs/qualifications/gimitest/R-06-gimitest-isolated.json` |
+   | Isolated-interpreter Gimitest | `docs/qualifications/gimitest/R-06-gimitest.json` |
    | OCI / W&B / MLflow (optional) | `docs/qualifications/<backend>/live-qualification.json` |
 
 4. **Attach into the R-gate skeleton** (does not mutate the support matrix):
@@ -39,7 +39,7 @@ preview.
    python scripts/collect_release_evidence.py \
      --attach R-04=docs/qualifications/hf/live-qualification.json \
      --attach R-05=docs/qualifications/openenv/R-05-openenv-separate-service.json \
-     --attach R-06=docs/qualifications/gimitest/R-06-gimitest-isolated.json
+     --attach R-06=docs/qualifications/gimitest/R-06-gimitest.json
    ```
 
    Sibling stream READMEs may live under `docs/qualifications/openenv/` and
@@ -49,7 +49,9 @@ preview.
 5. **Support-matrix updates.** Only stream D proposes flipping
    `evidence: none-attached` → a concrete evidence pointer / `stable` after the
    qualification JSON is reviewed and bound into the release evidence index.
-   Other streams open PRs that add the JSON + docs only.
+   Other streams open PRs that add the JSON + docs only. Pointing `evidence`
+   at a real file while `status` stays `preview` is allowed (local proof on
+   disk; not yet a release-stable claim).
 
 ## Schema expectations
 
@@ -63,6 +65,12 @@ preview.
 
 ## Current status
 
-Until files exist in this directory, `arena doctor` correctly reports preview
-capabilities as locally ready (deps) but **not** release-stable. That is
-intentional.
+| Capability | Matrix status | On-disk evidence |
+|---|---|---|
+| OpenEnv | preview | `openenv/R-05-openenv-separate-service.json` (separate-service, `ok: true`) |
+| Gimitest | preview | `gimitest/R-06-gimitest.json` (isolated worker, `stable_claim: false`) |
+| Hugging Face | preview | no `hf/live-qualification.json` — needs `HF_TOKEN` + live round-trip |
+| OCI / W&B / MLflow | preview | no live reports yet |
+
+`arena doctor` may report preview caps as locally usable when deps are present;
+that is not a `v1.0.0` stable claim. HF remains the non-waivable live-store floor.

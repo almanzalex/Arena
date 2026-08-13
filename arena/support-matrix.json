@@ -52,8 +52,8 @@
       "executables": [],
       "install": "python -m pip install 'arena[openenv]==1.0.0rc1'",
       "credentials": false,
-      "evidence": "none-attached",
-      "stable_requires": "Fresh qualification against a separately deployed/operated OpenEnv service; local loopback alone is not a 1.0 stable claim.",
+      "evidence": "docs/qualifications/openenv/R-05-openenv-separate-service.json",
+      "stable_requires": "Fresh qualification against a separately deployed/operated OpenEnv service bound into the release evidence index on the exact release commit; local loopback alone is not a 1.0 stable claim.",
       "qualify": "arena adapter qualify <openenv-task.yaml> --peer <native-peer.yaml> --trace-suite <suite.yaml> --out openenv-qualification.json"
     },
     "openspiel": {
@@ -78,7 +78,7 @@
       "isolated_distributions": ["arena", "gimitest", "torch", "pettingzoo", "pillow"],
       "install": "python -m venv .venv-gimitest && .venv-gimitest/bin/python -m pip install 'arena[torch,pettingzoo,gimitest]==1.0.0rc1' && .venv-gimitest/bin/python -m pip install --no-deps gimitest==1.0",
       "credentials": false,
-      "evidence": "none-attached",
+      "evidence": "docs/qualifications/gimitest/R-06-gimitest.json",
       "stable_requires": "Non-no-op qualification from a genuinely separate interpreter, repeated in claimed-platform release CI and bound to the release evidence index.",
       "qualify": "export ARENA_GIMITEST_PYTHON=<isolated-python> && arena adapter qualify examples/eval/robustness.yaml --out gimitest-qualification.json"
     },
