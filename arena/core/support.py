@@ -340,6 +340,7 @@ def doctor_report(capability: str | None = None) -> dict[str, Any]:
         "preview_missing_for_stable": [
             {
                 "name": item["name"],
+                "evidence": item.get("evidence"),
                 "stable_requires": item.get("stable_requires"),
                 "qualify": item.get("qualify"),
                 "missing": item.get("missing") or [],
@@ -402,6 +403,9 @@ def format_doctor_human(report: dict[str, Any]) -> str:
             if item.get("extra"):
                 state = "installed" if item.get("extra_installed") else "incomplete"
                 bits.append(f"extra[{item['extra']}]={state}")
+            evidence = item.get("evidence")
+            if evidence and evidence != "none-attached":
+                bits.append(f"local evidence={evidence}")
             lines.append(f"  ~ {name}  ({'; '.join(bits)})")
     else:
         lines.append("  (none in this report)")
@@ -434,6 +438,14 @@ def format_doctor_human(report: dict[str, Any]) -> str:
                 lines.append(
                     "    local deps: ready (still preview until release evidence)"
                 )
+            evidence = gap.get("evidence")
+            if evidence and evidence != "none-attached":
+                lines.append(
+                    f"    local evidence on disk: {evidence} "
+                    "(preview until release-CI bind)"
+                )
+            elif evidence == "none-attached":
+                lines.append("    local evidence on disk: none-attached")
             if gap.get("stable_requires"):
                 lines.append(f"    stable requires: {gap['stable_requires']}")
             if gap.get("qualify"):

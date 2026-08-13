@@ -26,7 +26,7 @@ python scripts/collect_release_evidence.py \
   --attach R-01=/path/to/ci-summary.json \
   --attach R-04=docs/qualifications/hf-live.json \
   --attach R-05=docs/qualifications/openenv/R-05-openenv-separate-service.json \
-  --attach R-06=docs/qualifications/gimitest/R-06-gimitest-isolated.json
+  --attach R-06=docs/qualifications/gimitest/R-06-gimitest.json
 ```
 
 See [docs/releasing.md](../docs/releasing.md) and

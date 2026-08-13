@@ -15,9 +15,17 @@ environment servers, or artifact hosts.
 That is useful inside one lab (train → eval → claim on a clean machine) and when
 sharing artifacts with another party.
 
-Current distribution: **Arena 1.0.0rc1**. The final `v1.0.0` tag stays blocked until
-the release-commit evidence gates in [docs/1.0-readiness.md](docs/1.0-readiness.md)
-are attached to that exact commit.
+### What Arena is today
+
+Current distribution: **Arena 1.0.0rc1** (release candidate — not PyPI `1.0.0` final).
+On claimed platforms (Linux x86_64, macOS arm64; Python 3.12–3.13), the stable
+surface is core identity/inspect, native runtime, `file://`, quickstart handoff,
+and frozen OpenSpiel cases. OpenEnv and Gimitest ship as **preview** with local
+separate-service / isolated-interpreter qualification JSON on disk; they stay
+preview until that evidence is bound in claimed-platform release CI. Hugging
+Face, OCI, W&B, and MLflow stay preview until live credentialed qualifications
+exist (`?simulate=` never counts). Final `v1.0.0` is blocked on the gates in
+[docs/1.0-readiness.md](docs/1.0-readiness.md).
 
 ---
 
