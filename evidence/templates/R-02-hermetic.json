@@ -15,5 +15,5 @@
     "docker_network_none": "pass",
     "composed_journey": "pass"
   },
-  "notes": "Must use the exact release wheel/sdist, not an editable checkout."
+  "notes": "Must use the exact release wheel/sdist, not an editable checkout. Local hermetic-capable inventory or a developer pytest -m slow run is rehearsal only until bound to the release-commit wheel."
 }

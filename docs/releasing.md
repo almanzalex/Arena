@@ -164,3 +164,26 @@ and never reads publish credentials. The manual GitHub Actions workflow
 steps—registration fields, environments, and what a future upload job would
 need—are documented in [pypi-trusted-publishing.md](pypi-trusted-publishing.md).
 Do not add API tokens for the dry-run path.
+
+## R-14 signing rehearsal (ephemeral keys)
+
+Before every gate file exists, rehearse the assemble → sign → verify path without
+inventing passes:
+
+```bash
+bash scripts/rehearse_release_sign.sh
+```
+
+By default the script:
+
+- writes ephemeral Ed25519 keys only under `/tmp` (or gitignored
+  `evidence/local/` if you set `KEY_DIR`);
+- inventories `evidence/R-01-…R-14-*.json`;
+- **fails loudly** listing every missing, template/`REPLACE_*`, or non-`pass`
+  gate instead of fabricating assemble inputs;
+- only when all fourteen real gate files are ready, runs `arena release assemble`,
+  `sign`, and `verify` against artifacts under `dist/` (from the PyPI dry-run).
+
+Do not commit rehearsal private keys or a self-bound `arena.release-evidence/v1`
+index from a half-filled tree. The collector skeleton remains
+`arena.release-evidence-skeleton/v1` and is not a substitute for this path.
