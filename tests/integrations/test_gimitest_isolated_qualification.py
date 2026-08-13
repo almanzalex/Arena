@@ -27,8 +27,8 @@ def test_gimitest_doctor_locally_unqualified_without_env(monkeypatch) -> None:
 def test_gimitest_doctor_ready_with_configured_worker(monkeypatch) -> None:
     """Same-machine proof: pointing the env at a ready interpreter qualifies locally.
 
-    This does not claim release-stable. Matrix evidence remains none-attached until
-    CI binds a genuine separate-interpreter R-06 report.
+    This does not claim release-stable. Matrix may point at local R-06 JSON while
+    status stays preview until claimed-platform release CI repeats the proof.
     """
     # Use abspath, not resolve(): resolve() follows the venv symlink to the base
     # interpreter and falsely reports the worker as missing packages.
@@ -38,7 +38,7 @@ def test_gimitest_doctor_ready_with_configured_worker(monkeypatch) -> None:
     assert report["local_status"] == "ready"
     assert report["usable_today"] == "preview"
     assert report["release_status"] == "preview"
-    assert report["evidence"] == "none-attached"
+    assert report["evidence"] == "docs/qualifications/gimitest/R-06-gimitest.json"
     full = doctor_report("gimitest")
     assert full["ok"] is True
     assert "gimitest" not in full["summary"]["locally_unqualified"]
