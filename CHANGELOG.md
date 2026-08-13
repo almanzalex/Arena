@@ -3,6 +3,10 @@
 
 ## Unreleased
 
+- Point support-matrix `evidence` for OpenEnv/Gimitest at on-disk R-05/R-06
+  qualification JSON while status stays `preview`; add CI `workflow_dispatch`
+  so tip evidence can be re-run without a push thrash; refresh the
+  qualifications drop-zone status table (HF still blocked on credentials).
 - Add a manual `workflow_dispatch` GitHub Action for Hugging Face R-04 live
   store qualification (`scripts/qualify_hf_live.py`) that fail-closes when
   `secrets.HF_TOKEN` is missing and uploads the qualification artifact; document

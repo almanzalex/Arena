@@ -85,9 +85,9 @@ Support truth (what is stable vs preview) lives in
 |---|---|---|
 | Core identity/inspect, native runtime, `file://`, quickstart | stable | Claimed-platform release CI |
 | OpenSpiel frozen qualified cases | stable | Claimed-platform release CI |
-| OpenEnv | preview → target stable | Fresh separate-service qualification |
-| Gimitest | preview → target stable | Non-no-op isolated-interpreter qualification |
-| Hugging Face | preview → required stable | Fresh credentialed immutable-revision round trip |
+| OpenEnv | preview → target stable | Separate-service evidence on disk; bind into release index on the release commit |
+| Gimitest | preview → target stable | Isolated-interpreter evidence on disk; repeat in release CI and bind |
+| Hugging Face | preview → required stable | Fresh credentialed immutable-revision round trip (`HF_TOKEN`) |
 | OCI, W&B, MLflow | preview | May remain preview; never simulated into a live claim |
 
 ---
