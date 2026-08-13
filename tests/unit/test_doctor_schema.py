@@ -17,9 +17,14 @@ REQUIRED_PREVIEW = ("openenv", "hf", "gimitest")
 
 def test_support_matrix_keeps_required_integrations_preview() -> None:
     matrix = load_support_matrix()
+    expected_evidence = {
+        "openenv": "docs/qualifications/openenv/R-05-openenv-separate-service.json",
+        "gimitest": "docs/qualifications/gimitest/R-06-gimitest.json",
+        "hf": "none-attached",
+    }
     for name in REQUIRED_PREVIEW:
         assert matrix["capabilities"][name]["status"] == "preview"
-        assert matrix["capabilities"][name].get("evidence") == "none-attached"
+        assert matrix["capabilities"][name].get("evidence") == expected_evidence[name]
         assert matrix["capabilities"][name].get("stable_requires")
         assert matrix["capabilities"][name].get("qualify")
 
